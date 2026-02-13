@@ -1,0 +1,202 @@
+[
+  {
+    "function": "8748100672",
+    "samples": 740,
+    "percent": 100.0
+  },
+  {
+    "function": "_main",
+    "samples": 740,
+    "percent": 100.0
+  },
+  {
+    "function": "all",
+    "samples": 740,
+    "percent": 100.0
+  },
+  {
+    "function": "criterion::benchmark_group::BenchmarkGroup<M>::bench_function",
+    "samples": 740,
+    "percent": 100.0
+  },
+  {
+    "function": "criterion::routine::Routine::profile",
+    "samples": 740,
+    "percent": 100.0
+  },
+  {
+    "function": "render::main",
+    "samples": 740,
+    "percent": 100.0
+  },
+  {
+    "function": "std::rt::lang_start::{{closure}}",
+    "samples": 740,
+    "percent": 100.0
+  },
+  {
+    "function": "std::rt::lang_start_internal",
+    "samples": 740,
+    "percent": 100.0
+  },
+  {
+    "function": "std::sys::backtrace::__rust_begin_short_backtrace",
+    "samples": 740,
+    "percent": 100.0
+  },
+  {
+    "function": "<alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter",
+    "samples": 646,
+    "percent": 87.29729729729729
+  },
+  {
+    "function": "criterion::bencher::Bencher<M>::iter",
+    "samples": 646,
+    "percent": 87.29729729729729
+  },
+  {
+    "function": "nereid::layout::flowchart::layout_flowchart",
+    "samples": 340,
+    "percent": 45.94594594594595
+  },
+  {
+    "function": "nereid::render::flowchart::render_flowchart_unicode",
+    "samples": 297,
+    "percent": 40.13513513513514
+  },
+  {
+    "function": "nereid::layout::flowchart::route_flowchart_edges_orthogonal",
+    "samples": 129,
+    "percent": 17.43243243243243
+  },
+  {
+    "function": "<criterion::routine::Function<M,F,T> as criterion::routine::Routine<M,T>>::warm_up",
+    "samples": 94,
+    "percent": 12.702702702702704
+  },
+  {
+    "function": "nereid::render::text::canvas_to_string_trimmed",
+    "samples": 84,
+    "percent": 11.351351351351353
+  },
+  {
+    "function": "alloc::collections::btree::map::BTreeMap<K,V,A>::insert",
+    "samples": 69,
+    "percent": 9.324324324324325
+  },
+  {
+    "function": "core::slice::sort::shared::smallsort::insertion_sort_shift_left",
+    "samples": 49,
+    "percent": 6.621621621621622
+  },
+  {
+    "function": "<alloc::string::String as core::clone::Clone>::clone",
+    "samples": 39,
+    "percent": 5.27027027027027
+  },
+  {
+    "function": "alloc::slice::<impl [T]>::sort_by::{{closure}}",
+    "samples": 26,
+    "percent": 3.5135135135135136
+  },
+  {
+    "function": "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",
+    "samples": 19,
+    "percent": 2.5675675675675675
+  },
+  {
+    "function": "nereid::render::flowchart::node_renders",
+    "samples": 12,
+    "percent": 1.6216216216216217
+  },
+  {
+    "function": "alloc::raw_vec::RawVec<T,A>::grow_one",
+    "samples": 11,
+    "percent": 1.4864864864864866
+  },
+  {
+    "function": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+    "samples": 10,
+    "percent": 1.3513513513513513
+  },
+  {
+    "function": "core::ptr::drop_in_place<nereid::layout::flowchart::FlowchartLayout>",
+    "samples": 9,
+    "percent": 1.2162162162162162
+  },
+  {
+    "function": "alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle",
+    "samples": 8,
+    "percent": 1.0810810810810811
+  },
+  {
+    "function": "<core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::try_fold",
+    "samples": 7,
+    "percent": 0.945945945945946
+  },
+  {
+    "function": "nereid::render::flowchart::layer_metrics",
+    "samples": 7,
+    "percent": 0.945945945945946
+  },
+  {
+    "function": "alloc::collections::btree::map::IntoIter<K,V,A>::dying_next",
+    "samples": 4,
+    "percent": 0.5405405405405406
+  },
+  {
+    "function": "alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut,K,V,alloc::collections::btree::node::marker::Leaf>,alloc::collections::btree::node::marker::Edge>::insert_recursing",
+    "samples": 4,
+    "percent": 0.5405405405405406
+  },
+  {
+    "function": "<alloc::collections::btree::set::BTreeSet<T> as core::iter::traits::collect::FromIterator<T>>::from_iter",
+    "samples": 3,
+    "percent": 0.40540540540540543
+  },
+  {
+    "function": "alloc::collections::btree::map::BTreeMap<K,V,A>::remove",
+    "samples": 3,
+    "percent": 0.40540540540540543
+  },
+  {
+    "function": "alloc::collections::btree::append::<impl alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Owned,K,V,alloc::collections::btree::node::marker::LeafOrInternal>>::bulk_push",
+    "samples": 2,
+    "percent": 0.2702702702702703
+  },
+  {
+    "function": "alloc::collections::btree::remove::<impl alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut,K,V,alloc::collections::btree::node::marker::LeafOrInternal>,alloc::collections::btree::node::marker::KV>>::remove_kv_tracking",
+    "samples": 2,
+    "percent": 0.2702702702702703
+  },
+  {
+    "function": "<alloc::collections::btree::map::BTreeMap<K,V> as core::iter::traits::collect::FromIterator<(K,V)>>::from_iter",
+    "samples": 1,
+    "percent": 0.13513513513513514
+  },
+  {
+    "function": "alloc::collections::btree::remove::<impl alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut,K,V,alloc::collections::btree::node::marker::Leaf>,alloc::collections::btree::node::marker::KV>>::remove_leaf_kv",
+    "samples": 1,
+    "percent": 0.13513513513513514
+  },
+  {
+    "function": "core::slice::sort::stable::drift::sort",
+    "samples": 1,
+    "percent": 0.13513513513513514
+  },
+  {
+    "function": "core::slice::sort::stable::driftsort_main",
+    "samples": 1,
+    "percent": 0.13513513513513514
+  },
+  {
+    "function": "nereid::render::Canvas::draw_box",
+    "samples": 1,
+    "percent": 0.13513513513513514
+  },
+  {
+    "function": "nereid::render::Canvas::new_filled",
+    "samples": 1,
+    "percent": 0.13513513513513514
+  }
+]

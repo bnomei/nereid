@@ -1,0 +1,422 @@
+# Tasks — 12-mcp
+
+Meta:
+- Spec: 12-mcp — MCP server + tool surface
+- Depends on: spec:02-dependencies/T005
+- Global scope:
+  - src/mcp/
+
+## In Progress
+
+- (none)
+
+## Blocked
+
+## Todo
+
+- (none)
+
+## Done
+
+- [x] T023: Add `diagram.get_slice` tool (owner: mayor) (scope: src/mcp/) (depends: T015,T017,T018–T022)
+  - Started_at: 2026-02-07T21:01:00+00:00
+  - Context: Provide a small subgraph/slice around a center object for probe→refine workflows.
+  - DoD: Minimal deterministic slice returning `ObjectRef` sets for objects/edges around a center with a small radius; strict error mapping; update `ServerInfo.instructions`; unit tests.
+  - Validation: `cargo test --offline`
+  - Escalate if: this requires changes outside `src/mcp/`; keep it isolated.
+  - Completed_at: 2026-02-07T21:13:05+00:00
+  - Completion note: Added `diagram.get_slice` tool returning deterministic `ObjectRef` sets (`objects` + `edges`) around a `center_ref` with optional `radius`, supporting both sequence and flowchart diagrams, with strict `INVALID_PARAMS` mapping for bad params and `RESOURCE_NOT_FOUND` for missing center objects; updated `ServerInfo.instructions`; added unit tests for flow/seq slices and error cases.
+  - Validation result: `cargo test --offline` (ok, 182 tests)
+
+- [x] T019: Add `seq.search` tool (owner: mayor) (scope: src/mcp/) (depends: T001,spec:08-query-engine/T001)
+  - Started_at: 2026-02-07T20:55:00+00:00
+  - Context: Expose deterministic sequence message text search as a typed MCP tool.
+  - DoD: `seq.search({ diagram_id?, needle }) -> { messages[] }` (message refs ordered deterministically); strict error mapping; update `ServerInfo.instructions`; unit tests.
+  - Validation: `cargo test --offline`
+  - Escalate if: this requires changes outside `src/mcp/`; keep it isolated.
+  - Completed_at: 2026-02-07T21:00:24+00:00
+  - Completion note: Added MCP tool `seq.search` backed by `crate::query::sequence::message_search`, returning canonical `seq/message` refs in deterministic order with strict `INVALID_PARAMS` mapping for invalid diagram ids, non-sequence targets, and empty needles; updated `ServerInfo.instructions`; added unit tests for deterministic hits, empty results, and error mapping.
+  - Validation result: `cargo test --offline` (ok, 176 tests)
+
+- [x] T022: Add `flow.cycles` + `flow.dead_ends` tools (owner: mayor) (scope: src/mcp/) (depends: T001,spec:08-query-engine/T002)
+  - Started_at: 2026-02-07T20:41:45+00:00
+  - Context (worker-facing; do not read `docs/protocol-01.md`):
+    - Expose flow cycle detection + dead-end discovery as typed MCP tools so clients can reason about flowchart structure without full snapshots.
+  - DoD:
+    - Add MCP tool `flow.cycles({ diagram_id? }) -> { cycles[] }`.
+      - `cycles[]` is a list of cycles; each cycle is a list of canonical `ObjectRef` strings for `flow/node` objects.
+    - Add MCP tool `flow.dead_ends({ diagram_id? }) -> { nodes[] }` where `nodes[]` are canonical `ObjectRef` strings for `flow/node` objects.
+    - Errors:
+      - `INVALID_PARAMS` on invalid `diagram_id`.
+      - `INVALID_PARAMS` if the target diagram is not a flowchart.
+    - Determinism: response ordering is deterministic across runs for the same AST/params.
+    - Update `ServerInfo.instructions` tool list to include `flow.cycles` and `flow.dead_ends`.
+    - Unit tests cover:
+      - `flow.cycles` returns expected cycles (including self-loop vs multi-node SCC)
+      - `flow.dead_ends` returns expected terminal nodes
+      - invalid diagram id / non-flowchart diagram kind errors
+  - Validation: `cargo test --offline`
+  - Escalate if: this requires changes outside `src/mcp/`; keep it isolated.
+  - Completed_at: 2026-02-07T20:54:47+00:00
+  - Completion note: Added MCP tools `flow.cycles` and `flow.dead_ends` backed by `crate::query::flow::{cycles,dead_ends}` returning canonical `flow/node` refs with deterministic ordering, with strict `INVALID_PARAMS` mapping for invalid diagram ids and non-flowchart targets, updated `ServerInfo.instructions`, and unit tests covering multi-node cycles, self-loops, dead ends, and error mapping.
+  - Validation result: `cargo test --offline` (ok, 171 tests)
+
+- [x] T021: Add `flow.paths` tool (owner: worker:019c39cd-bd33-7551-8190-fe0713d5a26c) (scope: src/mcp/) (depends: T001,spec:08-query-engine/T002)
+  - Started_at: 2026-02-07T20:30:29+00:00
+  - Context (worker-facing; do not read `docs/protocol-01.md`):
+    - Expose bounded path-finding between two flow nodes as a typed MCP tool, backed by the query engine.
+  - DoD:
+    - Add MCP tool `flow.paths({ diagram_id?, from_node_id, to_node_id, limit?, max_extra_hops? }) -> { paths[] }`.
+      - `paths[]` is a list of paths; each path is a list of canonical `ObjectRef` strings for `flow/node` objects in order from start to end.
+      - Defaults: `limit=10`, `max_extra_hops=0`.
+    - Errors:
+      - `INVALID_PARAMS` on invalid ids/params.
+      - `INVALID_PARAMS` if the target diagram is not a flowchart.
+      - `RESOURCE_NOT_FOUND` if `from_node_id` or `to_node_id` are missing.
+    - Determinism: results are deterministic across runs for the same AST/params.
+    - Update `ServerInfo.instructions` tool list to include `flow.paths`.
+    - Unit tests cover:
+      - happy path with multiple paths (order is deterministic)
+      - empty result when no path exists
+      - invalid node id (INVALID_PARAMS)
+      - missing node id (RESOURCE_NOT_FOUND)
+  - Validation: `cargo test --offline`
+  - Escalate if: this requires changes outside `src/mcp/`; keep it isolated.
+  - Completed_at: 2026-02-07T20:40:18+00:00
+  - Completion note: Added MCP tool `flow.paths` backed by `crate::query::flow::paths` returning deterministic bounded node-ref paths, with strict `INVALID_PARAMS` mapping for invalid ids/params and non-flowchart targets, `RESOURCE_NOT_FOUND` for missing endpoints, updated `ServerInfo.instructions`, and unit tests for multiple/no paths plus invalid/missing cases.
+  - Validation result: `cargo test --offline` (ok, 167 tests)
+
+- [x] T020: Add `flow.reachable` tool (owner: worker:019c39c2-9423-70c1-a281-fb3e37f1c4c0) (scope: src/mcp/) (depends: T001,spec:08-query-engine/T002)
+  - Started_at: 2026-02-07T20:19:49+00:00
+  - Context (worker-facing; do not read `docs/protocol-01.md`):
+    - Expose flow reachability as a typed MCP tool so clients can quickly compute local graph context without downloading full snapshots.
+  - DoD:
+    - Add MCP tool `flow.reachable({ diagram_id?, from_node_id, direction? }) -> { nodes[] }`.
+      - `nodes[]` are canonical `ObjectRef` strings for `flow/node` objects in the target diagram.
+      - `direction`: `out` | `in` | `both` (default: `out`).
+        - `out`: nodes reachable following edge directions.
+        - `in`: nodes that can reach `from_node_id` (reverse edges).
+        - `both`: union of `in` and `out`.
+      - Include the start node in the result set when it exists.
+    - Errors:
+      - `INVALID_PARAMS` on invalid ids/direction.
+      - `INVALID_PARAMS` if the target diagram is not a flowchart.
+    - Determinism: response nodes are returned sorted lexicographically by their `ObjectRef` string.
+    - Update `ServerInfo.instructions` tool list to include `flow.reachable`.
+    - Unit tests cover:
+      - `out` returns reachable nodes
+      - `in` returns inbound-reachable nodes
+      - `both` unions
+      - invalid `direction`
+  - Validation: `cargo test --offline`
+  - Escalate if: this requires changes outside `src/mcp/`; keep it isolated.
+  - Completed_at: 2026-02-07T20:29:16+00:00
+  - Completion note: Added MCP tool `flow.reachable` returning lexicographically-sorted `flow/node` `ObjectRef` strings for `out|in|both` reachability, with strict invalid id/direction and non-flowchart `INVALID_PARAMS` mapping; updated `ServerInfo.instructions` and added unit tests for out/in/both + invalid direction.
+  - Validation result: `cargo test --offline` (ok, 163 tests)
+
+- [x] T018: Add `seq.trace` tool (owner: worker:019c39b6-ecba-7ca1-a899-44a5770403a4) (scope: src/mcp/) (depends: T001,spec:08-query-engine/T001)
+  - Started_at: 2026-02-07T20:07:05+00:00
+  - Context (worker-facing; do not read `docs/protocol-01.md`):
+    - Add a typed “trace” tool for sequence diagrams so clients can fetch a small window of message refs without pulling full snapshots.
+    - Use existing deterministic ordering from the query engine.
+  - DoD:
+    - Add MCP tool `seq.trace({ diagram_id?, from_message_id?, direction, limit? }) -> { messages[] }`.
+      - `messages[]` are canonical `ObjectRef` strings for `seq/message` objects in the target diagram.
+      - `direction`: `before` | `after` (default: `after`).
+      - `limit` default: 25.
+      - If `from_message_id` is omitted:
+        - `after`: return the first `limit` messages in order.
+        - `before`: return the last `limit` messages in order.
+    - Errors:
+      - `INVALID_PARAMS` on invalid `diagram_id`/ids/direction.
+      - `INVALID_PARAMS` if the target diagram is not a sequence diagram.
+      - `RESOURCE_NOT_FOUND` if `from_message_id` is provided but missing.
+    - Determinism: messages are returned in chronological order (stable tie-breaker by message id).
+    - Update `ServerInfo.instructions` tool list to include `seq.trace`.
+    - Unit tests cover:
+      - `after` trace from a message id
+      - `before` trace from a message id
+      - `from_message_id` omitted behavior (first/last)
+      - invalid `direction`
+      - missing `from_message_id`
+  - Validation: `cargo test --offline`
+  - Escalate if: this requires changes outside `src/mcp/`; keep it isolated.
+  - Completed_at: 2026-02-07T20:18:26+00:00
+  - Completion note: Implemented MCP tool `seq.trace` with typed params/response to return canonical `ObjectRef` strings for `seq/message` objects in deterministic chronological order, supporting `before|after` directions, optional `from_message_id` first/last behavior, and strict `INVALID_PARAMS`/`RESOURCE_NOT_FOUND` mappings; updated `ServerInfo.instructions` and added unit tests for required cases.
+  - Validation result: `cargo test --offline` (ok, 159 tests)
+
+- [x] T017: Add `xref.neighbors` tool (owner: worker:019c3986-b5f5-7032-bd62-be8f3aaf649b) (scope: src/mcp/) (depends: T004)
+  - Started_at: 2026-02-07T19:14:22+00:00
+  - Context (worker-facing; do not read `docs/protocol-01.md`):
+    - Provide a convenience tool to ask “what objects are xref-connected to this object?” without downloading the full xref list.
+  - DoD:
+    - Add MCP tool `xref.neighbors({ object_ref, direction? }) -> { neighbors[] }` where `neighbors` are canonical `ObjectRef` strings.
+      - `direction` values: `out`, `in`, `both` (default `both`).
+      - `out`: consider xrefs where `from == object_ref`; return `to`.
+      - `in`: consider xrefs where `to == object_ref`; return `from`.
+      - `both`: union of in+out.
+    - Errors:
+      - `INVALID_PARAMS` on invalid `object_ref` or invalid `direction`.
+    - Determinism: response neighbors are sorted lexicographically.
+    - Update `ServerInfo.instructions` tool list to include `xref.neighbors`.
+    - Unit tests cover: out/in/both behavior + invalid direction.
+  - Validation: `cargo test --offline`
+  - Escalate if: this requires changes outside `src/mcp/`; keep it isolated.
+  - Completed_at: 2026-02-07T19:23:06+00:00
+  - Completion note: Implemented MCP tool `xref.neighbors` to return the lexicographically-sorted union of inbound/outbound xref neighbor `ObjectRef` strings (configurable via `direction`), added DTOs, updated `ServerInfo.instructions`, and added unit tests for out/in/both(default) plus invalid direction error mapping.
+  - Validation result: `cargo test --offline` (ok, 154 tests)
+
+- [x] T016: Add active walkthrough session tools (owner: worker:019c3980-a162-7be1-b414-8d2c974eb964) (scope: src/mcp/) (depends: T008,T009)
+  - Started_at: 2026-02-07T19:07:45+00:00
+  - Context (worker-facing; do not read `docs/protocol-01.md`):
+    - The model already tracks `Session.active_walkthrough_id`; expose it over MCP to support resumable navigation and client-side defaults.
+  - DoD:
+    - Add MCP tool `session.get_active_walkthrough() -> { active_walkthrough_id? }`.
+    - Add MCP tool `session.set_active_walkthrough({ walkthrough_id }) -> { active_walkthrough_id }` (reject invalid/missing ids).
+    - Errors for `set_active_walkthrough`:
+      - `INVALID_PARAMS` on invalid `walkthrough_id`.
+      - `RESOURCE_NOT_FOUND` if walkthrough missing.
+    - Update `ServerInfo.instructions` tool list to include the new tool names.
+    - Unit tests cover get(null), set, get(after set), invalid id, missing id.
+  - Validation: `cargo test --offline`
+  - Escalate if: this requires changes outside `src/mcp/`; keep it isolated.
+  - Completed_at: 2026-02-07T19:13:19+00:00
+  - Completion note: Added MCP session tools `session.get_active_walkthrough` and `session.set_active_walkthrough` (with strict `INVALID_PARAMS`/`RESOURCE_NOT_FOUND` mapping), introduced corresponding DTOs, updated `ServerInfo.instructions`, and added unit tests for unset/set/invalid/missing behavior.
+  - Validation result: `cargo test --offline` (ok, 150 tests)
+
+- [x] T015: Add `diagram.render_ascii` tool (owner: worker:019c3979-d323-78a3-86cf-f9e870a826e4) (scope: src/mcp/) (depends: T001,spec:13-diagram-renderers/T004)
+  - Started_at: 2026-02-07T19:00:19+00:00
+  - Context (worker-facing; do not read `docs/protocol-01.md`):
+    - Add an explicit render tool so MCP clients can fetch deterministic `.ascii.txt` output without going through the store export-on-save.
+  - DoD:
+    - Add MCP tool `diagram.render_ascii({ diagram_id? }) -> { ascii }` using the existing Unicode renderer pipeline.
+    - Target resolution: omit `diagram_id` to use `session.active_diagram_id` (same behavior as other diagram tools).
+    - Errors:
+      - `INVALID_PARAMS` if no active diagram and `diagram_id` omitted.
+      - `RESOURCE_NOT_FOUND` if diagram missing.
+      - `INTERNAL_ERROR` on layout/render failures (include a message).
+    - Update `ServerInfo.instructions` tool list to include `diagram.render_ascii`.
+    - Unit tests cover: happy path render (compare to direct renderer output) + uses active diagram when `diagram_id` omitted.
+  - Validation: `cargo test --offline`
+  - Escalate if: this requires changes outside `src/mcp/`; keep it isolated.
+  - Completed_at: 2026-02-07T19:06:40+00:00
+  - Completion note: Added MCP tool `diagram.render_ascii({ diagram_id? }) -> { ascii }` backed by `render_diagram_unicode`, using active diagram fallback when `diagram_id` is omitted and mapping errors to `INVALID_PARAMS`/`RESOURCE_NOT_FOUND`/`INTERNAL_ERROR`; added DTO, updated `ServerInfo.instructions`, and added unit tests for renderer parity and active-diagram behavior.
+  - Validation result: `cargo test --offline` (ok, 146 tests)
+
+- [x] T014: Add `session.get_active_diagram` tool (owner: worker:019c3973-edec-78c1-aa7a-943ce5540f3f) (scope: src/mcp/) (depends: T010)
+  - Started_at: 2026-02-07T18:53:53+00:00
+  - Context (worker-facing; do not read `docs/protocol-01.md`):
+    - Clients can already set the active diagram; add a companion read tool so they can discover the current active diagram id (or null).
+  - DoD:
+    - Add MCP tool `session.get_active_diagram() -> { active_diagram_id? }`.
+    - Update `ServerInfo.instructions` tool list to include `session.get_active_diagram`.
+    - Unit tests cover: returns null when unset; returns id when set.
+  - Validation: `cargo test --offline`
+  - Escalate if: this requires changes outside `src/mcp/`; keep it isolated.
+  - Completed_at: 2026-02-07T18:59:06+00:00
+  - Completion note: Implemented MCP tool `session.get_active_diagram` returning `{ active_diagram_id }` with `null` when unset; added DTO, updated `ServerInfo.instructions` tool list, and added unit tests for unset/set behavior.
+  - Validation result: `cargo test --offline` (ok, 144 tests)
+
+- [x] T013: Add `walkthrough.get_node` slice tool (owner: worker:019c396d-1d1e-7263-8706-f8300fd8b35c) (scope: src/mcp/) (depends: T009,T012)
+  - Started_at: 2026-02-07T18:46:24+00:00
+  - Context (worker-facing; do not read `docs/protocol-01.md`):
+    - Provide a small “slice” tool for walkthroughs so clients can fetch a single node without downloading the full walkthrough.
+  - DoD:
+    - Add MCP tool `walkthrough.get_node({ walkthrough_id, node_id }) -> { node }` where node includes `node_id`, `title`, `body_md?`, `refs[]`, `tags[]`, `status?`.
+    - Errors:
+      - `INVALID_PARAMS` on invalid ids (walkthrough_id or node_id).
+      - `RESOURCE_NOT_FOUND` when walkthrough or node missing.
+    - Update `ServerInfo.instructions` tool list to include `walkthrough.get_node`.
+    - Unit tests cover happy path + invalid walkthrough_id + invalid node_id + missing node.
+  - Validation: `cargo test --offline`
+  - Escalate if: this requires changes outside `src/mcp/`; keep it isolated.
+  - Completed_at: 2026-02-07T18:52:44+00:00
+  - Completion note: Added MCP tool `walkthrough.get_node` with request/response DTOs (reusing `McpWalkthroughNode`), strict `INVALID_PARAMS` for invalid `walkthrough_id`/`node_id`, and `RESOURCE_NOT_FOUND` for missing walkthrough/node; updated `ServerInfo.instructions` to list the new tool and added unit tests for happy/invalid/missing cases.
+  - Validation result: `cargo test --offline` (ok, 142 tests)
+
+- [x] T012: Add walkthrough digest + render tools (owner: worker:019c3965-4dfe-7ad3-96d3-e9c1f8842a29) (scope: src/mcp/) (depends: T008,T009,spec:10-walkthroughs/T003)
+  - Started_at: 2026-02-07T18:37:53+00:00
+  - Context (worker-facing; do not read `docs/protocol-01.md`):
+    - Extend the MCP walkthrough surface with small-by-default read tools similar to diagrams.
+    - Implement `walkthrough.get_digest` (rev + counts) and `walkthrough.render_ascii` using the existing walkthrough renderer.
+  - DoD:
+    - Add MCP tool `walkthrough.get_digest({ walkthrough_id }) -> { digest }` with `rev` + `counts{nodes,edges}`.
+    - Add MCP tool `walkthrough.render_ascii({ walkthrough_id }) -> { ascii }` using `render_walkthrough_unicode(...)`.
+    - Errors:
+      - `INVALID_PARAMS` on invalid id(s).
+      - `RESOURCE_NOT_FOUND` on missing walkthrough(s).
+    - Update `ServerInfo.instructions` tool list to include the new tool names.
+    - Unit tests cover happy path + invalid/missing ids for both tools.
+  - Validation: `cargo test --offline`
+  - Escalate if: this requires changes outside `src/mcp/`; keep it isolated.
+  - Completed_at: 2026-02-07T18:44:48+00:00
+  - Completion note: Added MCP tools `walkthrough.get_digest` (rev + node/edge counts) and `walkthrough.render_ascii` (string render via `render_walkthrough_unicode`), with strict `INVALID_PARAMS`/`RESOURCE_NOT_FOUND` error mapping; updated `ServerInfo.instructions` to list the new tools and added unit tests for happy/invalid/missing cases.
+  - Validation result: `cargo test --offline` (ok, 138 tests)
+
+- [x] T011: Update MCP server instructions tool list (owner: mayor) (scope: src/mcp/) (depends: T001,T004–T010)
+  - Started_at: 2026-02-07T18:03:16+00:00
+  - Context: `ServerInfo.instructions` currently lists only the original tool set. Update it to reflect the current tool surface so clients can discover capabilities more easily.
+  - DoD: `get_info()` instructions string includes all current tool names (session/diagram/xref/object/walkthrough tools); `cargo test --offline` remains green.
+  - Validation: `cargo test --offline`
+  - Escalate if: this requires touching code outside `src/mcp/`; keep it isolated.
+  - Completed_at: 2026-02-07T18:07:07+00:00
+  - Completion note: Updated `ServerInfo.instructions` tool list to include the full current surface: `session.list_diagrams`, `session.set_active_diagram`, `session.find_route`, `diagram.get_digest`, `diagram.get_snapshot`, `diagram.get_delta`, `diagram.apply_ops`, `xref.list`, `xref.add`, `xref.remove`, `object.get`, `walkthrough.list`, `walkthrough.get`.
+  - Validation result: `cargo test --offline` (ok, 131 tests)
+
+- [x] T010: Add `session.set_active_diagram` tool (owner: worker:019c393f-14fc-7370-86ce-622734ba462e) (scope: src/mcp/) (depends: T001)
+  - Started_at: 2026-02-07T17:56:09+00:00
+  - Context (worker-facing; do not read `docs/protocol-01.md`):
+    - Allow MCP clients to change the implicit default diagram used when `diagram_id` is omitted in other tools.
+  - DoD:
+    - Add MCP tool `session.set_active_diagram({ diagram_id }) -> { active_diagram_id }`.
+    - Errors:
+      - `INVALID_PARAMS` on invalid `diagram_id`.
+      - `RESOURCE_NOT_FOUND` if the diagram does not exist in the session.
+    - Unit tests cover setting active diagram and subsequent `diagram.get_digest({ diagram_id: null })` using the new active id.
+  - Validation: `cargo test --offline`
+  - Escalate if: this requires changes outside `src/mcp/`; keep it isolated to MCP types + handlers.
+  - Completed_at: 2026-02-07T18:03:16+00:00
+  - Completion note: Added MCP tool `session.set_active_diagram` with typed `DiagramId` parsing, `INVALID_PARAMS`/`RESOURCE_NOT_FOUND` error mapping, and session state update; added unit tests verifying that setting the active diagram affects subsequent calls that omit `diagram_id`.
+  - Validation result: `cargo test --offline` (ok)
+
+- [x] T009: Add `walkthrough.get` tool (owner: worker:019c3935-1686-7982-b31d-f1eccd620d5c) (scope: src/mcp/) (depends: T008)
+  - Started_at: 2026-02-07T17:45:19+00:00
+  - Context (worker-facing; do not read `docs/protocol-01.md`):
+    - After discovery via `walkthrough.list`, agents need a typed way to fetch walkthrough content (nodes/edges + evidence refs).
+  - DoD:
+    - Add MCP tool `walkthrough.get({ walkthrough_id }) -> { walkthrough }` where `walkthrough_id` is a typed `WalkthroughId`.
+    - Response includes: `walkthrough_id`, `title`, `rev`, `nodes[]`, `edges[]`.
+      - Node fields: `node_id`, `title`, `body_md?`, `refs[]` (canonical `ObjectRef` strings), `tags[]`, `status?`.
+      - Edge fields: `from_node_id`, `to_node_id`, `kind`, `label?`.
+    - Errors:
+      - `INVALID_PARAMS` on invalid id.
+      - `RESOURCE_NOT_FOUND` when walkthrough missing.
+    - Unit test covers a round-trip get of a non-trivial walkthrough (nodes+edges+refs).
+  - Validation: `cargo test --offline`
+  - Escalate if: this requires changes outside `src/mcp/`; keep it isolated to MCP types + handlers.
+  - Completed_at: 2026-02-07T17:54:47+00:00
+  - Completion note: Added MCP tool `walkthrough.get` with typed walkthrough/node/edge DTOs including evidence refs and strict error mapping for invalid/missing IDs; added unit tests covering a non-trivial walkthrough round-trip plus invalid/missing id errors.
+  - Validation result: `cargo test --offline` (ok)
+
+- [x] T008: Add `walkthrough.list` tool (owner: worker:019c392e-a533-7140-994b-0d059053b8f0) (scope: src/mcp/) (depends: T001)
+  - Started_at: 2026-02-07T17:38:11+00:00
+  - Context (worker-facing; do not read `docs/protocol-01.md`):
+    - Walkthroughs are first-class artifacts; add a read tool to list them so agents can discover available walkthroughs without loading full content.
+  - DoD:
+    - Add MCP tool `walkthrough.list() -> { walkthroughs: [{walkthrough_id, title, rev, nodes, edges}] }` where `nodes/edges` are counts.
+    - Ordering is deterministic by `walkthrough_id`.
+    - Unit test covers deterministic ordering + counts.
+  - Validation: `cargo test --offline`
+  - Escalate if: this requires changes outside `src/mcp/`; keep it isolated to MCP types + handlers.
+  - Completed_at: 2026-02-07T17:43:53+00:00
+  - Completion note: Added MCP tool `walkthrough.list` returning deterministic `walkthrough_id`-ordered summaries with node/edge counts; added DTOs and a unit test verifying ordering and counts.
+  - Validation result: `cargo test --offline` (ok)
+
+- [x] T007: Add `object.get` tool (owner: worker:019c3922-62e0-7e61-9c4a-33babdf38d66) (scope: src/mcp/) (depends: T001)
+  - Started_at: 2026-02-07T17:24:48+00:00
+  - Context (worker-facing; do not read `docs/protocol-01.md`):
+    - Add a typed “slice” read tool so agents can fetch details for a single canonical `ObjectRef` without pulling full snapshots.
+  - DoD:
+    - Add MCP tool `object.get({ object_ref }) -> { object }` where `object_ref` is canonical (`d:<diagram>/<category>/<id>`).
+    - Response `object` is a tagged union covering at least:
+      - `seq_participant` (mermaid_name, role?)
+      - `seq_message` (from_participant_id, to_participant_id, kind, text, order_key)
+      - `flow_node` (label, shape, mermaid_id?)
+      - `flow_edge` (from_node_id, to_node_id, label?, style?)
+    - Errors:
+      - `INVALID_PARAMS` on invalid `object_ref` string or unsupported category for the diagram kind.
+      - `RESOURCE_NOT_FOUND` when the diagram/object is missing.
+    - Unit tests cover one happy-path per object kind.
+  - Validation: `cargo test --offline`
+  - Escalate if: implementing this requires touching code outside `src/mcp/`; keep it isolated to MCP types + handlers.
+  - Completed_at: 2026-02-07T17:36:30+00:00
+  - Completion note: Added MCP `object.get` tool with a typed tagged-union response for `seq_participant`, `seq_message`, `flow_node`, and `flow_edge` object details, including strict error mapping for invalid refs and missing resources; added unit tests covering happy paths for each kind.
+  - Validation result: `cargo test --offline` (ok)
+
+- [x] T006: Add `session.find_route` tool (owner: worker:019c3918-6a15-7a81-a3af-6a2962bd8631) (scope: src/mcp/) (depends: T005)
+  - Started_at: 2026-02-07T17:13:54+00:00
+  - Context (worker-facing; do not read `docs/protocol-01.md`):
+    - Expose the query-engine cross-diagram route finder over MCP so an agent can jump between related flow/seq objects via xrefs and adjacency.
+  - DoD:
+    - Add MCP tool `session.find_route({ from, to }) -> { found, route[] }` where `from/to` are canonical `ObjectRef` strings.
+    - Uses `crate::query::session_routes::find_route` and returns deterministic `route` strings (canonical `ObjectRef` formatting).
+    - Unit tests cover a found route and a not-found case.
+  - Validation: `cargo test --offline`
+  - Escalate if: adding this requires changes outside `src/mcp/`; keep it isolated to MCP types + handlers.
+  - Completed_at: 2026-02-07T17:23:07+00:00
+  - Completion note: Added MCP tool `session.find_route` that parses canonical `ObjectRef` endpoints, delegates to `query::session_routes::find_route`, and returns `{ found, route[] }` with deterministic canonical ref formatting; added unit tests for found and not-found routes.
+  - Validation result: `cargo test --offline` (ok)
+
+- [x] T005: Add `xref.add` + `xref.remove` tools (owner: worker:019c390d-4257-7861-be54-3adbb7aea076) (scope: src/mcp/) (depends: T004)
+  - Started_at: 2026-02-07T17:01:43+00:00
+  - Context (worker-facing; do not read `docs/protocol-01.md`):
+    - XRefs should be agent-writable. Add minimal create/delete tools that validate IDs and compute dangling status based on current session state.
+  - DoD:
+    - Add MCP tool `xref.add({ xref_id, from, to, kind, label? }) -> { xref_id, status }`:
+      - Parses `xref_id` as a typed `XRefId` and `from/to` as canonical `ObjectRef` strings.
+      - Errors `INVALID_PARAMS` on invalid ids/refs or if `xref_id` already exists.
+      - Computes `status` by checking endpoint existence in the current session diagrams (ok/dangling_*).
+    - Add MCP tool `xref.remove({ xref_id }) -> { removed: bool }`:
+      - Errors `RESOURCE_NOT_FOUND` if missing.
+    - Add unit tests covering add ok + add dangling + remove.
+  - Validation: `cargo test --offline`
+  - Escalate if: implementing existence checks requires touching code outside `src/mcp/`; keep helpers in MCP.
+  - Completed_at: 2026-02-07T17:12:07+00:00
+  - Completion note: Added MCP `xref.add` and `xref.remove` tools. `xref.add` parses typed ids/refs, rejects duplicates, computes dangling status from current session diagrams, and persists it on the stored xref; `xref.remove` deletes by id with not-found errors. Added unit tests for add ok/dangling and remove.
+  - Validation result: `cargo test --offline` (ok)
+
+- [x] T004: Add `xref.list` tool (dangling filter) (owner: worker:019c3903-2d78-7f53-a2af-5374af8effb6) (scope: src/mcp/) (depends: T001)
+  - Started_at: 2026-02-07T16:50:41+00:00
+  - Context (worker-facing; do not read `docs/protocol-01.md`):
+    - XRefs are first-class and dangling refs must be trivially retrievable. Add a read tool to list xrefs with an optional dangling-only filter.
+  - DoD: Add MCP tool `xref.list({ dangling_only? }) -> { xrefs: [{xref_id, from, to, kind, label?, status}] }`; order is deterministic (by `xref_id`); unit tests cover full list + dangling-only filter.
+  - Validation: `cargo test --offline`
+  - Escalate if: implementing this requires touching code outside `src/mcp/`; keep it isolated to MCP types + handlers.
+  - Completed_at: 2026-02-07T16:59:29+00:00
+  - Completion note: Added MCP tool `xref.list` with optional `dangling_only` filter and deterministic ordering by `xref_id`; added DTOs and unit tests for full list + dangling-only filtering.
+  - Validation result: `cargo test --offline` (ok)
+
+- [x] T003: Improve MCP error mapping (invalid params vs conflict) (owner: worker:019c38b8-4a8b-7371-89ca-cade31748005) (scope: src/mcp/) (depends: T001,T002)
+  - Started_at: 2026-02-07T15:28:55+00:00
+  - Context: `map_apply_error` currently returns `INVALID_REQUEST` for multiple client-input errors (e.g. op kind mismatch, unsupported op, add-with-existing-id). Tighten error codes so client input issues map to `INVALID_PARAMS`, while `base_rev` conflicts remain `INVALID_REQUEST` (“conflict”).
+  - DoD: `map_apply_error` maps `ApplyError::{KindMismatch,UnsupportedOp,AlreadyExists}` to `ErrorCode::INVALID_PARAMS` and keeps `ApplyError::Conflict` as `ErrorCode::INVALID_REQUEST`; add unit tests for at least KindMismatch + AlreadyExists mapping.
+  - Validation: `cargo test --offline`
+  - Escalate if: changing error codes breaks existing tests or rmcp semantics; keep the change limited to apply-error mapping + tests.
+  - Completed_at: 2026-02-07T15:35:07+00:00
+  - Completion note: Updated MCP apply error mapping so `KindMismatch`, `UnsupportedOp`, and `AlreadyExists` return `INVALID_PARAMS` while stale `base_rev` conflicts remain `INVALID_REQUEST`; added unit tests locking the KindMismatch and AlreadyExists error codes.
+  - Validation result: `cargo test --offline` (ok)
+
+- [x] T002: Add snapshot tool + bounded delta history window (owner: worker:019c3871-8c0e-7a10-b6e5-a76de772c9ea) (scope: src/mcp/) (depends: T001)
+  - Started_at: 2026-02-07T14:10:36+00:00
+  - DoD: A client can always recover to the latest rev via MCP (delta within window; snapshot otherwise); unit tests cover snapshot + delta-history behavior and error data fields.
+  - Validation: `cargo test --offline`
+  - Completed_at: 2026-02-07T14:52:41+00:00
+  - Completion note: Added a bounded per-diagram delta history so `diagram.get_delta(since_rev)` can span multiple revisions when within the window, and improved the “delta unavailable” error to include `supported_since_rev` plus a `snapshot_tool` hint. Verified `diagram.get_snapshot` returns canonical Mermaid and added unit tests for snapshot + delta history window behavior.
+  - Validation result: `cargo test --offline` (ok)
+
+- [x] T001: MCP server skeleton + tool routing (owner: mayor) (scope: src/mcp/) (depends: spec:02-dependencies/T005,spec:03-model-core/T001,spec:04-ops-delta/T001)
+  - Started_at: 2026-02-07T11:42:54+00:00
+  - Context (worker-facing; do not read `docs/protocol-01.md`):
+    - Tool surface (v1 minimal set; names are exact):
+      - `session.list_diagrams() -> { diagrams: [{diagram_id, name, kind, rev}] }`
+      - `diagram.get_digest({ diagram_id? }) -> { rev, counts, key_names }`
+      - `diagram.get_delta({ diagram_id?, since_rev }) -> { from_rev, to_rev, changes[] }`
+      - `diagram.apply_ops({ diagram_id?, base_rev, ops[] }) -> { new_rev, applied, delta }`
+    - Target resolution (only if `diagram_id` omitted):
+      - Use `session.active_diagram_id`; error if still missing.
+    - Revision gating:
+      - Mutations are gated by `base_rev`; on mismatch, return an MCP error with `{ current_rev }` in `data`.
+    - Delta model (v1 pragmatic):
+      - `get_delta` uses a per-diagram **last-delta cache** (supports `since_rev == current_rev - 1`); older deltas return an explicit “delta unavailable” error.
+    - Ops schema (v1):
+      - Tool input uses a tagged enum `ops[]` with `type: "..."`
+        - Example: `{"type":"seq_add_participant","participant_id":"p:new","mermaid_name":"New"}`
+        - Example: `{"type":"flow_add_node","node_id":"n:a","label":"A","shape":null}`
+      - Convert ops to `crate::ops::Op` and apply via `crate::ops::apply_ops`.
+    - Transport note:
+      - Implemented a stdio helper `NereidMcp::serve_stdio()`; tool handlers are also directly unit-testable.
+  - DoD: `src/mcp/` provides an rmcp `ServerHandler` with ToolRouter wiring and the four tools above operating on an in-memory `Session`.
+  - Validation: `cargo test --offline`
+  - Completed_at: 2026-02-07T12:32:15+00:00
+  - Completion note: Implemented `src/mcp/` using rmcp macros (`#[tool_router]`, `#[tool_handler]`) with a locked in-memory `Session` + last-delta cache. Added typed request/response DTOs and ops conversion, revision gating, and unit tests covering list/digest/delta/apply behaviors. Added `NereidMcp::serve_stdio()` helper for a real stdio MCP server entrypoint.
+  - Validation result: `cargo test --offline` (ok)

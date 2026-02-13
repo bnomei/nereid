@@ -1,0 +1,137 @@
+[
+  {
+    "function": "8748100672",
+    "samples": 929,
+    "percent": 100.0
+  },
+  {
+    "function": "_main",
+    "samples": 929,
+    "percent": 100.0
+  },
+  {
+    "function": "all",
+    "samples": 929,
+    "percent": 100.0
+  },
+  {
+    "function": "criterion::benchmark_group::BenchmarkGroup<M>::bench_function",
+    "samples": 929,
+    "percent": 100.0
+  },
+  {
+    "function": "criterion::routine::Routine::profile",
+    "samples": 929,
+    "percent": 100.0
+  },
+  {
+    "function": "ops::main",
+    "samples": 929,
+    "percent": 100.0
+  },
+  {
+    "function": "std::rt::lang_start::{{closure}}",
+    "samples": 929,
+    "percent": 100.0
+  },
+  {
+    "function": "std::rt::lang_start_internal",
+    "samples": 929,
+    "percent": 100.0
+  },
+  {
+    "function": "std::sys::backtrace::__rust_begin_short_backtrace",
+    "samples": 929,
+    "percent": 100.0
+  },
+  {
+    "function": "<alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter",
+    "samples": 837,
+    "percent": 90.09687836383208
+  },
+  {
+    "function": "criterion::bencher::Bencher<M>::iter_batched",
+    "samples": 837,
+    "percent": 90.09687836383208
+  },
+  {
+    "function": "core::ops::function::impls::<impl core::ops::function::FnMut<A> for &mut F>::call_mut",
+    "samples": 608,
+    "percent": 65.44671689989235
+  },
+  {
+    "function": "nereid::ops::apply_ops",
+    "samples": 482,
+    "percent": 51.88374596340151
+  },
+  {
+    "function": "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",
+    "samples": 267,
+    "percent": 28.74058127018299
+  },
+  {
+    "function": "<nereid::model::diagram::Diagram as core::clone::Clone>::clone",
+    "samples": 229,
+    "percent": 24.65016146393972
+  },
+  {
+    "function": "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",
+    "samples": 134,
+    "percent": 14.42411194833154
+  },
+  {
+    "function": "alloc::collections::btree::map::IntoIter<K,V,A>::dying_next",
+    "samples": 123,
+    "percent": 13.240043057050594
+  },
+  {
+    "function": "_open$NOCANCEL",
+    "samples": 108,
+    "percent": 11.6254036598493
+  },
+  {
+    "function": "<criterion::routine::Function<M,F,T> as criterion::routine::Routine<M,T>>::warm_up",
+    "samples": 92,
+    "percent": 9.903121636167922
+  },
+  {
+    "function": "core::ptr::drop_in_place<nereid::model::diagram::DiagramAst>",
+    "samples": 36,
+    "percent": 3.8751345532831003
+  },
+  {
+    "function": "<nereid::model::flow_ast::FlowEdge as core::clone::Clone>::clone",
+    "samples": 21,
+    "percent": 2.2604951560818085
+  },
+  {
+    "function": "<alloc::string::String as core::clone::Clone>::clone",
+    "samples": 20,
+    "percent": 2.1528525296017222
+  },
+  {
+    "function": "_netname_check_out",
+    "samples": 2,
+    "percent": 0.2152852529601722
+  },
+  {
+    "function": "_proc_get_dirty",
+    "samples": 2,
+    "percent": 0.2152852529601722
+  },
+  {
+    "function": "_proc_set_csm",
+    "samples": 2,
+    "percent": 0.2152852529601722
+  },
+  {
+    "function": "alloc::collections::btree::map::BTreeMap<K,V,A>::insert",
+    "samples": 1,
+    "percent": 0.1076426264800861
+  },
+  {
+    "function": "alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut,K,V,alloc::collections::btree::node::marker::Leaf>,alloc::collections::btree::node::marker::Edge>::insert_recursing",
+    "samples": 1,
+    "percent": 0.1076426264800861
+  }
+]

@@ -1,0 +1,45 @@
+function,samples,percent,x,y,width,height
+"alloc::collections::btree::navigate::<impl alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Dying,K,V,alloc::collections::btree::node::marker::Leaf>,alloc::collections::btree::node::marker::Edge>>::deallocating_next",3,0.41,5.4274%,101,0.4071%,15
+criterion::bencher::Bencher<M>::iter,78,10.58,5.8345%,101,10.5834%,15
+<alloc::string::String as core::clone::Clone>::clone,6,0.81,16.4179%,85,0.8141%,15
+"alloc::collections::btree::map::BTreeMap<K,V,A>::insert",1,0.14,18.7246%,69,0.1357%,15
+"alloc::collections::btree::map::BTreeMap<K,V,A>::insert",13,1.76,17.2320%,85,1.7639%,15
+"alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut,K,V,alloc::collections::btree::node::marker::Leaf>,alloc::collections::btree::node::marker::Edge>::insert_recursing",1,0.14,18.8602%,69,0.1357%,15
+<alloc::string::String as core::clone::Clone>::clone,120,16.28,55.2239%,37,16.2822%,15
+"<core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::try_fold",365,49.53,23.0665%,53,49.5251%,15
+"<core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::try_fold",8,1.09,71.5061%,37,1.0855%,15
+alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle,15,2.04,72.5916%,53,2.0353%,15
+alloc::raw_vec::RawVecInner<A>::finish_grow,15,2.04,72.5916%,37,2.0353%,15
+core::iter::adapters::try_process,421,57.12,18.9959%,85,57.1235%,15
+"alloc::vec::in_place_collect::<impl alloc::vec::spec_from_iter::SpecFromIter<T,I> for alloc::vec::Vec<T>>::from_iter",421,57.12,18.9959%,69,57.1235%,15
+"alloc::vec::in_place_collect::<impl alloc::vec::spec_from_iter::SpecFromIter<T,I> for alloc::vec::Vec<T>>::from_iter",11,1.49,74.6269%,53,1.4925%,15
+"<alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter",565,76.66,0.0000%,133,76.6621%,15
+criterion::bencher::Bencher<M>::iter,565,76.66,0.0000%,117,76.6621%,15
+nereid::layout::sequence::layout_sequence,444,60.24,16.4179%,101,60.2442%,15
+nereid::model::seq_ast::SequenceAst::messages_in_order,4,0.54,76.1194%,85,0.5427%,15
+core::slice::sort::stable::driftsort_main,4,0.54,76.1194%,69,0.5427%,15
+core::slice::sort::stable::driftsort_main,4,0.54,76.1194%,53,0.5427%,15
+criterion::bencher::Bencher<M>::iter,22,2.99,78.2904%,101,2.9851%,15
+<alloc::string::String as core::clone::Clone>::clone,37,5.02,92.5373%,37,5.0204%,15
+"<core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::try_fold",115,15.60,82.7680%,53,15.6038%,15
+"<core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::try_fold",6,0.81,97.5577%,37,0.8141%,15
+alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle,8,1.09,98.3718%,53,1.0855%,15
+alloc::raw_vec::RawVecInner<A>::finish_grow,8,1.09,98.3718%,37,1.0855%,15
+core::iter::adapters::try_process,134,18.18,81.5468%,85,18.1818%,15
+"alloc::vec::in_place_collect::<impl alloc::vec::spec_from_iter::SpecFromIter<T,I> for alloc::vec::Vec<T>>::from_iter",134,18.18,81.5468%,69,18.1818%,15
+"alloc::vec::in_place_collect::<impl alloc::vec::spec_from_iter::SpecFromIter<T,I> for alloc::vec::Vec<T>>::from_iter",2,0.27,99.4573%,53,0.2714%,15
+all,737,100.00,0.0000%,277,100.0000%,15
+8748100672,737,100.00,0.0000%,261,100.0000%,15
+_main,737,100.00,0.0000%,245,100.0000%,15
+std::rt::lang_start_internal,737,100.00,0.0000%,229,100.0000%,15
+std::rt::lang_start::{{closure}},737,100.00,0.0000%,213,100.0000%,15
+std::sys::backtrace::__rust_begin_short_backtrace,737,100.00,0.0000%,197,100.0000%,15
+seq::main,737,100.00,0.0000%,181,100.0000%,15
+criterion::benchmark_group::BenchmarkGroup<M>::bench_function,737,100.00,0.0000%,165,100.0000%,15
+criterion::routine::Routine::profile,737,100.00,0.0000%,149,100.0000%,15
+"<criterion::routine::Function<M,F,T> as criterion::routine::Routine<M,T>>::warm_up",172,23.34,76.6621%,133,23.3379%,15
+criterion::bencher::Bencher<M>::iter,172,23.34,76.6621%,117,23.3379%,15
+nereid::layout::sequence::layout_sequence,138,18.72,81.2754%,101,18.7246%,15
+nereid::model::seq_ast::SequenceAst::messages_in_order,2,0.27,99.7286%,85,0.2714%,15
+core::slice::sort::stable::driftsort_main,2,0.27,99.7286%,69,0.2714%,15
+core::slice::sort::stable::driftsort_main,2,0.27,99.7286%,53,0.2714%,15

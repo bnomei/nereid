@@ -1,0 +1,207 @@
+[
+  {
+    "function": "8748100672",
+    "samples": 814,
+    "percent": 100.0
+  },
+  {
+    "function": "_main",
+    "samples": 814,
+    "percent": 100.0
+  },
+  {
+    "function": "all",
+    "samples": 814,
+    "percent": 100.0
+  },
+  {
+    "function": "criterion::benchmark_group::BenchmarkGroup<M>::bench_function",
+    "samples": 814,
+    "percent": 100.0
+  },
+  {
+    "function": "criterion::routine::Routine::profile",
+    "samples": 814,
+    "percent": 100.0
+  },
+  {
+    "function": "ops::main",
+    "samples": 814,
+    "percent": 100.0
+  },
+  {
+    "function": "std::rt::lang_start::{{closure}}",
+    "samples": 814,
+    "percent": 100.0
+  },
+  {
+    "function": "std::rt::lang_start_internal",
+    "samples": 814,
+    "percent": 100.0
+  },
+  {
+    "function": "std::sys::backtrace::__rust_begin_short_backtrace",
+    "samples": 814,
+    "percent": 100.0
+  },
+  {
+    "function": "<alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter",
+    "samples": 665,
+    "percent": 81.6953316953317
+  },
+  {
+    "function": "criterion::bencher::Bencher<M>::iter_batched",
+    "samples": 665,
+    "percent": 81.6953316953317
+  },
+  {
+    "function": "core::ops::function::impls::<impl core::ops::function::FnMut<A> for &mut F>::call_mut",
+    "samples": 554,
+    "percent": 68.05896805896806
+  },
+  {
+    "function": "nereid::ops::apply_ops",
+    "samples": 392,
+    "percent": 48.157248157248155
+  },
+  {
+    "function": "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",
+    "samples": 152,
+    "percent": 18.67321867321867
+  },
+  {
+    "function": "<criterion::routine::Function<M,F,T> as criterion::routine::Routine<M,T>>::warm_up",
+    "samples": 149,
+    "percent": 18.304668304668304
+  },
+  {
+    "function": "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",
+    "samples": 144,
+    "percent": 17.69041769041769
+  },
+  {
+    "function": "alloc::collections::btree::map::IntoIter<K,V,A>::dying_next",
+    "samples": 129,
+    "percent": 15.847665847665848
+  },
+  {
+    "function": "_open$NOCANCEL",
+    "samples": 127,
+    "percent": 15.601965601965603
+  },
+  {
+    "function": "<nereid::model::diagram::Diagram as core::clone::Clone>::clone",
+    "samples": 111,
+    "percent": 13.636363636363635
+  },
+  {
+    "function": "core::ptr::drop_in_place<nereid::model::diagram::DiagramAst>",
+    "samples": 65,
+    "percent": 7.985257985257984
+  },
+  {
+    "function": "<alloc::string::String as core::clone::Clone>::clone",
+    "samples": 11,
+    "percent": 1.3513513513513513
+  },
+  {
+    "function": "alloc::collections::btree::map::BTreeMap<K,V,A>::insert",
+    "samples": 9,
+    "percent": 1.1056511056511056
+  },
+  {
+    "function": "hashbrown::map::HashMap<K,V,S,A>::insert",
+    "samples": 8,
+    "percent": 0.9828009828009828
+  },
+  {
+    "function": "<nereid::model::flow_ast::FlowEdge as core::clone::Clone>::clone",
+    "samples": 7,
+    "percent": 0.85995085995086
+  },
+  {
+    "function": "core::slice::sort::stable::drift::sort",
+    "samples": 7,
+    "percent": 0.85995085995086
+  },
+  {
+    "function": "core::slice::sort::stable::driftsort_main",
+    "samples": 7,
+    "percent": 0.85995085995086
+  },
+  {
+    "function": "core::slice::sort::stable::quicksort::quicksort",
+    "samples": 7,
+    "percent": 0.85995085995086
+  },
+  {
+    "function": "core::ptr::drop_in_place<nereid::model::diagram::Diagram>",
+    "samples": 6,
+    "percent": 0.7371007371007371
+  },
+  {
+    "function": "alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut,K,V,alloc::collections::btree::node::marker::Leaf>,alloc::collections::btree::node::marker::Edge>::insert_recursing",
+    "samples": 5,
+    "percent": 0.6142506142506142
+  },
+  {
+    "function": "core::hash::BuildHasher::hash_one",
+    "samples": 5,
+    "percent": 0.6142506142506142
+  },
+  {
+    "function": "hashbrown::raw::RawTable<T,A>::reserve_rehash",
+    "samples": 5,
+    "percent": 0.6142506142506142
+  },
+  {
+    "function": "nereid::ops::object_ref",
+    "samples": 5,
+    "percent": 0.6142506142506142
+  },
+  {
+    "function": "core::ptr::drop_in_place<nereid::ops::ApplyResult>",
+    "samples": 4,
+    "percent": 0.4914004914004914
+  },
+  {
+    "function": "<core::iter::adapters::copied::Copied<I> as core::iter::traits::iterator::Iterator>::fold",
+    "samples": 2,
+    "percent": 0.2457002457002457
+  },
+  {
+    "function": "_netname_check_out",
+    "samples": 2,
+    "percent": 0.2457002457002457
+  },
+  {
+    "function": "_proc_get_dirty",
+    "samples": 2,
+    "percent": 0.2457002457002457
+  },
+  {
+    "function": "_proc_set_csm",
+    "samples": 2,
+    "percent": 0.2457002457002457
+  },
+  {
+    "function": "core::ptr::drop_in_place<nereid::model::object_ref::ObjectRef>",
+    "samples": 2,
+    "percent": 0.2457002457002457
+  },
+  {
+    "function": "core::slice::sort::shared::smallsort::insert_tail",
+    "samples": 2,
+    "percent": 0.2457002457002457
+  },
+  {
+    "function": "core::slice::sort::shared::smallsort::small_sort_general_with_scratch",
+    "samples": 2,
+    "percent": 0.2457002457002457
+  },
+  {
+    "function": "hashbrown::map::HashMap<K,V,S,A>::remove",
+    "samples": 2,
+    "percent": 0.2457002457002457
+  }
+]

@@ -1,0 +1,116 @@
+function,samples,percent,x,y,width,height
+<alloc::string::String as core::clone::Clone>::clone,8,0.86,9.2573%,69,0.8611%,15
+_open$NOCANCEL,2,0.22,9.9031%,53,0.2153%,15
+<nereid::model::flow_ast::FlowEdge as core::clone::Clone>::clone,16,1.72,10.1184%,69,1.7223%,15
+<alloc::string::String as core::clone::Clone>::clone,15,1.61,10.2260%,53,1.6146%,15
+_open$NOCANCEL,9,0.97,10.8719%,37,0.9688%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",164,17.65,2.6911%,85,17.6534%,15
+_open$NOCANCEL,79,8.50,11.8407%,69,8.5038%,15
+<alloc::string::String as core::clone::Clone>::clone,4,0.43,20.3445%,85,0.4306%,15
+_open$NOCANCEL,2,0.22,20.5597%,69,0.2153%,15
+<nereid::model::flow_ast::FlowEdge as core::clone::Clone>::clone,4,0.43,20.7750%,85,0.4306%,15
+<alloc::string::String as core::clone::Clone>::clone,4,0.43,20.7750%,69,0.4306%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",219,23.57,0.3229%,101,23.5737%,15
+_open$NOCANCEL,25,2.69,21.2056%,85,2.6911%,15
+<alloc::string::String as core::clone::Clone>::clone,1,0.11,23.8967%,101,0.1076%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",224,24.11,0.2153%,117,24.1119%,15
+_open$NOCANCEL,3,0.32,24.0043%,101,0.3229%,15
+"<alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter",229,24.65,0.0000%,165,24.6502%,15
+<nereid::model::diagram::Diagram as core::clone::Clone>::clone,229,24.65,0.0000%,149,24.6502%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",229,24.65,0.0000%,133,24.6502%,15
+_open$NOCANCEL,3,0.32,24.3272%,117,0.3229%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",1,0.11,25.1884%,133,0.1076%,15
+_open$NOCANCEL,8,0.86,25.2960%,133,0.8611%,15
+_open$NOCANCEL,108,11.63,26.2648%,117,11.6254%,15
+_proc_set_csm,2,0.22,37.8902%,117,0.2153%,15
+_netname_check_out,2,0.22,37.8902%,101,0.2153%,15
+_proc_get_dirty,2,0.22,37.8902%,85,0.2153%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",126,13.56,24.6502%,149,13.5630%,15
+"alloc::collections::btree::map::IntoIter<K,V,A>::dying_next",112,12.06,26.1572%,133,12.0560%,15
+"alloc::collections::btree::map::IntoIter<K,V,A>::dying_next",1,0.11,38.1055%,117,0.1076%,15
+<alloc::string::String as core::clone::Clone>::clone,6,0.65,54.5748%,69,0.6459%,15
+<nereid::model::flow_ast::FlowEdge as core::clone::Clone>::clone,21,2.26,55.2207%,69,2.2605%,15
+<alloc::string::String as core::clone::Clone>::clone,20,2.15,55.3283%,53,2.1529%,15
+_open$NOCANCEL,1,0.11,57.3735%,37,0.1076%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",229,24.65,41.3348%,85,24.6502%,15
+_open$NOCANCEL,79,8.50,57.4812%,69,8.5038%,15
+<alloc::string::String as core::clone::Clone>::clone,8,0.86,65.9849%,85,0.8611%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",264,28.42,38.5361%,101,28.4177%,15
+<nereid::model::flow_ast::FlowEdge as core::clone::Clone>::clone,1,0.11,66.8461%,85,0.1076%,15
+<alloc::string::String as core::clone::Clone>::clone,1,0.11,66.8461%,69,0.1076%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",267,28.74,38.3208%,133,28.7406%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",267,28.74,38.3208%,117,28.7406%,15
+<alloc::string::String as core::clone::Clone>::clone,1,0.11,66.9537%,101,0.1076%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",9,0.97,67.0614%,117,0.9688%,15
+_open$NOCANCEL,2,0.22,68.0301%,117,0.2153%,15
+_open$NOCANCEL,46,4.95,68.3531%,101,4.9516%,15
+_proc_set_csm,1,0.11,73.3046%,101,0.1076%,15
+_netname_check_out,1,0.11,73.3046%,85,0.1076%,15
+_proc_get_dirty,1,0.11,73.3046%,69,0.1076%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",134,14.42,67.0614%,133,14.4241%,15
+"alloc::collections::btree::map::IntoIter<K,V,A>::dying_next",123,13.24,68.2454%,117,13.2400%,15
+"alloc::collections::btree::map::IntoIter<K,V,A>::dying_next",75,8.07,73.4123%,101,8.0732%,15
+"alloc::collections::btree::map::BTreeMap<K,V,A>::insert",1,0.11,81.4855%,133,0.1076%,15
+"alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut,K,V,alloc::collections::btree::node::marker::Leaf>,alloc::collections::btree::node::marker::Edge>::insert_recursing",1,0.11,81.4855%,117,0.1076%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",8,0.86,81.5931%,101,0.8611%,15
+_open$NOCANCEL,8,0.86,82.4543%,85,0.8611%,15
+core::ptr::drop_in_place<nereid::model::diagram::DiagramAst>,36,3.88,81.5931%,133,3.8751%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",36,3.88,81.5931%,117,3.8751%,15
+"alloc::collections::btree::map::IntoIter<K,V,A>::dying_next",28,3.01,82.4543%,101,3.0140%,15
+"alloc::collections::btree::map::IntoIter<K,V,A>::dying_next",20,2.15,83.3154%,85,2.1529%,15
+"<alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter",837,90.10,0.0000%,197,90.0969%,15
+criterion::bencher::Bencher<M>::iter_batched,837,90.10,0.0000%,181,90.0969%,15
+core::ops::function::impls::<impl core::ops::function::FnMut<A> for &mut F>::call_mut,608,65.45,24.6502%,165,65.4467%,15
+nereid::ops::apply_ops,482,51.88,38.2131%,149,51.8837%,15
+nereid::ops::apply_ops,43,4.63,85.4682%,133,4.6286%,15
+<alloc::string::String as core::clone::Clone>::clone,1,0.11,90.3122%,69,0.1076%,15
+_open$NOCANCEL,1,0.11,90.3122%,53,0.1076%,15
+<nereid::model::flow_ast::FlowEdge as core::clone::Clone>::clone,1,0.11,90.4198%,69,0.1076%,15
+<alloc::string::String as core::clone::Clone>::clone,1,0.11,90.4198%,53,0.1076%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",20,2.15,90.0969%,85,2.1529%,15
+_open$NOCANCEL,16,1.72,90.5274%,69,1.7223%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",24,2.58,90.0969%,117,2.5834%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",24,2.58,90.0969%,101,2.5834%,15
+_open$NOCANCEL,4,0.43,92.2497%,85,0.4306%,15
+"<alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter",25,2.69,90.0969%,165,2.6911%,15
+<nereid::model::diagram::Diagram as core::clone::Clone>::clone,25,2.69,90.0969%,149,2.6911%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",25,2.69,90.0969%,133,2.6911%,15
+_open$NOCANCEL,1,0.11,92.6803%,117,0.1076%,15
+_open$NOCANCEL,1,0.11,92.7879%,133,0.1076%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",20,2.15,92.7879%,149,2.1529%,15
+"alloc::collections::btree::map::IntoIter<K,V,A>::dying_next",19,2.05,92.8956%,133,2.0452%,15
+_open$NOCANCEL,19,2.05,92.8956%,117,2.0452%,15
+<nereid::model::flow_ast::FlowEdge as core::clone::Clone>::clone,2,0.22,95.1561%,69,0.2153%,15
+<alloc::string::String as core::clone::Clone>::clone,1,0.11,95.2637%,53,0.1076%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",29,3.12,94.9408%,85,3.1216%,15
+_open$NOCANCEL,25,2.69,95.3714%,69,2.6911%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",30,3.23,94.9408%,133,3.2293%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",30,3.23,94.9408%,117,3.2293%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",30,3.23,94.9408%,101,3.2293%,15
+<alloc::string::String as core::clone::Clone>::clone,1,0.11,98.0624%,85,0.1076%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",1,0.11,98.1701%,117,0.1076%,15
+_open$NOCANCEL,1,0.11,98.2777%,117,0.1076%,15
+_proc_set_csm,1,0.11,98.3854%,117,0.1076%,15
+_netname_check_out,1,0.11,98.3854%,101,0.1076%,15
+_proc_get_dirty,1,0.11,98.3854%,85,0.1076%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",15,1.61,98.1701%,133,1.6146%,15
+"alloc::collections::btree::map::IntoIter<K,V,A>::dying_next",12,1.29,98.4930%,117,1.2917%,15
+_open$NOCANCEL,12,1.29,98.4930%,101,1.2917%,15
+core::ptr::drop_in_place<nereid::model::diagram::DiagramAst>,1,0.11,99.7847%,133,0.1076%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",1,0.11,99.7847%,117,0.1076%,15
+"alloc::collections::btree::map::IntoIter<K,V,A>::dying_next",1,0.11,99.7847%,101,0.1076%,15
+_open$NOCANCEL,1,0.11,99.7847%,85,0.1076%,15
+all,929,100.00,0.0000%,341,100.0000%,15
+8748100672,929,100.00,0.0000%,325,100.0000%,15
+_main,929,100.00,0.0000%,309,100.0000%,15
+std::rt::lang_start_internal,929,100.00,0.0000%,293,100.0000%,15
+std::rt::lang_start::{{closure}},929,100.00,0.0000%,277,100.0000%,15
+std::sys::backtrace::__rust_begin_short_backtrace,929,100.00,0.0000%,261,100.0000%,15
+ops::main,929,100.00,0.0000%,245,100.0000%,15
+criterion::benchmark_group::BenchmarkGroup<M>::bench_function,929,100.00,0.0000%,229,100.0000%,15
+criterion::routine::Routine::profile,929,100.00,0.0000%,213,100.0000%,15
+"<criterion::routine::Function<M,F,T> as criterion::routine::Routine<M,T>>::warm_up",92,9.90,90.0969%,197,9.9031%,15
+criterion::bencher::Bencher<M>::iter_batched,92,9.90,90.0969%,181,9.9031%,15
+core::ops::function::impls::<impl core::ops::function::FnMut<A> for &mut F>::call_mut,67,7.21,92.7879%,165,7.2121%,15
+nereid::ops::apply_ops,47,5.06,94.9408%,149,5.0592%,15
+nereid::ops::apply_ops,1,0.11,99.8924%,133,0.1076%,15

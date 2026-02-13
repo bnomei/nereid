@@ -1,0 +1,47 @@
+function,samples,percent,x,y,width,height
+_open$NOCANCEL,1,0.11,0.1130%,85,0.1130%,15
+"alloc::collections::btree::map::BTreeMap<K,V,A>::insert",378,42.71,0.2260%,85,42.7119%,15
+"alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut,K,V,alloc::collections::btree::node::marker::Leaf>,alloc::collections::btree::node::marker::Edge>::insert_recursing",378,42.71,0.2260%,69,42.7119%,15
+_open$NOCANCEL,378,42.71,0.2260%,53,42.7119%,15
+nereid::layout::flowchart::ShortestPathScratch::configure,1,0.11,42.9379%,85,0.1130%,15
+_open$NOCANCEL,1,0.11,42.9379%,69,0.1130%,15
+nereid::layout::flowchart::compress_to_polyline,41,4.63,43.0508%,85,4.6328%,15
+"alloc::raw_vec::RawVec<T,A>::grow_one",41,4.63,43.0508%,69,4.6328%,15
+alloc::raw_vec::RawVecInner<A>::finish_grow,41,4.63,43.0508%,53,4.6328%,15
+_open$NOCANCEL,41,4.63,43.0508%,37,4.6328%,15
+nereid::layout::flowchart::edges_in_stable_order,11,1.24,47.6836%,85,1.2429%,15
+core::slice::sort::stable::driftsort_main,11,1.24,47.6836%,69,1.2429%,15
+_open$NOCANCEL,11,1.24,47.6836%,53,1.2429%,15
+nereid::layout::flowchart::route_flowchart_edges_orthogonal,2,0.23,48.9266%,85,0.2260%,15
+"<alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter",781,88.25,0.0000%,133,88.2486%,15
+criterion::bencher::Bencher<M>::iter,781,88.25,0.0000%,117,88.2486%,15
+nereid::layout::flowchart::route_flowchart_edges_orthogonal,781,88.25,0.0000%,101,88.2486%,15
+nereid::layout::flowchart::route_orthogonal_with_scratch_soft_occupancy,346,39.10,49.1525%,85,39.0960%,15
+nereid::layout::flowchart::route_orthogonal_with_scratch_soft_occupancy,41,4.63,83.6158%,69,4.6328%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",1,0.11,88.2486%,101,0.1130%,15
+"alloc::collections::btree::map::IntoIter<K,V,A>::dying_next",1,0.11,88.2486%,85,0.1130%,15
+_open$NOCANCEL,1,0.11,88.2486%,69,0.1130%,15
+"alloc::collections::btree::map::BTreeMap<K,V,A>::insert",52,5.88,88.4746%,85,5.8757%,15
+"alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut,K,V,alloc::collections::btree::node::marker::Leaf>,alloc::collections::btree::node::marker::Edge>::insert_recursing",52,5.88,88.4746%,69,5.8757%,15
+_open$NOCANCEL,48,5.42,88.9266%,53,5.4237%,15
+nereid::layout::flowchart::compress_to_polyline,5,0.56,94.3503%,85,0.5650%,15
+"alloc::raw_vec::RawVec<T,A>::grow_one",5,0.56,94.3503%,69,0.5650%,15
+alloc::raw_vec::RawVecInner<A>::finish_grow,5,0.56,94.3503%,53,0.5650%,15
+_open$NOCANCEL,5,0.56,94.3503%,37,0.5650%,15
+nereid::layout::flowchart::edges_in_stable_order,1,0.11,94.9153%,85,0.1130%,15
+core::slice::sort::stable::driftsort_main,1,0.11,94.9153%,69,0.1130%,15
+_open$NOCANCEL,1,0.11,94.9153%,53,0.1130%,15
+all,885,100.00,0.0000%,277,100.0000%,15
+8748100672,885,100.00,0.0000%,261,100.0000%,15
+_main,885,100.00,0.0000%,245,100.0000%,15
+std::rt::lang_start_internal,885,100.00,0.0000%,229,100.0000%,15
+std::rt::lang_start::{{closure}},885,100.00,0.0000%,213,100.0000%,15
+std::sys::backtrace::__rust_begin_short_backtrace,885,100.00,0.0000%,197,100.0000%,15
+flow::main,885,100.00,0.0000%,181,100.0000%,15
+criterion::benchmark_group::BenchmarkGroup<M>::bench_function,885,100.00,0.0000%,165,100.0000%,15
+criterion::routine::Routine::profile,885,100.00,0.0000%,149,100.0000%,15
+"<criterion::routine::Function<M,F,T> as criterion::routine::Routine<M,T>>::warm_up",104,11.75,88.2486%,133,11.7514%,15
+criterion::bencher::Bencher<M>::iter,104,11.75,88.2486%,117,11.7514%,15
+nereid::layout::flowchart::route_flowchart_edges_orthogonal,103,11.64,88.3616%,101,11.6384%,15
+nereid::layout::flowchart::route_orthogonal_with_scratch_soft_occupancy,44,4.97,95.0282%,85,4.9718%,15
+nereid::layout::flowchart::route_orthogonal_with_scratch_soft_occupancy,6,0.68,99.3220%,69,0.6780%,15

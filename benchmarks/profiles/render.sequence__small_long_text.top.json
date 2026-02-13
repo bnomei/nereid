@@ -1,0 +1,107 @@
+[
+  {
+    "function": "8748100672",
+    "samples": 767,
+    "percent": 100.0
+  },
+  {
+    "function": "_main",
+    "samples": 767,
+    "percent": 100.0
+  },
+  {
+    "function": "all",
+    "samples": 767,
+    "percent": 100.0
+  },
+  {
+    "function": "criterion::benchmark_group::BenchmarkGroup<M>::bench_function",
+    "samples": 767,
+    "percent": 100.0
+  },
+  {
+    "function": "criterion::routine::Routine::profile",
+    "samples": 767,
+    "percent": 100.0
+  },
+  {
+    "function": "render::main",
+    "samples": 767,
+    "percent": 100.0
+  },
+  {
+    "function": "std::rt::lang_start::{{closure}}",
+    "samples": 767,
+    "percent": 100.0
+  },
+  {
+    "function": "std::rt::lang_start_internal",
+    "samples": 767,
+    "percent": 100.0
+  },
+  {
+    "function": "std::sys::backtrace::__rust_begin_short_backtrace",
+    "samples": 767,
+    "percent": 100.0
+  },
+  {
+    "function": "<alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter",
+    "samples": 620,
+    "percent": 80.83441981747066
+  },
+  {
+    "function": "criterion::bencher::Bencher<M>::iter",
+    "samples": 620,
+    "percent": 80.83441981747066
+  },
+  {
+    "function": "nereid::render::sequence::render_sequence_unicode",
+    "samples": 620,
+    "percent": 80.83441981747066
+  },
+  {
+    "function": "_open$NOCANCEL",
+    "samples": 507,
+    "percent": 66.10169491525424
+  },
+  {
+    "function": "<criterion::routine::Function<M,F,T> as criterion::routine::Routine<M,T>>::warm_up",
+    "samples": 147,
+    "percent": 19.165580182529336
+  },
+  {
+    "function": "nereid::render::Canvas::new_filled",
+    "samples": 85,
+    "percent": 11.082138200782268
+  },
+  {
+    "function": "nereid::render::text::canvas_to_string_trimmed",
+    "samples": 24,
+    "percent": 3.129074315514994
+  },
+  {
+    "function": "nereid::render::sequence::write_message_text",
+    "samples": 2,
+    "percent": 0.2607561929595828
+  },
+  {
+    "function": "<alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter",
+    "samples": 1,
+    "percent": 0.1303780964797914
+  },
+  {
+    "function": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+    "samples": 1,
+    "percent": 0.1303780964797914
+  },
+  {
+    "function": "alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle",
+    "samples": 1,
+    "percent": 0.1303780964797914
+  },
+  {
+    "function": "nereid::render::text::truncate_with_ellipsis",
+    "samples": 1,
+    "percent": 0.1303780964797914
+  }
+]

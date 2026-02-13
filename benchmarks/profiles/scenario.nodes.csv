@@ -1,0 +1,50 @@
+function,samples,percent,x,y,width,height
+nereid::format::mermaid::flowchart::export_flowchart,1,2.70,0.0000%,133,2.7027%,15
+alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle,1,2.70,0.0000%,117,2.7027%,15
+alloc::raw_vec::RawVecInner<A>::finish_grow,1,2.70,0.0000%,101,2.7027%,15
+_open$NOCANCEL,1,2.70,0.0000%,85,2.7027%,15
+"alloc::collections::btree::map::BTreeMap<K,V,A>::insert",1,2.70,56.7568%,101,2.7027%,15
+"alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut,K,V,alloc::collections::btree::node::marker::Leaf>,alloc::collections::btree::node::marker::Edge>::insert_recursing",1,2.70,56.7568%,85,2.7027%,15
+"alloc::raw_vec::RawVec<T,A>::grow_one",1,2.70,59.4595%,101,2.7027%,15
+alloc::raw_vec::RawVecInner<A>::finish_grow,1,2.70,59.4595%,85,2.7027%,15
+nereid::layout::flowchart::route_flowchart_edges_orthogonal,28,75.68,2.7027%,117,75.6757%,15
+nereid::layout::flowchart::route_flowchart_edges_orthogonal,6,16.22,62.1622%,101,16.2162%,15
+nereid::render::flowchart::render_flowchart_unicode,30,81.08,2.7027%,133,81.0811%,15
+nereid::render::Canvas::new_filled,2,5.41,78.3784%,117,5.4054%,15
+_open$NOCANCEL,2,5.41,78.3784%,101,5.4054%,15
+"<serde_json::ser::Compound<W,F> as serde_core::ser::SerializeStruct>::serialize_field",1,2.70,83.7838%,117,2.7027%,15
+"<serde_json::ser::Compound<W,F> as serde_core::ser::SerializeStruct>::serialize_field",1,2.70,83.7838%,101,2.7027%,15
+"<&mut serde_json::ser::Serializer<W,F> as serde_core::ser::Serializer>::serialize_str",1,2.70,83.7838%,85,2.7027%,15
+alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle,1,2.70,83.7838%,69,2.7027%,15
+alloc::raw_vec::RawVecInner<A>::finish_grow,1,2.70,83.7838%,53,2.7027%,15
+_open$NOCANCEL,1,2.70,83.7838%,37,2.7027%,15
+nereid::store::session_folder::SessionFolder::save_diagram_meta,2,5.41,83.7838%,133,5.4054%,15
+nereid::store::session_folder::write_atomic_in_session,1,2.70,86.4865%,117,2.7027%,15
+std::fs::File::sync_data,1,2.70,86.4865%,101,2.7027%,15
+_mmap,1,2.70,86.4865%,85,2.7027%,15
+nereid::store::session_folder::SessionFolder::save_meta,1,2.70,89.1892%,133,2.7027%,15
+nereid::store::session_folder::write_atomic_in_session,1,2.70,89.1892%,117,2.7027%,15
+std::sys::fs::rename,1,2.70,89.1892%,101,2.7027%,15
+__kernelrpc_mach_port_request_notification,1,2.70,89.1892%,85,2.7027%,15
+nereid::store::session_folder::SessionFolder::save_walkthrough,1,2.70,91.8919%,133,2.7027%,15
+nereid::store::session_folder::write_atomic_in_session,1,2.70,91.8919%,117,2.7027%,15
+std::io::Write::write_all,1,2.70,91.8919%,101,2.7027%,15
+<std::process::ChildStdin as std::io::Write>::write,1,2.70,91.8919%,85,2.7027%,15
+"<criterion::routine::Function<M,F,T> as criterion::routine::Routine<M,T>>::warm_up",36,97.30,0.0000%,197,97.2973%,15
+criterion::bencher::Bencher<M>::iter_batched_ref,36,97.30,0.0000%,181,97.2973%,15
+scenario::checksum_persist_edit,36,97.30,0.0000%,165,97.2973%,15
+nereid::store::session_folder::SessionFolder::save_session,36,97.30,0.0000%,149,97.2973%,15
+nereid::store::session_folder::write_atomic_in_session,1,2.70,94.5946%,133,2.7027%,15
+std::sys::fs::rename,1,2.70,94.5946%,117,2.7027%,15
+__kernelrpc_mach_port_request_notification,1,2.70,94.5946%,101,2.7027%,15
+all,37,100.00,0.0000%,341,100.0000%,15
+8748100672,37,100.00,0.0000%,325,100.0000%,15
+_main,37,100.00,0.0000%,309,100.0000%,15
+std::rt::lang_start_internal,37,100.00,0.0000%,293,100.0000%,15
+std::rt::lang_start::{{closure}},37,100.00,0.0000%,277,100.0000%,15
+std::sys::backtrace::__rust_begin_short_backtrace,37,100.00,0.0000%,261,100.0000%,15
+scenario::main,37,100.00,0.0000%,245,100.0000%,15
+criterion::benchmark_group::BenchmarkGroup<M>::bench_function,37,100.00,0.0000%,229,100.0000%,15
+criterion::routine::Routine::profile,37,100.00,0.0000%,213,100.0000%,15
+<pprof::criterion::PProfProfiler as criterion::profiler::Profiler>::stop_profiling,1,2.70,97.2973%,197,2.7027%,15
+std::fs::DirBuilder::create_dir_all,1,2.70,97.2973%,181,2.7027%,15

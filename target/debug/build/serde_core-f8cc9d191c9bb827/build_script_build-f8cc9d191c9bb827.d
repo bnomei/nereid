@@ -1,0 +1,5 @@
+/Users/bnomei/Sites/nereid/target/debug/build/serde_core-f8cc9d191c9bb827/build_script_build-f8cc9d191c9bb827.d: /Users/bnomei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.228/build.rs
+
+/Users/bnomei/Sites/nereid/target/debug/build/serde_core-f8cc9d191c9bb827/build_script_build-f8cc9d191c9bb827: /Users/bnomei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.228/build.rs
+
+/Users/bnomei/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.228/build.rs:

@@ -1,0 +1,92 @@
+[
+  {
+    "function": "nereid::layout::flowchart::route_flowchart_edges_orthogonal",
+    "samples": 95,
+    "percent": 106.74157303370787
+  },
+  {
+    "function": "8748100672",
+    "samples": 89,
+    "percent": 100.0
+  },
+  {
+    "function": "<criterion::routine::Function<M,F,T> as criterion::routine::Routine<M,T>>::warm_up",
+    "samples": 89,
+    "percent": 100.0
+  },
+  {
+    "function": "_main",
+    "samples": 89,
+    "percent": 100.0
+  },
+  {
+    "function": "all",
+    "samples": 89,
+    "percent": 100.0
+  },
+  {
+    "function": "criterion::bencher::Bencher<M>::iter",
+    "samples": 89,
+    "percent": 100.0
+  },
+  {
+    "function": "criterion::benchmark_group::BenchmarkGroup<M>::bench_function",
+    "samples": 89,
+    "percent": 100.0
+  },
+  {
+    "function": "criterion::routine::Routine::profile",
+    "samples": 89,
+    "percent": 100.0
+  },
+  {
+    "function": "flow::main",
+    "samples": 89,
+    "percent": 100.0
+  },
+  {
+    "function": "std::rt::lang_start::{{closure}}",
+    "samples": 89,
+    "percent": 100.0
+  },
+  {
+    "function": "std::rt::lang_start_internal",
+    "samples": 89,
+    "percent": 100.0
+  },
+  {
+    "function": "std::sys::backtrace::__rust_begin_short_backtrace",
+    "samples": 89,
+    "percent": 100.0
+  },
+  {
+    "function": "_open$NOCANCEL",
+    "samples": 22,
+    "percent": 24.719101123595504
+  },
+  {
+    "function": "alloc::collections::btree::map::BTreeMap<K,V,A>::insert",
+    "samples": 15,
+    "percent": 16.853932584269664
+  },
+  {
+    "function": "alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut,K,V,alloc::collections::btree::node::marker::Leaf>,alloc::collections::btree::node::marker::Edge>::insert_recursing",
+    "samples": 15,
+    "percent": 16.853932584269664
+  },
+  {
+    "function": "alloc::raw_vec::RawVec<T,A>::grow_one",
+    "samples": 6,
+    "percent": 6.741573033707865
+  },
+  {
+    "function": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+    "samples": 6,
+    "percent": 6.741573033707865
+  },
+  {
+    "function": "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",
+    "samples": 2,
+    "percent": 2.247191011235955
+  }
+]

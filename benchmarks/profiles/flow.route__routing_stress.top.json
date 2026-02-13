@@ -1,0 +1,122 @@
+[
+  {
+    "function": "8748100672",
+    "samples": 857,
+    "percent": 100.0
+  },
+  {
+    "function": "_main",
+    "samples": 857,
+    "percent": 100.0
+  },
+  {
+    "function": "all",
+    "samples": 857,
+    "percent": 100.0
+  },
+  {
+    "function": "criterion::benchmark_group::BenchmarkGroup<M>::bench_function",
+    "samples": 857,
+    "percent": 100.0
+  },
+  {
+    "function": "criterion::routine::Routine::profile",
+    "samples": 857,
+    "percent": 100.0
+  },
+  {
+    "function": "flow::main",
+    "samples": 857,
+    "percent": 100.0
+  },
+  {
+    "function": "std::rt::lang_start::{{closure}}",
+    "samples": 857,
+    "percent": 100.0
+  },
+  {
+    "function": "std::rt::lang_start_internal",
+    "samples": 857,
+    "percent": 100.0
+  },
+  {
+    "function": "std::sys::backtrace::__rust_begin_short_backtrace",
+    "samples": 857,
+    "percent": 100.0
+  },
+  {
+    "function": "<alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter",
+    "samples": 741,
+    "percent": 86.46441073512253
+  },
+  {
+    "function": "criterion::bencher::Bencher<M>::iter",
+    "samples": 741,
+    "percent": 86.46441073512253
+  },
+  {
+    "function": "nereid::layout::flowchart::route_flowchart_edges_orthogonal",
+    "samples": 741,
+    "percent": 86.46441073512253
+  },
+  {
+    "function": "nereid::layout::flowchart::route_orthogonal_with_scratch_soft_occupancy",
+    "samples": 489,
+    "percent": 57.05950991831972
+  },
+  {
+    "function": "alloc::collections::btree::map::BTreeMap<K,V,A>::insert",
+    "samples": 236,
+    "percent": 27.537922987164524
+  },
+  {
+    "function": "_open$NOCANCEL",
+    "samples": 233,
+    "percent": 27.18786464410735
+  },
+  {
+    "function": "alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut,K,V,alloc::collections::btree::node::marker::Leaf>,alloc::collections::btree::node::marker::Edge>::insert_recursing",
+    "samples": 233,
+    "percent": 27.18786464410735
+  },
+  {
+    "function": "<criterion::routine::Function<M,F,T> as criterion::routine::Routine<M,T>>::warm_up",
+    "samples": 116,
+    "percent": 13.53558926487748
+  },
+  {
+    "function": "nereid::layout::flowchart::compress_to_polyline",
+    "samples": 6,
+    "percent": 0.7001166861143524
+  },
+  {
+    "function": "alloc::raw_vec::RawVec<T,A>::grow_one",
+    "samples": 5,
+    "percent": 0.5834305717619603
+  },
+  {
+    "function": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+    "samples": 4,
+    "percent": 0.4667444574095682
+  },
+  {
+    "function": "<alloc::string::String as core::clone::Clone>::clone",
+    "samples": 1,
+    "percent": 0.11668611435239205
+  },
+  {
+    "function": "_mach_ports_lookup_legacy",
+    "samples": 1,
+    "percent": 0.11668611435239205
+  },
+  {
+    "function": "core::slice::sort::stable::driftsort_main",
+    "samples": 1,
+    "percent": 0.11668611435239205
+  },
+  {
+    "function": "nereid::layout::flowchart::edges_in_stable_order",
+    "samples": 1,
+    "percent": 0.11668611435239205
+  }
+]

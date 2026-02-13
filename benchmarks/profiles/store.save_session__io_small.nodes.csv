@@ -1,0 +1,183 @@
+function,samples,percent,x,y,width,height
+_clock_get_attributes,4,0.59,0.5900%,101,0.5900%,15
+_mach_voucher_extract_attr_content,36,5.31,1.1799%,101,5.3097%,15
+"alloc::sync::Arc<T,A>::drop_slow",1,0.15,6.4897%,101,0.1475%,15
+<std::sys::fs::unix::Dir as core::ops::drop::Drop>::drop,1,0.15,6.4897%,85,0.1475%,15
+_clock_get_attributes,2,0.29,6.9322%,85,0.2950%,15
+"<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop",122,17.99,0.0000%,165,17.9941%,15
+<store::fixtures::TempDir as core::ops::drop::Drop>::drop,122,17.99,0.0000%,149,17.9941%,15
+std::sys::fs::remove_dir_all,122,17.99,0.0000%,133,17.9941%,15
+std::sys::fs::unix::remove_dir_impl::remove_dir_all_recursive,120,17.70,0.2950%,117,17.6991%,15
+std::sys::fs::unix::remove_dir_impl::remove_dir_all_recursive,77,11.36,6.6372%,101,11.3569%,15
+_mach_voucher_extract_attr_content,73,10.77,7.2271%,85,10.7670%,15
+"<alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter",12,1.77,17.9941%,165,1.7699%,15
+store::fixtures::TempDir::new,12,1.77,17.9941%,149,1.7699%,15
+std::fs::DirBuilder::create_dir_all,12,1.77,17.9941%,133,1.7699%,15
+<alloc::string::String as core::clone::Clone>::clone,2,0.29,20.5015%,117,0.2950%,15
+nereid::layout::flowchart::layout_flowchart,8,1.18,19.9115%,133,1.1799%,15
+"alloc::collections::btree::map::BTreeMap<K,V,A>::insert",2,0.29,20.7965%,117,0.2950%,15
+"alloc::collections::btree::map::BTreeMap<K,V,A>::insert",1,0.15,20.9440%,101,0.1475%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",1,0.15,21.8289%,117,0.1475%,15
+"alloc::collections::btree::map::IntoIter<K,V,A>::dying_next",1,0.15,21.8289%,101,0.1475%,15
+"alloc::collections::btree::map::IntoIter<K,V,A>::dying_next",1,0.15,21.8289%,85,0.1475%,15
+<alloc::collections::btree::set::BTreeSet<T> as core::iter::traits::collect::FromIterator<T>>::from_iter,1,0.15,22.5664%,85,0.1475%,15
+<alloc::collections::btree::set::BTreeSet<T> as core::iter::traits::collect::FromIterator<T>>::from_iter,2,0.29,22.5664%,101,0.2950%,15
+core::slice::sort::stable::driftsort_main,1,0.15,22.7139%,85,0.1475%,15
+core::slice::sort::stable::drift::sort,1,0.15,22.7139%,69,0.1475%,15
+core::slice::sort::stable::quicksort::quicksort,1,0.15,22.7139%,53,0.1475%,15
+core::slice::sort::shared::smallsort::small_sort_general_with_scratch,1,0.15,22.7139%,37,0.1475%,15
+nereid::layout::flowchart::route_flowchart_edges_orthogonal,7,1.03,21.9764%,117,1.0324%,15
+"alloc::raw_vec::RawVec<T,A>::grow_one",1,0.15,22.8614%,101,0.1475%,15
+alloc::raw_vec::RawVecInner<A>::finish_grow,1,0.15,22.8614%,85,0.1475%,15
+nereid::render::Canvas::new_filled,2,0.29,23.0088%,117,0.2950%,15
+nereid::render::flowchart::render_flowchart_unicode,16,2.36,21.0914%,133,2.3599%,15
+nereid::render::text::canvas_to_string_trimmed,1,0.15,23.3038%,117,0.1475%,15
+nereid::render::text::canvas_to_string_trimmed,1,0.15,23.3038%,101,0.1475%,15
+_open$NOCANCEL,6,0.88,23.4513%,117,0.8850%,15
+nereid::render::Canvas::new_filled,1,0.15,24.3363%,117,0.1475%,15
+_open$NOCANCEL,1,0.15,24.3363%,101,0.1475%,15
+nereid::render::sequence::render_sequence_unicode,8,1.18,23.4513%,133,1.1799%,15
+nereid::render::text::canvas_to_string_trimmed,1,0.15,24.4838%,117,0.1475%,15
+alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle,1,0.15,24.4838%,101,0.1475%,15
+alloc::raw_vec::RawVecInner<A>::finish_grow,1,0.15,24.4838%,85,0.1475%,15
+"<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter",1,0.15,24.6313%,117,0.1475%,15
+"<core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold",1,0.15,24.6313%,101,0.1475%,15
+<alloc::string::String as core::fmt::Write>::write_str,1,0.15,24.6313%,85,0.1475%,15
+"<serde_json::ser::Compound<W,F> as serde_core::ser::SerializeStruct>::serialize_field",1,0.15,24.7788%,117,0.1475%,15
+"<serde_json::ser::Compound<W,F> as serde_core::ser::SerializeStruct>::serialize_field",1,0.15,24.7788%,101,0.1475%,15
+core::ptr::drop_in_place<nereid::store::session_folder::DiagramMetaJson>,1,0.15,24.9263%,117,0.1475%,15
+core::ptr::drop_in_place<nereid::store::session_folder::DiagramFlowEdgeMetaJson>,1,0.15,24.9263%,101,0.1475%,15
+std::fs::DirBuilder::create_dir_all,6,0.88,25.5162%,101,0.8850%,15
+std::path::Path::is_dir,1,0.15,26.2537%,85,0.1475%,15
+std::fs::OpenOptions::_open,31,4.57,26.4012%,101,4.5723%,15
+std::sys::fs::unix::File::open_c,31,4.57,26.4012%,85,4.5723%,15
+_os_cpu_copy_in_cksum,31,4.57,26.4012%,69,4.5723%,15
+std::io::Write::write_all,15,2.21,30.9735%,101,2.2124%,15
+<std::fs::File as std::io::Write>::write,15,2.21,30.9735%,85,2.2124%,15
+std::sys::fs::rename,29,4.28,33.1858%,101,4.2773%,15
+__kernelrpc_mach_port_request_notification,29,4.28,33.1858%,85,4.2773%,15
+nereid::store::session_folder::SessionFolder::save_diagram_meta,90,13.27,24.6313%,133,13.2743%,15
+nereid::store::session_folder::write_atomic_in_session,87,12.83,25.0737%,117,12.8319%,15
+std::sys::fs::symlink_metadata,3,0.44,37.4631%,101,0.4425%,15
+std::fs::DirBuilder::create_dir_all,1,0.15,38.2006%,101,0.1475%,15
+std::fs::OpenOptions::_open,16,2.36,38.3481%,101,2.3599%,15
+std::sys::fs::unix::File::open_c,16,2.36,38.3481%,85,2.3599%,15
+_os_cpu_copy_in_cksum,16,2.36,38.3481%,69,2.3599%,15
+std::io::Write::write_all,6,0.88,40.7080%,101,0.8850%,15
+<std::fs::File as std::io::Write>::write,6,0.88,40.7080%,85,0.8850%,15
+nereid::store::session_folder::write_atomic_in_session,37,5.46,37.9056%,117,5.4572%,15
+std::sys::fs::rename,12,1.77,41.5929%,101,1.7699%,15
+__kernelrpc_mach_port_request_notification,12,1.77,41.5929%,85,1.7699%,15
+std::fs::DirBuilder::create_dir_all,6,0.88,43.3628%,117,0.8850%,15
+std::path::Path::is_dir,4,0.59,43.6578%,101,0.5900%,15
+nereid::store::session_folder::SessionFolder::save_meta,44,6.49,37.9056%,133,6.4897%,15
+std::sys::fs::remove_file,1,0.15,44.2478%,117,0.1475%,15
+___sendto,1,0.15,44.2478%,101,0.1475%,15
+std::fs::DirBuilder::_create,17,2.51,45.7227%,117,2.5074%,15
+std::fs::DirBuilder::create_dir_all,55,8.11,48.2301%,117,8.1121%,15
+std::path::Path::is_dir,2,0.29,56.0472%,101,0.2950%,15
+std::fs::OpenOptions::_open,58,8.55,56.3422%,117,8.5546%,15
+std::sys::fs::unix::File::open_c,58,8.55,56.3422%,101,8.5546%,15
+_os_cpu_copy_in_cksum,58,8.55,56.3422%,85,8.5546%,15
+std::io::Write::write_all,19,2.80,64.8968%,117,2.8024%,15
+<std::fs::File as std::io::Write>::write,19,2.80,64.8968%,101,2.8024%,15
+std::sys::fs::rename,65,9.59,67.6991%,117,9.5870%,15
+__kernelrpc_mach_port_request_notification,65,9.59,67.6991%,101,9.5870%,15
+nereid::store::session_folder::write_atomic_in_session,228,33.63,44.3953%,133,33.6283%,15
+std::sys::fs::symlink_metadata,5,0.74,77.2861%,117,0.7375%,15
+nereid::store::session_folder::SessionFolder::save_session,397,58.55,19.7640%,149,58.5546%,15
+std::sys::fs::read_dir,2,0.29,78.0236%,133,0.2950%,15
+_posix_spawnattr_set_uid_np,2,0.29,78.0236%,117,0.2950%,15
+"<alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter",533,78.61,0.0000%,197,78.6136%,15
+criterion::bencher::Bencher<M>::iter_batched_ref,533,78.61,0.0000%,181,78.6136%,15
+core::ops::function::impls::<impl core::ops::function::FnMut<A> for &mut F>::call_mut,399,58.85,19.7640%,165,58.8496%,15
+std::sys::fs::metadata,2,0.29,78.3186%,149,0.2950%,15
+_clock_get_attributes,2,0.29,78.6136%,101,0.2950%,15
+_mach_voucher_extract_attr_content,4,0.59,78.9086%,101,0.5900%,15
+_clock_get_attributes,1,0.15,79.4985%,85,0.1475%,15
+"<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop",27,3.98,78.6136%,165,3.9823%,15
+<store::fixtures::TempDir as core::ops::drop::Drop>::drop,27,3.98,78.6136%,149,3.9823%,15
+std::sys::fs::remove_dir_all,27,3.98,78.6136%,133,3.9823%,15
+std::sys::fs::unix::remove_dir_impl::remove_dir_all_recursive,27,3.98,78.6136%,117,3.9823%,15
+std::sys::fs::unix::remove_dir_impl::remove_dir_all_recursive,21,3.10,79.4985%,101,3.0973%,15
+_mach_voucher_extract_attr_content,20,2.95,79.6460%,85,2.9499%,15
+"<alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter",6,0.88,82.5959%,165,0.8850%,15
+store::fixtures::TempDir::new,6,0.88,82.5959%,149,0.8850%,15
+std::fs::DirBuilder::create_dir_all,6,0.88,82.5959%,133,0.8850%,15
+core::ptr::drop_in_place<nereid::store::session_folder::DiagramMeta>,1,0.15,83.4808%,133,0.1475%,15
+core::ptr::drop_in_place<nereid::store::session_folder::DiagramFlowEdgeMetaJson>,1,0.15,83.4808%,117,0.1475%,15
+nereid::format::mermaid::flowchart::export_flowchart,1,0.15,83.6283%,133,0.1475%,15
+alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle,1,0.15,83.6283%,117,0.1475%,15
+alloc::raw_vec::RawVecInner<A>::finish_grow,1,0.15,83.6283%,101,0.1475%,15
+nereid::layout::flowchart::layout_flowchart,2,0.29,83.7758%,133,0.2950%,15
+core::slice::sort::shared::smallsort::insertion_sort_shift_left,1,0.15,83.9233%,117,0.1475%,15
+nereid::render::flowchart::render_flowchart_unicode,2,0.29,84.0708%,133,0.2950%,15
+nereid::layout::flowchart::route_flowchart_edges_orthogonal,1,0.15,84.2183%,117,0.1475%,15
+_open$NOCANCEL,2,0.29,84.3658%,117,0.2950%,15
+nereid::render::sequence::render_sequence_unicode,3,0.44,84.3658%,133,0.4425%,15
+nereid::render::Canvas::new_filled,1,0.15,84.6608%,117,0.1475%,15
+_open$NOCANCEL,1,0.15,84.6608%,101,0.1475%,15
+alloc::fmt::format::format_inner,1,0.15,84.8083%,117,0.1475%,15
+core::fmt::write,1,0.15,84.8083%,101,0.1475%,15
+<alloc::string::String as core::fmt::Write>::write_str,1,0.15,84.8083%,85,0.1475%,15
+std::fs::DirBuilder::create_dir_all,3,0.44,84.9558%,101,0.4425%,15
+std::path::Path::is_dir,1,0.15,85.2507%,85,0.1475%,15
+std::fs::OpenOptions::_open,5,0.74,85.3982%,101,0.7375%,15
+std::sys::fs::unix::File::open_c,5,0.74,85.3982%,85,0.7375%,15
+_os_cpu_copy_in_cksum,5,0.74,85.3982%,69,0.7375%,15
+std::io::Write::write_all,5,0.74,86.1357%,101,0.7375%,15
+<std::fs::File as std::io::Write>::write,5,0.74,86.1357%,85,0.7375%,15
+nereid::store::session_folder::SessionFolder::save_diagram_meta,21,3.10,84.8083%,133,3.0973%,15
+nereid::store::session_folder::write_atomic_in_session,20,2.95,84.9558%,117,2.9499%,15
+std::sys::fs::rename,7,1.03,86.8732%,101,1.0324%,15
+__kernelrpc_mach_port_request_notification,7,1.03,86.8732%,85,1.0324%,15
+std::fs::OpenOptions::_open,5,0.74,88.2006%,101,0.7375%,15
+std::sys::fs::unix::File::open_c,5,0.74,88.2006%,85,0.7375%,15
+_os_cpu_copy_in_cksum,5,0.74,88.2006%,69,0.7375%,15
+std::io::Write::write_all,3,0.44,88.9381%,101,0.4425%,15
+<std::fs::File as std::io::Write>::write,3,0.44,88.9381%,85,0.4425%,15
+nereid::store::session_folder::write_atomic_in_session,16,2.36,87.9056%,117,2.3599%,15
+std::sys::fs::rename,6,0.88,89.3805%,101,0.8850%,15
+__kernelrpc_mach_port_request_notification,6,0.88,89.3805%,85,0.8850%,15
+nereid::store::session_folder::SessionFolder::save_meta,17,2.51,87.9056%,133,2.5074%,15
+std::fs::DirBuilder::create_dir_all,1,0.15,90.2655%,117,0.1475%,15
+std::path::Path::is_dir,1,0.15,90.2655%,101,0.1475%,15
+std::fs::DirBuilder::_create,1,0.15,90.8555%,117,0.1475%,15
+std::fs::DirBuilder::create_dir_all,10,1.47,91.0029%,117,1.4749%,15
+std::fs::OpenOptions::_open,21,3.10,92.4779%,117,3.0973%,15
+std::sys::fs::unix::File::open_c,21,3.10,92.4779%,101,3.0973%,15
+_os_cpu_copy_in_cksum,21,3.10,92.4779%,85,3.0973%,15
+std::io::Write::write_all,7,1.03,95.5752%,117,1.0324%,15
+<std::fs::File as std::io::Write>::write,7,1.03,95.5752%,101,1.0324%,15
+std::sys::fs::rename,16,2.36,96.6077%,117,2.3599%,15
+__kernelrpc_mach_port_request_notification,16,2.36,96.6077%,101,2.3599%,15
+core::ops::function::impls::<impl core::ops::function::FnMut<A> for &mut F>::call_mut,107,15.78,83.4808%,165,15.7817%,15
+nereid::store::session_folder::SessionFolder::save_session,107,15.78,83.4808%,149,15.7817%,15
+nereid::store::session_folder::write_atomic_in_session,60,8.85,90.4130%,133,8.8496%,15
+std::sys::fs::symlink_metadata,2,0.29,98.9676%,117,0.2950%,15
+alloc::str::join_generic_copy,1,0.15,99.2625%,117,0.1475%,15
+nereid::render::flowchart::render_flowchart_unicode,2,0.29,99.2625%,149,0.2950%,15
+nereid::render::text::canvas_to_string_trimmed,2,0.29,99.2625%,133,0.2950%,15
+nereid::render::text::canvas_to_string_trimmed,1,0.15,99.4100%,117,0.1475%,15
+std::fs::OpenOptions::_open,1,0.15,99.5575%,117,0.1475%,15
+std::sys::fs::unix::File::open_c,1,0.15,99.5575%,101,0.1475%,15
+_os_cpu_copy_in_cksum,1,0.15,99.5575%,85,0.1475%,15
+nereid::store::session_folder::SessionFolder::save_diagram_meta,2,0.29,99.5575%,149,0.2950%,15
+nereid::store::session_folder::write_atomic_in_session,2,0.29,99.5575%,133,0.2950%,15
+std::sys::fs::rename,1,0.15,99.7050%,117,0.1475%,15
+__kernelrpc_mach_port_request_notification,1,0.15,99.7050%,101,0.1475%,15
+all,678,100.00,0.0000%,341,100.0000%,15
+8748100672,678,100.00,0.0000%,325,100.0000%,15
+_main,678,100.00,0.0000%,309,100.0000%,15
+std::rt::lang_start_internal,678,100.00,0.0000%,293,100.0000%,15
+std::rt::lang_start::{{closure}},678,100.00,0.0000%,277,100.0000%,15
+std::sys::backtrace::__rust_begin_short_backtrace,678,100.00,0.0000%,261,100.0000%,15
+store::main,678,100.00,0.0000%,245,100.0000%,15
+criterion::benchmark_group::BenchmarkGroup<M>::bench_function,678,100.00,0.0000%,229,100.0000%,15
+criterion::routine::Routine::profile,678,100.00,0.0000%,213,100.0000%,15
+"<criterion::routine::Function<M,F,T> as criterion::routine::Routine<M,T>>::warm_up",145,21.39,78.6136%,197,21.3864%,15
+criterion::bencher::Bencher<M>::iter_batched_ref,145,21.39,78.6136%,181,21.3864%,15
+nereid::store::session_folder::SessionFolder::save_session,5,0.74,99.2625%,165,0.7375%,15
+nereid::store::session_folder::write_atomic_in_session,1,0.15,99.8525%,149,0.1475%,15
+std::sys::fs::rename,1,0.15,99.8525%,133,0.1475%,15
+__kernelrpc_mach_port_request_notification,1,0.15,99.8525%,117,0.1475%,15

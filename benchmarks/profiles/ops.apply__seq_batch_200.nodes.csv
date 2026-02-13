@@ -1,0 +1,107 @@
+function,samples,percent,x,y,width,height
+<alloc::string::String as core::clone::Clone>::clone,1,0.17,0.0000%,117,0.1701%,15
+_open$NOCANCEL,1,0.17,0.0000%,101,0.1701%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",2,0.34,0.0000%,133,0.3401%,15
+_open$NOCANCEL,1,0.17,0.1701%,117,0.1701%,15
+<alloc::string::String as core::clone::Clone>::clone,12,2.04,0.8503%,117,2.0408%,15
+_open$NOCANCEL,10,1.70,1.1905%,101,1.7007%,15
+"<alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter",21,3.57,0.0000%,165,3.5714%,15
+<nereid::model::diagram::Diagram as core::clone::Clone>::clone,21,3.57,0.0000%,149,3.5714%,15
+"<alloc::vec::Vec<T,A> as core::clone::Clone>::clone",19,3.23,0.3401%,133,3.2313%,15
+_open$NOCANCEL,4,0.68,2.8912%,117,0.6803%,15
+core::ptr::drop_in_place<nereid::model::diagram::Diagram>,1,0.17,3.5714%,149,0.1701%,15
+_open$NOCANCEL,1,0.17,3.5714%,133,0.1701%,15
+"<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop",5,0.85,4.7619%,117,0.8503%,15
+"<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop",15,2.55,3.7415%,133,2.5510%,15
+_open$NOCANCEL,4,0.68,5.6122%,117,0.6803%,15
+core::ptr::drop_in_place<nereid::model::seq_ast::SequenceAst>,90,15.31,3.7415%,149,15.3061%,15
+_open$NOCANCEL,75,12.76,6.2925%,133,12.7551%,15
+core::ptr::drop_in_place<nereid::model::object_ref::ObjectRef>,5,0.85,19.0476%,133,0.8503%,15
+core::ptr::drop_in_place<nereid::model::object_ref::ObjectRef>,4,0.68,19.2177%,117,0.6803%,15
+core::ptr::drop_in_place<nereid::ops::ApplyResult>,6,1.02,19.0476%,149,1.0204%,15
+core::ptr::drop_in_place<nereid::ops::ApplyResult>,1,0.17,19.8980%,133,0.1701%,15
+<alloc::string::String as core::clone::Clone>::clone,1,0.17,22.7891%,133,0.1701%,15
+"<alloc::vec::Vec<T,A> as core::clone::Clone>::clone",1,0.17,22.9592%,133,0.1701%,15
+<alloc::string::String as core::clone::Clone>::clone,1,0.17,22.9592%,117,0.1701%,15
+_open$NOCANCEL,5,0.85,23.1293%,133,0.8503%,15
+"alloc::raw_vec::RawVec<T,A>::grow_one",21,3.57,23.9796%,133,3.5714%,15
+alloc::raw_vec::RawVecInner<A>::finish_grow,21,3.57,23.9796%,117,3.5714%,15
+_open$NOCANCEL,21,3.57,23.9796%,101,3.5714%,15
+core::ptr::drop_in_place<nereid::model::diagram::DiagramAst>,2,0.34,27.5510%,133,0.3401%,15
+"<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop",2,0.34,27.5510%,117,0.3401%,15
+"<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop",1,0.17,27.7211%,101,0.1701%,15
+_mach_ports_lookup_legacy,1,0.17,28.0612%,117,0.1701%,15
+_open$NOCANCEL,265,45.07,28.2313%,117,45.0680%,15
+core::slice::sort::stable::drift::sort,6,1.02,73.2993%,117,1.0204%,15
+core::slice::sort::stable::quicksort::quicksort,6,1.02,73.2993%,101,1.0204%,15
+core::slice::sort::stable::quicksort::quicksort,4,0.68,73.6395%,85,0.6803%,15
+core::slice::sort::stable::quicksort::quicksort,2,0.34,73.9796%,69,0.3401%,15
+core::slice::sort::stable::quicksort::quicksort,1,0.17,74.1497%,53,0.1701%,15
+core::slice::sort::shared::smallsort::small_sort_general_with_scratch,1,0.17,74.1497%,37,0.1701%,15
+core::slice::sort::stable::driftsort_main,290,49.32,27.8912%,133,49.3197%,15
+core::slice::sort::stable::driftsort_main,17,2.89,74.3197%,117,2.8912%,15
+<Q as hashbrown::Equivalent<K>>::equivalent,1,0.17,77.2109%,117,0.1701%,15
+core::hash::BuildHasher::hash_one,1,0.17,77.3810%,117,0.1701%,15
+"hashbrown::map::HashMap<K,V,S,A>::insert",5,0.85,77.2109%,133,0.8503%,15
+"hashbrown::raw::RawTable<T,A>::reserve_rehash",3,0.51,77.5510%,117,0.5102%,15
+core::hash::BuildHasher::hash_one,2,0.34,77.7211%,101,0.3401%,15
+"hashbrown::map::HashMap<K,V,S,A>::remove",4,0.68,78.0612%,133,0.6803%,15
+core::hash::BuildHasher::hash_one,4,0.68,78.0612%,117,0.6803%,15
+nereid::ops::apply_ops,4,0.68,78.7415%,133,0.6803%,15
+"<alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter",468,79.59,0.0000%,197,79.5918%,15
+criterion::bencher::Bencher<M>::iter_batched,468,79.59,0.0000%,181,79.5918%,15
+core::ops::function::impls::<impl core::ops::function::FnMut<A> for &mut F>::call_mut,447,76.02,3.5714%,165,76.0204%,15
+nereid::ops::apply_ops,350,59.52,20.0680%,149,59.5238%,15
+nereid::ops::object_ref,1,0.17,79.4218%,133,0.1701%,15
+<alloc::string::String as core::clone::Clone>::clone,1,0.17,79.4218%,117,0.1701%,15
+<alloc::string::String as core::clone::Clone>::clone,1,0.17,79.5918%,101,0.1701%,15
+_open$NOCANCEL,1,0.17,79.5918%,85,0.1701%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",2,0.34,79.5918%,133,0.3401%,15
+"<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",2,0.34,79.5918%,117,0.3401%,15
+_open$NOCANCEL,1,0.17,79.7619%,101,0.1701%,15
+"<alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter",5,0.85,79.5918%,165,0.8503%,15
+<nereid::model::diagram::Diagram as core::clone::Clone>::clone,5,0.85,79.5918%,149,0.8503%,15
+"<alloc::vec::Vec<T,A> as core::clone::Clone>::clone",3,0.51,79.9320%,133,0.5102%,15
+<alloc::string::String as core::clone::Clone>::clone,3,0.51,79.9320%,117,0.5102%,15
+_open$NOCANCEL,3,0.51,79.9320%,101,0.5102%,15
+"<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop",2,0.34,80.4422%,117,0.3401%,15
+"<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop",6,1.02,80.4422%,133,1.0204%,15
+_open$NOCANCEL,4,0.68,80.7823%,117,0.6803%,15
+core::ptr::drop_in_place<nereid::model::seq_ast::SequenceAst>,26,4.42,80.4422%,149,4.4218%,15
+_open$NOCANCEL,20,3.40,81.4626%,133,3.4014%,15
+core::ptr::drop_in_place<nereid::model::object_ref::ObjectRef>,1,0.17,84.8639%,133,0.1701%,15
+core::ptr::drop_in_place<nereid::model::object_ref::ObjectRef>,1,0.17,84.8639%,117,0.1701%,15
+core::ptr::drop_in_place<nereid::ops::ApplyResult>,2,0.34,84.8639%,149,0.3401%,15
+core::ptr::drop_in_place<nereid::ops::ApplyResult>,1,0.17,85.0340%,133,0.1701%,15
+_open$NOCANCEL,2,0.34,85.7143%,133,0.3401%,15
+"alloc::raw_vec::RawVec<T,A>::grow_one",5,0.85,86.0544%,133,0.8503%,15
+alloc::raw_vec::RawVecInner<A>::finish_grow,5,0.85,86.0544%,117,0.8503%,15
+_open$NOCANCEL,5,0.85,86.0544%,101,0.8503%,15
+_open$NOCANCEL,72,12.24,87.0748%,117,12.2449%,15
+core::slice::sort::shared::smallsort::small_sort_general_with_scratch,1,0.17,99.3197%,69,0.1701%,15
+core::slice::sort::shared::smallsort::insert_tail,1,0.17,99.3197%,53,0.1701%,15
+core::slice::sort::stable::driftsort_main,75,12.76,86.9048%,133,12.7551%,15
+core::slice::sort::stable::drift::sort,2,0.34,99.3197%,117,0.3401%,15
+core::slice::sort::stable::quicksort::quicksort,2,0.34,99.3197%,101,0.3401%,15
+core::slice::sort::stable::quicksort::quicksort,2,0.34,99.3197%,85,0.3401%,15
+core::slice::sort::stable::quicksort::quicksort,1,0.17,99.4898%,69,0.1701%,15
+core::slice::sort::shared::smallsort::small_sort_general_with_scratch,1,0.17,99.4898%,53,0.1701%,15
+core::slice::sort::shared::smallsort::insert_tail,1,0.17,99.4898%,37,0.1701%,15
+"hashbrown::map::HashMap<K,V,S,A>::insert",1,0.17,99.6599%,133,0.1701%,15
+"hashbrown::raw::RawTable<T,A>::reserve_rehash",1,0.17,99.6599%,117,0.1701%,15
+core::hash::BuildHasher::hash_one,1,0.17,99.6599%,101,0.1701%,15
+all,588,100.00,0.0000%,341,100.0000%,15
+8748100672,588,100.00,0.0000%,325,100.0000%,15
+_main,588,100.00,0.0000%,309,100.0000%,15
+std::rt::lang_start_internal,588,100.00,0.0000%,293,100.0000%,15
+std::rt::lang_start::{{closure}},588,100.00,0.0000%,277,100.0000%,15
+std::sys::backtrace::__rust_begin_short_backtrace,588,100.00,0.0000%,261,100.0000%,15
+ops::main,588,100.00,0.0000%,245,100.0000%,15
+criterion::benchmark_group::BenchmarkGroup<M>::bench_function,588,100.00,0.0000%,229,100.0000%,15
+criterion::routine::Routine::profile,588,100.00,0.0000%,213,100.0000%,15
+"<criterion::routine::Function<M,F,T> as criterion::routine::Routine<M,T>>::warm_up",120,20.41,79.5918%,197,20.4082%,15
+criterion::bencher::Bencher<M>::iter_batched,120,20.41,79.5918%,181,20.4082%,15
+core::ops::function::impls::<impl core::ops::function::FnMut<A> for &mut F>::call_mut,115,19.56,80.4422%,165,19.5578%,15
+nereid::ops::apply_ops,87,14.80,85.2041%,149,14.7959%,15
+nereid::ops::object_ref,1,0.17,99.8299%,133,0.1701%,15
+<core::iter::adapters::copied::Copied<I> as core::iter::traits::iterator::Iterator>::fold,1,0.17,99.8299%,117,0.1701%,15

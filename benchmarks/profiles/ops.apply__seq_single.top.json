@@ -1,0 +1,152 @@
+[
+  {
+    "function": "8748100672",
+    "samples": 926,
+    "percent": 100.0
+  },
+  {
+    "function": "_main",
+    "samples": 926,
+    "percent": 100.0
+  },
+  {
+    "function": "all",
+    "samples": 926,
+    "percent": 100.0
+  },
+  {
+    "function": "criterion::benchmark_group::BenchmarkGroup<M>::bench_function",
+    "samples": 926,
+    "percent": 100.0
+  },
+  {
+    "function": "criterion::routine::Routine::profile",
+    "samples": 926,
+    "percent": 100.0
+  },
+  {
+    "function": "ops::main",
+    "samples": 926,
+    "percent": 100.0
+  },
+  {
+    "function": "std::rt::lang_start::{{closure}}",
+    "samples": 926,
+    "percent": 100.0
+  },
+  {
+    "function": "std::rt::lang_start_internal",
+    "samples": 926,
+    "percent": 100.0
+  },
+  {
+    "function": "std::sys::backtrace::__rust_begin_short_backtrace",
+    "samples": 926,
+    "percent": 100.0
+  },
+  {
+    "function": "<alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter",
+    "samples": 800,
+    "percent": 86.39308855291577
+  },
+  {
+    "function": "criterion::bencher::Bencher<M>::iter_batched",
+    "samples": 800,
+    "percent": 86.39308855291577
+  },
+  {
+    "function": "core::ops::function::impls::<impl core::ops::function::FnMut<A> for &mut F>::call_mut",
+    "samples": 541,
+    "percent": 58.42332613390929
+  },
+  {
+    "function": "nereid::ops::apply_ops",
+    "samples": 366,
+    "percent": 39.524838012958966
+  },
+  {
+    "function": "<nereid::model::diagram::Diagram as core::clone::Clone>::clone",
+    "samples": 259,
+    "percent": 27.96976241900648
+  },
+  {
+    "function": "<alloc::vec::Vec<T,A> as core::clone::Clone>::clone",
+    "samples": 226,
+    "percent": 24.406047516198704
+  },
+  {
+    "function": "core::ptr::drop_in_place<nereid::model::seq_ast::SequenceAst>",
+    "samples": 168,
+    "percent": 18.142548596112313
+  },
+  {
+    "function": "_open$NOCANCEL",
+    "samples": 163,
+    "percent": 17.60259179265659
+  },
+  {
+    "function": "<criterion::routine::Function<M,F,T> as criterion::routine::Routine<M,T>>::warm_up",
+    "samples": 126,
+    "percent": 13.606911447084233
+  },
+  {
+    "function": "core::ptr::drop_in_place<nereid::model::diagram::DiagramAst>",
+    "samples": 102,
+    "percent": 11.01511879049676
+  },
+  {
+    "function": "alloc::raw_vec::RawVec<T,A>::grow_one",
+    "samples": 96,
+    "percent": 10.367170626349893
+  },
+  {
+    "function": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+    "samples": 96,
+    "percent": 10.367170626349893
+  },
+  {
+    "function": "<alloc::string::String as core::clone::Clone>::clone",
+    "samples": 83,
+    "percent": 8.96328293736501
+  },
+  {
+    "function": "<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop",
+    "samples": 47,
+    "percent": 5.075593952483802
+  },
+  {
+    "function": "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::clone::Clone>::clone::clone_subtree",
+    "samples": 33,
+    "percent": 3.5637149028077757
+  },
+  {
+    "function": "core::ptr::drop_in_place<nereid::model::diagram::Diagram>",
+    "samples": 7,
+    "percent": 0.755939524838013
+  },
+  {
+    "function": "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",
+    "samples": 5,
+    "percent": 0.5399568034557235
+  },
+  {
+    "function": "alloc::collections::btree::map::IntoIter<K,V,A>::dying_next",
+    "samples": 4,
+    "percent": 0.4319654427645789
+  },
+  {
+    "function": "_netname_check_out",
+    "samples": 2,
+    "percent": 0.21598272138228944
+  },
+  {
+    "function": "_proc_get_dirty",
+    "samples": 2,
+    "percent": 0.21598272138228944
+  },
+  {
+    "function": "_proc_set_csm",
+    "samples": 2,
+    "percent": 0.21598272138228944
+  }
+]
