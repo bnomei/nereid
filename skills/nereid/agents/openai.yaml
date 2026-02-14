@@ -1,0 +1,4 @@
+interface:
+  display_name: "Nereid Collaboration"
+  short_description: "Live Mermaid collaboration via Nereid MCP"
+  default_prompt: "Use $nereid to probe, spotlight attention, and safely edit this Nereid session with diff/slice-first workflows."

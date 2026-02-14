@@ -1,0 +1,231 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+bench-criterion — run nereid Criterion benches with a repeatable baseline workflow
+
+Usage:
+  ./scripts/bench-criterion run [options] [-- <criterion args...>]
+  ./scripts/bench-criterion save [options] [--baseline NAME] [-- <criterion args...>]
+  ./scripts/bench-criterion compare [options] --baseline NAME [-- <criterion args...>]
+  ./scripts/bench-criterion name
+
+Commands:
+  run       Run benches (no baseline save/compare).
+  save      Run benches and save a Criterion baseline.
+  compare   Run benches and compare against a saved baseline.
+  name      Print the default baseline name (branch-date-sha).
+
+Options:
+  --cargo-home PATH         Sets CARGO_HOME (default: /tmp/nereid-cargo-home).
+  --bench NAME              Run only one bench target (repeatable), e.g. flow, ops.
+  --package, -p NAME        Pass through to cargo.
+  --features FEATURES       Pass through to cargo.
+  --all-features            Pass through to cargo.
+  --no-default-features     Pass through to cargo.
+  --manifest-path PATH      Pass through to cargo.
+  --profile PROFILE         Pass through to cargo.
+  --baseline NAME           Baseline name (for save/compare).
+  -h, --help                Show this help.
+
+Notes:
+  - Criterion baselines live under target/criterion/*/<baseline>/.
+  - Additional Criterion CLI args can be passed after '--' (if you use them).
+USAGE
+}
+
+die() {
+  echo "error: $*" >&2
+  exit 2
+}
+
+sanitize_baseline_name() {
+  local raw="${1:-}"
+  raw="${raw// /-}"
+  raw="${raw//\//-}"
+  raw="$(printf '%s' "$raw" | tr -c 'A-Za-z0-9._-\n' '-' | tr -s '-')"
+  raw="${raw#-}"
+  raw="${raw%-}"
+  printf '%s' "$raw"
+}
+
+default_baseline_name() {
+  local date sha branch name
+  date="$(date +%Y%m%d)"
+  sha="nogit"
+  branch="unknown"
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    sha="$(git rev-parse --short HEAD 2>/dev/null || echo nogit)"
+    branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
+  fi
+
+  name="$(sanitize_baseline_name "${branch}-${date}-${sha}")"
+  if [[ -z "$name" ]]; then
+    name="baseline-${date}-${sha}"
+  fi
+  printf '%s' "$name"
+}
+
+ensure_bench_targets_selected() {
+  # `cargo bench` also runs lib/bin benchmark harnesses and forwards args after
+  # `--` to them. That breaks Criterion options like `--save-baseline` because
+  # the libtest harness doesn't recognize them. Restrict to explicit bench
+  # targets unless the user already specified one or more `--bench` selectors.
+  if [[ "${has_bench_target_filter:-false}" == "true" ]]; then
+    return 0
+  fi
+
+  local manifest="${manifest_path:-Cargo.toml}"
+  local -a bench_targets=()
+  local in_bench_table="false"
+  local line
+
+  if [[ -f "$manifest" ]]; then
+    while IFS= read -r line; do
+      if [[ "$line" =~ ^\[\[bench\]\][[:space:]]*$ ]]; then
+        in_bench_table="true"
+        continue
+      fi
+      if [[ "$in_bench_table" == "true" && "$line" =~ ^name[[:space:]]*=[[:space:]]*\"([^\"]+)\" ]]; then
+        bench_targets+=("${BASH_REMATCH[1]}")
+        in_bench_table="false"
+        continue
+      fi
+      if [[ "$line" =~ ^\[.*\] ]]; then
+        in_bench_table="false"
+      fi
+    done < "$manifest"
+  fi
+
+  if [[ ${#bench_targets[@]} -gt 0 ]]; then
+    local bench
+    for bench in "${bench_targets[@]}"; do
+      cargo_args+=("--bench" "$bench")
+    done
+  else
+    cargo_args+=("--benches")
+  fi
+}
+
+main() {
+  local cmd="${1:-}"
+  if [[ -z "$cmd" || "$cmd" == "help" || "$cmd" == "-h" || "$cmd" == "--help" ]]; then
+    usage
+    exit 0
+  fi
+  shift
+
+  local cargo_home="${CARGO_HOME:-/tmp/nereid-cargo-home}"
+  local baseline=""
+  local has_bench_target_filter="false"
+  local manifest_path="Cargo.toml"
+  local -a cargo_args=()
+  local -a criterion_args=()
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --cargo-home)
+        [[ $# -ge 2 ]] || die "--cargo-home requires a value"
+        cargo_home="$2"
+        shift 2
+        ;;
+      --bench)
+        [[ $# -ge 2 ]] || die "--bench requires a value"
+        has_bench_target_filter="true"
+        cargo_args+=("--bench" "$2")
+        shift 2
+        ;;
+      --package|-p)
+        [[ $# -ge 2 ]] || die "$1 requires a value"
+        cargo_args+=("$1" "$2")
+        shift 2
+        ;;
+      --features)
+        [[ $# -ge 2 ]] || die "--features requires a value"
+        cargo_args+=("--features" "$2")
+        shift 2
+        ;;
+      --all-features|--no-default-features)
+        cargo_args+=("$1")
+        shift
+        ;;
+      --manifest-path|--profile)
+        [[ $# -ge 2 ]] || die "$1 requires a value"
+        if [[ "$1" == "--manifest-path" ]]; then
+          manifest_path="$2"
+        fi
+        cargo_args+=("$1" "$2")
+        shift 2
+        ;;
+      --baseline|--name)
+        [[ $# -ge 2 ]] || die "$1 requires a value"
+        baseline="$2"
+        shift 2
+        ;;
+      --)
+        shift
+        criterion_args+=("$@")
+        break
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        die "unknown argument: $1"
+        ;;
+    esac
+  done
+
+  export CARGO_HOME="$cargo_home"
+  mkdir -p "$CARGO_HOME"
+
+  command -v cargo >/dev/null 2>&1 || die "cargo not found in PATH"
+
+  case "$cmd" in
+    name)
+      default_baseline_name
+      echo
+      ;;
+    run)
+      ensure_bench_targets_selected
+      if [[ ${#criterion_args[@]} -gt 0 ]]; then
+        exec cargo bench "${cargo_args[@]+${cargo_args[@]}}" -- "${criterion_args[@]}"
+      fi
+      exec cargo bench "${cargo_args[@]+${cargo_args[@]}}"
+      ;;
+    save)
+      ensure_bench_targets_selected
+      if [[ -z "$baseline" ]]; then
+        baseline="$(default_baseline_name)"
+      else
+        baseline="$(sanitize_baseline_name "$baseline")"
+        [[ -n "$baseline" ]] || die "--baseline resolved to an empty name"
+      fi
+      echo "baseline: $baseline"
+      local -a bench_bin_args=(--save-baseline "$baseline")
+      if [[ ${#criterion_args[@]} -gt 0 ]]; then
+        bench_bin_args+=("${criterion_args[@]}")
+      fi
+      exec cargo bench "${cargo_args[@]+${cargo_args[@]}}" -- "${bench_bin_args[@]}"
+      ;;
+    compare)
+      ensure_bench_targets_selected
+      [[ -n "$baseline" ]] || die "compare requires --baseline NAME"
+      baseline="$(sanitize_baseline_name "$baseline")"
+      [[ -n "$baseline" ]] || die "--baseline resolved to an empty name"
+      echo "baseline: $baseline"
+      local -a bench_bin_args=(--baseline "$baseline")
+      if [[ ${#criterion_args[@]} -gt 0 ]]; then
+        bench_bin_args+=("${criterion_args[@]}")
+      fi
+      exec cargo bench "${cargo_args[@]+${cargo_args[@]}}" -- "${bench_bin_args[@]}"
+      ;;
+    *)
+      die "unknown command: $cmd"
+      ;;
+  esac
+}
+
+main "$@"
