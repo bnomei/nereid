@@ -1,0 +1,31 @@
+{
+  "diagram_id": "demo-seq",
+  "mmd_path": "diagrams/demo-seq.mmd",
+  "sequence_messages": [
+    {
+      "message_id": "m:hello",
+      "from_participant_id": "p:alice",
+      "to_participant_id": "p:bob",
+      "kind": "sync",
+      "text": "Hello"
+    },
+    {
+      "message_id": "m:hi",
+      "from_participant_id": "p:bob",
+      "to_participant_id": "p:alice",
+      "kind": "return",
+      "text": "Hi!"
+    },
+    {
+      "message_id": "m:ping",
+      "from_participant_id": "p:alice",
+      "to_participant_id": "p:bob",
+      "kind": "async",
+      "text": "Async ping"
+    }
+  ],
+  "sequence_participant_notes": {
+    "p:alice": "sync + async",
+    "p:bob": "return"
+  }
+}

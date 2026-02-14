@@ -1,0 +1,53 @@
+{
+  "diagram_id": "demo-t-seq-ambiguous",
+  "mmd_path": "diagrams/demo-t-seq-ambiguous.mmd",
+  "sequence_messages": [
+    {
+      "message_id": "m:req",
+      "from_participant_id": "p:client",
+      "to_participant_id": "p:api",
+      "kind": "sync",
+      "text": "Request"
+    },
+    {
+      "message_id": "m:ok_hit",
+      "from_participant_id": "p:api",
+      "to_participant_id": "p:client",
+      "kind": "sync",
+      "text": "OK"
+    },
+    {
+      "message_id": "m:ok_db",
+      "from_participant_id": "p:api",
+      "to_participant_id": "p:db",
+      "kind": "sync",
+      "text": "OK"
+    },
+    {
+      "message_id": "m:ok_db_return",
+      "from_participant_id": "p:db",
+      "to_participant_id": "p:api",
+      "kind": "return",
+      "text": "OK"
+    },
+    {
+      "message_id": "m:ok_client",
+      "from_participant_id": "p:api",
+      "to_participant_id": "p:client",
+      "kind": "return",
+      "text": "OK"
+    },
+    {
+      "message_id": "m:ok_self",
+      "from_participant_id": "p:api",
+      "to_participant_id": "p:api",
+      "kind": "sync",
+      "text": "OK"
+    }
+  ],
+  "sequence_participant_notes": {
+    "p:client": "requester",
+    "p:api": "repeats OK",
+    "p:db": "responds in else branch"
+  }
+}

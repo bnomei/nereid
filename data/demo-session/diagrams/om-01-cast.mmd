@@ -1,0 +1,15 @@
+flowchart LR
+%% Cast + forces (kept DAG so flowchart layout never errors on cycles).
+
+manolin(Manolin) -->|helps| santiago[Santiago]
+sea(Sea) -->|tests| santiago
+di_maggio(DiMaggio) -->|inspires| santiago
+lions(Lions) -->|dreams| santiago
+luck{Luck} --> santiago
+
+santiago -->|hooks| marlin[Marlin]
+marlin -->|draws| mako[Mako shark]
+marlin -->|draws| galanos[Galanos sharks]
+
+santiago --> terrace[Terrace]
+terrace --> baseball[Baseball talk]

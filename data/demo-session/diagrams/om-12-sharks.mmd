@@ -1,0 +1,32 @@
+sequenceDiagram
+%% Shark attacks (paraphrased). Shows alt + loop + par.
+
+participant santiago
+participant marlin
+participant mako
+participant galanos
+participant weapon
+
+mako->>marlin: First bite
+santiago->>weapon: Harpoon ready
+santiago->>mako: Strike
+mako-->>santiago: Retreat
+
+loop more sharks
+  alt tool intact
+    galanos->>marlin: Bite at carcass
+    santiago->>weapon: Knife on oar
+    santiago->>galanos: Swing oar
+  else tool lost
+    galanos->>marlin: Bite again
+    santiago->>santiago: Keep going anyway
+  end
+
+  par keep course
+    santiago->>santiago: Sail and steer
+  and watch the fish
+    santiago->>marlin: Check lashings
+  end
+end
+
+marlin-->>santiago: Only skeleton remains

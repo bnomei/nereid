@@ -1,0 +1,29 @@
+sequenceDiagram
+%% Marlin hook + fight (paraphrased). Blocks show pacing.
+
+participant santiago
+participant marlin
+participant line
+participant sea
+
+santiago->>line: Set baits and depths
+line->>marlin: Hook takes
+marlin-->>line: Pulls steadily
+
+loop hours pass
+  santiago->>santiago: Hold line and rest
+  alt marlin runs
+    marlin-)sea: Deep run
+    sea-->>santiago: Skiff towed
+  else marlin circles
+    marlin->>sea: Circles under skiff
+    santiago->>line: Gain line
+  end
+end
+
+opt wish for help
+  santiago->>santiago: I wish the boy were here
+end
+
+santiago->>marlin: Harpoon strike
+marlin-->>sea: Bleeds

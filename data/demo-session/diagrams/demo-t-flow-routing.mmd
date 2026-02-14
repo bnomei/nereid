@@ -1,0 +1,29 @@
+flowchart TD
+%% Demo: routing around obstacles with a dense DAG.
+
+start(Start) --> ingest[Ingest]
+start --> opts(Options)
+
+ingest --> parse[Parse]
+opts --> parse
+
+parse --> ast[AST]
+parse --> diag(Diagnostics)
+
+ast --> analyze[Analyze]
+diag --> analyze
+
+analyze --> plan[Plan]
+opts --> plan
+
+plan --> exec[Execute]
+analyze --> exec
+
+exec --> render[Render]
+analyze --> render
+
+render --> out[Output]
+render --> metrics(Stats)
+
+out --> done{Done}
+metrics --> done

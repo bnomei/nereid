@@ -1,0 +1,9 @@
+{
+  "diagram_id": "om-11-marlin",
+  "mmd_path": "diagrams/om-11-marlin.mmd",
+  "sequence_participant_notes": {
+    "p:santiago": "inner monologue (self messages)",
+    "p:marlin": "steady pull",
+    "p:sea": "drift + tow"
+  }
+}

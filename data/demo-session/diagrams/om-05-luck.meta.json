@@ -1,0 +1,9 @@
+{
+  "diagram_id": "om-05-luck",
+  "mmd_path": "diagrams/om-05-luck.mmd",
+  "flow_node_notes": {
+    "n:streak_84": "Starts the story",
+    "n:lucky_boat": "Contrast with the streak",
+    "n:salao": "Worst luck marker"
+  }
+}

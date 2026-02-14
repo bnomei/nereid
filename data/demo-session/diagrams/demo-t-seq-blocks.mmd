@@ -1,0 +1,33 @@
+sequenceDiagram
+%% Demo: blocks (alt/else/opt/loop/par/and) + self messages.
+participant client
+participant api
+participant db
+participant cache
+participant worker
+
+client->>api: request items
+
+alt cache hit
+  api->>cache: lookup
+  cache-->>api: hit
+else cache miss
+  api->>db: query
+  db-->>api: rows
+  opt warm cache
+    api-)cache: put
+  end
+end
+
+par side effects
+  api-)worker: audit event
+and response build
+  api->>api: format json
+end
+
+api-->>client: response
+
+loop pagination
+  client->>api: next page
+  api-->>client: page data
+end

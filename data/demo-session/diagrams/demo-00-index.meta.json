@@ -1,0 +1,13 @@
+{
+  "diagram_id": "demo-00-index",
+  "mmd_path": "diagrams/demo-00-index.mmd",
+  "flow_node_notes": {
+    "n:start": "Tab / xrefs / search",
+    "n:features": "Parser + renderer",
+    "n:story": "Based on docs text",
+    "n:flow_demo": "edges + shapes",
+    "n:seq_demo": "sync/async/return",
+    "n:seq_blocks": "alt/loop/par",
+    "n:flow_route": "routing + tees"
+  }
+}

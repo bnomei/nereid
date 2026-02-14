@@ -1,0 +1,9 @@
+{
+  "diagram_id": "demo-t-flow-routing",
+  "mmd_path": "diagrams/demo-t-flow-routing.mmd",
+  "flow_node_notes": {
+    "n:start": "dense DAG",
+    "n:render": "many merges",
+    "n:done": "routing demo"
+  }
+}

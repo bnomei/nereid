@@ -1,0 +1,500 @@
+{
+  "session_id": "s:demo",
+  "active_diagram_id": "demo-00-index",
+  "diagrams": [
+    {
+      "diagram_id": "demo-00-index",
+      "name": "Demo index (xrefs + notes)",
+      "kind": "flowchart",
+      "mmd_path": "diagrams/demo-00-index.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "demo-flow",
+      "name": "Flowchart demo (edges, labels, shapes)",
+      "kind": "flowchart",
+      "mmd_path": "diagrams/demo-flow.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "demo-seq",
+      "name": "Sequence demo (sync/async/return)",
+      "kind": "sequence",
+      "mmd_path": "diagrams/demo-seq.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "demo-t-flow-routing",
+      "name": "Flowchart demo (routing + crossings)",
+      "kind": "flowchart",
+      "mmd_path": "diagrams/demo-t-flow-routing.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "demo-t-seq-blocks",
+      "name": "Sequence demo (alt/loop/par + self msg)",
+      "kind": "sequence",
+      "mmd_path": "diagrams/demo-t-seq-blocks.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "demo-t-seq-ambiguous",
+      "name": "Sequence demo (ambiguous OK messages)",
+      "kind": "sequence",
+      "mmd_path": "diagrams/demo-t-seq-ambiguous.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "om-00-index",
+      "name": "OMATS index (nav + notes)",
+      "kind": "flowchart",
+      "mmd_path": "diagrams/om-00-index.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "om-01-cast",
+      "name": "OMATS cast (xrefs hub)",
+      "kind": "flowchart",
+      "mmd_path": "diagrams/om-01-cast.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "om-02-gear",
+      "name": "OMATS gear (inline labels + linkStyle)",
+      "kind": "flowchart",
+      "mmd_path": "diagrams/om-02-gear.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "om-03-arc",
+      "name": "OMATS arc (timeline)",
+      "kind": "flowchart",
+      "mmd_path": "diagrams/om-03-arc.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "om-10-dialogue",
+      "name": "OMATS dialogue (alt/opt + arrow tokens)",
+      "kind": "sequence",
+      "mmd_path": "diagrams/om-10-dialogue.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "om-11-marlin",
+      "name": "OMATS marlin (loop + alt + self)",
+      "kind": "sequence",
+      "mmd_path": "diagrams/om-11-marlin.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "om-12-sharks",
+      "name": "OMATS sharks (loop + alt + par)",
+      "kind": "sequence",
+      "mmd_path": "diagrams/om-12-sharks.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "om-13-return",
+      "name": "OMATS return (aftermath)",
+      "kind": "flowchart",
+      "mmd_path": "diagrams/om-13-return.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "om-20-motifs",
+      "name": "OMATS motifs (DAG + xrefs)",
+      "kind": "flowchart",
+      "mmd_path": "diagrams/om-20-motifs.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "om-04-sea",
+      "name": "OMATS sea (perspective shift)",
+      "kind": "flowchart",
+      "mmd_path": "diagrams/om-04-sea.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "om-05-luck",
+      "name": "OMATS luck (streak + resolve)",
+      "kind": "flowchart",
+      "mmd_path": "diagrams/om-05-luck.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "om-06-baseball",
+      "name": "OMATS baseball (alt + opt)",
+      "kind": "sequence",
+      "mmd_path": "diagrams/om-06-baseball.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "om-07-shark-types",
+      "name": "OMATS shark types (taxonomy)",
+      "kind": "flowchart",
+      "mmd_path": "diagrams/om-07-shark-types.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "om-08-dreams",
+      "name": "OMATS dreams (alt + loop)",
+      "kind": "sequence",
+      "mmd_path": "diagrams/om-08-dreams.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "om-09-weapons",
+      "name": "OMATS weapons (chain)",
+      "kind": "flowchart",
+      "mmd_path": "diagrams/om-09-weapons.mmd",
+      "rev": 0
+    }
+  ],
+  "xrefs": [
+    {
+      "xref_id": "x:1",
+      "from": "d:demo-flow/flow/node/n:a",
+      "to": "d:demo-flow/flow/edge/e:ab",
+      "kind": "uses",
+      "label": "entry edge",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:2",
+      "from": "d:demo-flow/flow/node/n:b",
+      "to": "d:demo-flow/flow/edge/e:missing",
+      "kind": "uses",
+      "label": "dangling example",
+      "status": "dangling_to"
+    },
+    {
+      "xref_id": "x:nav:flow",
+      "from": "d:demo-00-index/flow/node/n:flow_demo",
+      "to": "d:demo-flow/flow/edge/e:ab",
+      "kind": "nav",
+      "label": "open flowchart demo",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:nav:seq",
+      "from": "d:demo-00-index/flow/node/n:seq_demo",
+      "to": "d:demo-seq/seq/participant/p:alice",
+      "kind": "nav",
+      "label": "open sequence demo",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:nav:blocks",
+      "from": "d:demo-00-index/flow/node/n:seq_blocks",
+      "to": "d:demo-t-seq-blocks/seq/participant/p:client",
+      "kind": "nav",
+      "label": "open blocks demo",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:nav:routing",
+      "from": "d:demo-00-index/flow/node/n:flow_route",
+      "to": "d:demo-t-flow-routing/flow/node/n:start",
+      "kind": "nav",
+      "label": "open routing demo",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:nav:om:index",
+      "from": "d:demo-00-index/flow/node/n:om_index",
+      "to": "d:om-00-index/flow/node/n:start",
+      "kind": "nav",
+      "label": "open story index",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:nav:om:cast",
+      "from": "d:demo-00-index/flow/node/n:om_cast",
+      "to": "d:om-01-cast/flow/node/n:santiago",
+      "kind": "nav",
+      "label": "open cast map",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:nav:om:gear",
+      "from": "d:demo-00-index/flow/node/n:om_gear",
+      "to": "d:om-02-gear/flow/node/n:prepare",
+      "kind": "nav",
+      "label": "open gear diagram",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:nav:om:arc",
+      "from": "d:demo-00-index/flow/node/n:om_arc",
+      "to": "d:om-03-arc/flow/node/n:streak",
+      "kind": "nav",
+      "label": "open plot arc",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:nav:om:dialogue",
+      "from": "d:demo-00-index/flow/node/n:om_dialogue",
+      "to": "d:om-10-dialogue/seq/participant/p:manolin",
+      "kind": "nav",
+      "label": "open dialogue sequence",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:nav:om:marlin",
+      "from": "d:demo-00-index/flow/node/n:om_marlin",
+      "to": "d:om-11-marlin/seq/participant/p:marlin",
+      "kind": "nav",
+      "label": "open marlin sequence",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:nav:om:sharks",
+      "from": "d:demo-00-index/flow/node/n:om_sharks",
+      "to": "d:om-12-sharks/seq/participant/p:mako",
+      "kind": "nav",
+      "label": "open sharks sequence",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:nav:om:return",
+      "from": "d:demo-00-index/flow/node/n:om_return",
+      "to": "d:om-13-return/flow/node/n:sail_home",
+      "kind": "nav",
+      "label": "open return diagram",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:nav:om:motifs",
+      "from": "d:demo-00-index/flow/node/n:om_motifs",
+      "to": "d:om-20-motifs/flow/node/n:motifs",
+      "kind": "nav",
+      "label": "open motifs diagram",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:nav:cast",
+      "from": "d:om-00-index/flow/node/n:cast",
+      "to": "d:om-01-cast/flow/node/n:santiago",
+      "kind": "nav",
+      "label": "cast map",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:nav:gear",
+      "from": "d:om-00-index/flow/node/n:gear",
+      "to": "d:om-02-gear/flow/node/n:prepare",
+      "kind": "nav",
+      "label": "gear prep",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:nav:arc",
+      "from": "d:om-00-index/flow/node/n:arc",
+      "to": "d:om-03-arc/flow/node/n:streak",
+      "kind": "nav",
+      "label": "plot arc",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:nav:dialogue",
+      "from": "d:om-00-index/flow/node/n:dialogue",
+      "to": "d:om-10-dialogue/seq/participant/p:manolin",
+      "kind": "nav",
+      "label": "dialogue",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:nav:marlin",
+      "from": "d:om-00-index/flow/node/n:marlin",
+      "to": "d:om-11-marlin/seq/participant/p:santiago",
+      "kind": "nav",
+      "label": "marlin fight",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:nav:sharks",
+      "from": "d:om-00-index/flow/node/n:sharks",
+      "to": "d:om-12-sharks/seq/participant/p:mako",
+      "kind": "nav",
+      "label": "shark attacks",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:nav:return",
+      "from": "d:om-00-index/flow/node/n:return",
+      "to": "d:om-13-return/flow/node/n:sail_home",
+      "kind": "nav",
+      "label": "return",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:nav:motifs",
+      "from": "d:om-00-index/flow/node/n:motifs",
+      "to": "d:om-20-motifs/flow/node/n:motifs",
+      "kind": "nav",
+      "label": "motifs",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:nav:baseball",
+      "from": "d:om-00-index/flow/node/n:baseball_view",
+      "to": "d:om-06-baseball/seq/participant/p:manolin",
+      "kind": "nav",
+      "label": "baseball talk",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:nav:shark_types",
+      "from": "d:om-00-index/flow/node/n:shark_types",
+      "to": "d:om-07-shark-types/flow/node/n:sharks",
+      "kind": "nav",
+      "label": "shark types",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:nav:sea",
+      "from": "d:om-00-index/flow/node/n:sea_view",
+      "to": "d:om-04-sea/flow/node/n:sea",
+      "kind": "nav",
+      "label": "sea as character",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:nav:luck",
+      "from": "d:om-00-index/flow/node/n:luck_view",
+      "to": "d:om-05-luck/flow/node/n:streak_84",
+      "kind": "nav",
+      "label": "luck + streak",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:nav:dreams",
+      "from": "d:om-00-index/flow/node/n:dreams",
+      "to": "d:om-08-dreams/seq/participant/p:lions",
+      "kind": "nav",
+      "label": "dreams",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:nav:weapons",
+      "from": "d:om-00-index/flow/node/n:weapons",
+      "to": "d:om-09-weapons/flow/node/n:harpoon",
+      "kind": "nav",
+      "label": "weapon chain",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:cast:manolin_dialogue",
+      "from": "d:om-01-cast/flow/node/n:manolin",
+      "to": "d:om-10-dialogue/seq/participant/p:manolin",
+      "kind": "appears_in",
+      "label": "dialogue sequence",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:cast:dimaggio_dialogue",
+      "from": "d:om-01-cast/flow/node/n:di_maggio",
+      "to": "d:om-10-dialogue/seq/message/m:dimaggio",
+      "kind": "mentions",
+      "label": "baseball motif",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:cast:lions_motif",
+      "from": "d:om-01-cast/flow/node/n:lions",
+      "to": "d:om-20-motifs/flow/node/n:lions",
+      "kind": "motif",
+      "label": "recurs",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:cast:marlin_fight",
+      "from": "d:om-01-cast/flow/node/n:marlin",
+      "to": "d:om-11-marlin/seq/participant/p:marlin",
+      "kind": "appears_in",
+      "label": "marlin sequence",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:cast:mako_attacks",
+      "from": "d:om-01-cast/flow/node/n:mako",
+      "to": "d:om-12-sharks/seq/participant/p:mako",
+      "kind": "appears_in",
+      "label": "sharks sequence",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:cast:galanos_attacks",
+      "from": "d:om-01-cast/flow/node/n:galanos",
+      "to": "d:om-12-sharks/seq/participant/p:galanos",
+      "kind": "appears_in",
+      "label": "sharks sequence",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:gear:harpoon_sharks",
+      "from": "d:om-02-gear/flow/node/n:harpoon",
+      "to": "d:om-12-sharks/seq/participant/p:weapon",
+      "kind": "used_in",
+      "label": "weapon chain",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:arc:terrace_dialogue",
+      "from": "d:om-03-arc/flow/node/n:terrace",
+      "to": "d:om-10-dialogue/seq/participant/p:santiago",
+      "kind": "scene",
+      "label": "terrace talk",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:return:skeleton_message",
+      "from": "d:om-13-return/flow/node/n:skeleton",
+      "to": "d:om-12-sharks/seq/message/m:skeleton",
+      "kind": "result",
+      "label": "only skeleton remains",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:motifs:dimaggio_dialogue",
+      "from": "d:om-20-motifs/flow/node/n:di_maggio",
+      "to": "d:om-10-dialogue/seq/message/m:dimaggio",
+      "kind": "mentions",
+      "label": "quote",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:motifs:sea_detail",
+      "from": "d:om-20-motifs/flow/node/n:sea",
+      "to": "d:om-04-sea/flow/node/n:sea",
+      "kind": "detail",
+      "label": "sea framing",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:motifs:dreams_detail",
+      "from": "d:om-20-motifs/flow/node/n:lions",
+      "to": "d:om-08-dreams/seq/participant/p:lions",
+      "kind": "detail",
+      "label": "dreams",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:motifs:dimaggio_baseball",
+      "from": "d:om-20-motifs/flow/node/n:di_maggio",
+      "to": "d:om-06-baseball/seq/message/m:dimaggio_diff",
+      "kind": "mentions",
+      "label": "makes the difference",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:om:weapons:weapon_seq",
+      "from": "d:om-09-weapons/flow/node/n:oar",
+      "to": "d:om-12-sharks/seq/participant/p:weapon",
+      "kind": "used_in",
+      "label": "improvised weapon",
+      "status": "ok"
+    }
+  ],
+  "selected_object_refs": []
+}

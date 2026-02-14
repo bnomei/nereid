@@ -1,0 +1,10 @@
+{
+  "diagram_id": "demo-t-seq-blocks",
+  "mmd_path": "diagrams/demo-t-seq-blocks.mmd",
+  "sequence_participant_notes": {
+    "p:client": "caller",
+    "p:api": "self msg",
+    "p:cache": "alt/else",
+    "p:worker": "async"
+  }
+}

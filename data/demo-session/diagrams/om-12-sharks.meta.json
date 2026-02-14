@@ -1,0 +1,25 @@
+{
+  "diagram_id": "om-12-sharks",
+  "mmd_path": "diagrams/om-12-sharks.mmd",
+  "sequence_messages": [
+    {
+      "message_id": "m:first_bite",
+      "from_participant_id": "p:mako",
+      "to_participant_id": "p:marlin",
+      "kind": "sync",
+      "text": "First bite"
+    },
+    {
+      "message_id": "m:skeleton",
+      "from_participant_id": "p:marlin",
+      "to_participant_id": "p:santiago",
+      "kind": "return",
+      "text": "Only skeleton remains"
+    }
+  ],
+  "sequence_participant_notes": {
+    "p:mako": "first shark",
+    "p:galanos": "later sharks",
+    "p:weapon": "harpoon / oar / knife"
+  }
+}

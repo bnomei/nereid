@@ -1,0 +1,12 @@
+{
+  "diagram_id": "om-02-gear",
+  "mmd_path": "diagrams/om-02-gear.mmd",
+  "flow_node_notes": {
+    "n:prepare": "Flowchart: inline labels + connectors",
+    "n:mast": "Carried on shoulder",
+    "n:lines": "Coiled line + hooks",
+    "n:harpoon": "Primary weapon",
+    "n:gaff": "Utility tool",
+    "n:skiff": "Small boat in the Gulf Stream"
+  }
+}

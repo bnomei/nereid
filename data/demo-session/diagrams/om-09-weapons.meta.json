@@ -1,0 +1,9 @@
+{
+  "diagram_id": "om-09-weapons",
+  "mmd_path": "diagrams/om-09-weapons.mmd",
+  "flow_node_notes": {
+    "n:harpoon": "starts with the harpoon",
+    "n:oar": "improvised weapon",
+    "n:endurance": "ends as a test of will"
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "diagram_id": "om-10-dialogue",
+  "mmd_path": "diagrams/om-10-dialogue.mmd",
+  "sequence_messages": [
+    {
+      "message_id": "m:ask_go",
+      "from_participant_id": "p:manolin",
+      "to_participant_id": "p:santiago",
+      "kind": "sync",
+      "text": "Can I go with you again"
+    },
+    {
+      "message_id": "m:stay",
+      "from_participant_id": "p:santiago",
+      "to_participant_id": "p:manolin",
+      "kind": "return",
+      "text": "Stay with them"
+    },
+    {
+      "message_id": "m:we_will_go",
+      "from_participant_id": "p:santiago",
+      "to_participant_id": "p:manolin",
+      "kind": "return",
+      "text": "We will go"
+    },
+    {
+      "message_id": "m:yankees",
+      "from_participant_id": "p:manolin",
+      "to_participant_id": "p:santiago",
+      "kind": "sync",
+      "text": "The Yankees cannot lose"
+    },
+    {
+      "message_id": "m:dimaggio",
+      "from_participant_id": "p:santiago",
+      "to_participant_id": "p:manolin",
+      "kind": "return",
+      "text": "Think of DiMaggio"
+    },
+    {
+      "message_id": "m:dawn",
+      "from_participant_id": "p:santiago",
+      "to_participant_id": "p:manolin",
+      "kind": "async",
+      "text": "See you at dawn"
+    }
+  ],
+  "sequence_participant_notes": {
+    "p:manolin": "asks to go fishing",
+    "p:santiago": "talks baseball + resolve"
+  }
+}

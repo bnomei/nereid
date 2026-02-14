@@ -1,0 +1,23 @@
+flowchart TD
+%% Gear + preparation (paraphrased). Demonstrates:
+%% - inline edge label syntax: `<lhs> -- <label> --> <rhs>`
+%% - connector variants preserved for export (`-.->`)
+%% - `linkStyle` accepted (render ignores it)
+
+prepare(Prepare for dawn) --> carry[Carry gear]
+carry -- mast + sail --> mast[Mast]
+carry -- lines + hooks --> lines[Lines]
+carry -- gaff + harpoon --> tools[Tools]
+
+lines --> bait[Bait] --> hook[Hook]
+tools --> harpoon[Harpoon]
+tools --> gaff[Gaff]
+tools --> club[Club]
+
+mast --> skiff[Skiff]
+lines --> skiff
+harpoon --> skiff
+gaff --> skiff
+
+skiff -.-> sea[Sea]
+linkStyle 0 stroke:#888,stroke-width:1px;

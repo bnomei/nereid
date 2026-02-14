@@ -1,0 +1,10 @@
+{
+  "diagram_id": "om-13-return",
+  "mmd_path": "diagrams/om-13-return.mmd",
+  "flow_node_notes": {
+    "n:sail_home": "Wind + current",
+    "n:skeleton": "What remains of the fish",
+    "n:boy_cries": "Emotional reunion",
+    "n:plan": "Ends with intent to go again"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "walkthrough_id": "wt-demo",
+  "title": "Demo walkthrough",
+  "rev": 0,
+  "nodes": [
+    {
+      "node_id": "n:start",
+      "title": "Start at index",
+      "body_md": "Open the demo index and orient to the feature map.",
+      "refs": ["d:demo-00-index/flow/node/n:start"],
+      "tags": ["intro"],
+      "status": "todo"
+    },
+    {
+      "node_id": "n:sharks",
+      "title": "Sharks sequence",
+      "body_md": "Follow the sharks sequence to the aftermath message.",
+      "refs": [
+        "d:om-12-sharks/seq/participant/p:mako",
+        "d:om-12-sharks/seq/message/m:skeleton"
+      ],
+      "tags": ["story"],
+      "status": "todo"
+    }
+  ],
+  "edges": [
+    {
+      "from_node_id": "n:start",
+      "to_node_id": "n:sharks",
+      "kind": "next",
+      "label": "follow story"
+    }
+  ],
+  "source": "fixture"
+}

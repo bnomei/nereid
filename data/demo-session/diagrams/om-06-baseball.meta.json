@@ -1,0 +1,24 @@
+{
+  "diagram_id": "om-06-baseball",
+  "mmd_path": "diagrams/om-06-baseball.mmd",
+  "sequence_messages": [
+    {
+      "message_id": "m:yankees_lost",
+      "from_participant_id": "p:manolin",
+      "to_participant_id": "p:santiago",
+      "kind": "sync",
+      "text": "The Yankees lost today"
+    },
+    {
+      "message_id": "m:dimaggio_diff",
+      "from_participant_id": "p:santiago",
+      "to_participant_id": "p:manolin",
+      "kind": "return",
+      "text": "DiMaggio makes the difference"
+    }
+  ],
+  "sequence_participant_notes": {
+    "p:manolin": "asks questions",
+    "p:santiago": "anchors on DiMaggio"
+  }
+}

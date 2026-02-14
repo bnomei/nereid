@@ -1,0 +1,13 @@
+{
+  "diagram_id": "om-03-arc",
+  "mmd_path": "diagrams/om-03-arc.mmd",
+  "flow_node_notes": {
+    "n:streak": "Starts with bad luck",
+    "n:hook": "Turning point: marlin takes bait",
+    "n:fight": "Endurance + pacing",
+    "n:mako": "First shark arrival",
+    "n:galanos": "Later attacks",
+    "n:skeleton": "Aftermath at harbor",
+    "n:lions": "Motif returns at end"
+  }
+}

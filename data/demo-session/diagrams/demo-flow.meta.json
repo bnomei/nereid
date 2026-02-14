@@ -1,0 +1,34 @@
+{
+  "diagram_id": "demo-flow",
+  "mmd_path": "diagrams/demo-flow.mmd",
+  "flow_edges": [
+    {
+      "edge_id": "e:ab",
+      "from_node_id": "n:a",
+      "to_node_id": "n:b",
+      "label": "alpha",
+      "style": null
+    },
+    {
+      "edge_id": "e:ac",
+      "from_node_id": "n:a",
+      "to_node_id": "n:c",
+      "label": "beta",
+      "style": null
+    },
+    {
+      "edge_id": "e:bd",
+      "from_node_id": "n:b",
+      "to_node_id": "n:d",
+      "label": null,
+      "style": null
+    },
+    {
+      "edge_id": "e:cd",
+      "from_node_id": "n:c",
+      "to_node_id": "n:d",
+      "label": null,
+      "style": null
+    }
+  ]
+}

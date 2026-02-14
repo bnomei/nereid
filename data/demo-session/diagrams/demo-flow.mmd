@@ -1,0 +1,9 @@
+flowchart TD
+%% Demo: basic DAG + labeled edges + node shapes.
+a[A] -->|alpha| b[B]
+a -->|beta| c(C)
+b --> d{D}
+c --> d
+
+%% Demo: linkStyle is accepted (render currently ignores it).
+linkStyle 0 stroke:#ff0000,stroke-width:2px;

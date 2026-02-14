@@ -1,0 +1,9 @@
+{
+  "diagram_id": "om-04-sea",
+  "mmd_path": "diagrams/om-04-sea.mmd",
+  "flow_node_notes": {
+    "n:sea": "Perspective shift demo",
+    "n:la_mar": "Personal framing",
+    "n:el_mar": "Competitive framing"
+  }
+}

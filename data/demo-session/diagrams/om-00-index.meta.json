@@ -1,0 +1,21 @@
+{
+  "diagram_id": "om-00-index",
+  "mmd_path": "diagrams/om-00-index.mmd",
+  "flow_node_notes": {
+    "n:start": "Navigation hub for the story suite",
+    "n:cast": "Cast map with xrefs into sequences",
+    "n:gear": "Inline edge labels + connector variants",
+    "n:arc": "High-level timeline (DAG)",
+    "n:dialogue": "Sequence: alt/opt + arrow variants",
+    "n:marlin": "Sequence: loop + alt + self-talk",
+    "n:sharks": "Sequence: alt + loop + par",
+    "n:baseball_view": "Sequence: alt + opt",
+    "n:shark_types": "Flowchart: taxonomy",
+    "n:return": "Aftermath + measurement",
+    "n:motifs": "Motif graph (kept cycle-free)",
+    "n:sea_view": "Flowchart: perspective shift",
+    "n:luck_view": "Flowchart: streak + resolve",
+    "n:dreams": "Sequence: alt + loop",
+    "n:weapons": "Flowchart: chain"
+  }
+}

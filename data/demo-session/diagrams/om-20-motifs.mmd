@@ -1,0 +1,19 @@
+flowchart LR
+%% Motifs network (DAG).
+
+motifs(Motifs) --> endurance[Endurance]
+motifs --> luck[Luck]
+motifs --> pride[Pride]
+motifs --> sea[Sea]
+motifs --> lions[Lions]
+motifs --> di_maggio[DiMaggio]
+
+endurance --> fight[Long fight]
+pride --> fight
+luck --> streak[Unlucky streak]
+sea --> journey[Offshore journey]
+lions --> sleep[Sleep + dreams]
+di_maggio --> resolve[Resolve]
+resolve --> fight
+journey --> fight
+fight --> return[Return]

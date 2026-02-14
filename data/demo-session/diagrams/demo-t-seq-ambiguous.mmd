@@ -1,0 +1,18 @@
+sequenceDiagram
+%% Demo: ambiguous repeated messages that require AST-aware resolution.
+
+participant client
+participant api
+participant db
+
+client->>api: Request
+
+alt cache hit
+  api->>client: OK
+else cache miss
+  api->>db: OK
+  db-->>api: OK
+  api-->>client: OK
+end
+
+api->>api: OK
