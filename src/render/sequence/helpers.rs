@@ -359,7 +359,7 @@ fn box_widths(name: &str) -> (usize, usize) {
     let mut total_width = inner_width + 2;
 
     // Keep widths odd so lifelines fall on a true center cell.
-    if total_width.is_multiple_of(2) {
+    if total_width % 2 == 0 {
         total_width += 1;
         inner_width += 1;
     }

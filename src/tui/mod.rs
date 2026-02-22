@@ -2545,16 +2545,19 @@ impl TerminalSession {
         enable_raw_mode()?;
 
         let mut stdout = io::stdout();
-        execute!(stdout, EnterAlternateScreen).inspect_err(|_err| {
+        execute!(stdout, EnterAlternateScreen).map_err(|err| {
             teardown_terminal();
+            err
         })?;
 
         let backend = CrosstermBackend::new(stdout);
-        let mut terminal = Terminal::new(backend).inspect_err(|_err| {
+        let mut terminal = Terminal::new(backend).map_err(|err| {
             teardown_terminal();
+            err
         })?;
-        terminal.clear().inspect_err(|_err| {
+        terminal.clear().map_err(|err| {
             teardown_terminal();
+            err
         })?;
 
         Ok(Self { terminal })

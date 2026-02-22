@@ -158,7 +158,7 @@ fn box_widths(title: &str) -> (usize, usize) {
     let mut total_width = inner_width + 2;
 
     // Keep widths odd so arrows naturally land on a single center-ish cell.
-    if total_width.is_multiple_of(2) {
+    if total_width % 2 == 0 {
         total_width += 1;
         inner_width += 1;
     }

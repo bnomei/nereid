@@ -387,10 +387,12 @@ mod tests {
         find_route, find_route_with_adjacency, find_routes, find_routes_with_adjacency,
         RoutesOrdering, SessionRouteAdjacency,
     };
+    use crate::model::seq_ast::{
+        SequenceBlock, SequenceBlockKind, SequenceSection, SequenceSectionKind,
+    };
     use crate::model::{
         Diagram, DiagramAst, DiagramId, FlowEdge, FlowNode, FlowchartAst, ObjectRef, SequenceAst,
-        SequenceBlock, SequenceBlockKind, SequenceMessage, SequenceMessageKind, SequenceSection,
-        SequenceSectionKind, Session, SessionId, XRef, XRefId, XRefStatus,
+        SequenceMessage, SequenceMessageKind, Session, SessionId, XRef, XRefId, XRefStatus,
     };
     use crate::model::{ObjectId, SequenceParticipant};
 

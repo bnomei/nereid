@@ -1995,7 +1995,10 @@ async fn object_read_returns_seq_block() {
         } => {
             assert_eq!(*kind, McpSeqBlockKind::Alt);
             assert_eq!(header.as_deref(), Some("guard"));
-            assert_eq!(section_ids, &vec!["sec:0000:00".into(), "sec:0000:01".into()]);
+            assert_eq!(
+                section_ids,
+                &vec![String::from("sec:0000:00"), String::from("sec:0000:01")]
+            );
             assert!(child_block_ids.is_empty());
         }
         _ => panic!("unexpected object kind"),
@@ -2022,7 +2025,7 @@ async fn object_read_returns_seq_section() {
         } => {
             assert_eq!(*kind, McpSeqSectionKind::Main);
             assert_eq!(header.as_deref(), Some("ok"));
-            assert_eq!(message_ids, &vec!["m:1".into()]);
+            assert_eq!(message_ids, &vec![String::from("m:1")]);
         }
         _ => panic!("unexpected object kind"),
     }
@@ -2968,7 +2971,7 @@ async fn object_read_rejects_when_object_ref_and_object_refs_are_both_set() {
     let err = match server
         .object_read(Parameters(ObjectGetParams {
             object_ref: Some("d:d-seq/seq/participant/p:a".into()),
-            object_refs: Some(vec!["d:d-flow/flow/edge/e:ab".into()]),
+            object_refs: Some(vec![String::from("d:d-flow/flow/edge/e:ab")]),
         }))
         .await
     {
@@ -3622,7 +3625,7 @@ async fn diagram_get_slice_filters_include_categories() {
             radius: None,
             depth: None,
             filters: Some(DiagramSliceFilters {
-                include_categories: Some(vec!["flow/node".into()]),
+                include_categories: Some(vec![String::from("flow/node")]),
                 exclude_categories: None,
             }),
         }))

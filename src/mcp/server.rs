@@ -2119,12 +2119,12 @@ impl NereidMcp {
             .filter(|msg| {
                 from_participant_id
                     .as_ref()
-                    .is_none_or(|from| msg.from_participant_id() == from)
+                    .map_or(true, |from| msg.from_participant_id() == from)
             })
             .filter(|msg| {
                 to_participant_id
                     .as_ref()
-                    .is_none_or(|to| msg.to_participant_id() == to)
+                    .map_or(true, |to| msg.to_participant_id() == to)
             })
             .collect::<Vec<_>>();
         messages.sort_by(|a, b| crate::model::SequenceMessage::cmp_in_order(a, b));
@@ -2927,11 +2927,9 @@ impl NereidMcp {
                     visited
                 }
 
-                let seq_participant_category = CategoryPath::new(vec![
-                    "seq".to_owned(),
-                    "participant".to_owned(),
-                ])
-                .expect("seq participant category");
+                let seq_participant_category =
+                    CategoryPath::new(vec!["seq".to_owned(), "participant".to_owned()])
+                        .expect("seq participant category");
                 let seq_message_category =
                     CategoryPath::new(vec!["seq".to_owned(), "message".to_owned()])
                         .expect("seq message category");

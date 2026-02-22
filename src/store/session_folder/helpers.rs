@@ -1440,14 +1440,14 @@ fn write_atomic_in_session_inner(
     let Some(parent) = path.parent() else {
         return Err(StoreError::Io {
             path: path.to_path_buf(),
-            source: io::Error::other("path has no parent"),
+            source: io::Error::new(io::ErrorKind::Other, "path has no parent"),
         });
     };
 
     let Some(file_name) = path.file_name() else {
         return Err(StoreError::Io {
             path: path.to_path_buf(),
-            source: io::Error::other("path has no file name"),
+            source: io::Error::new(io::ErrorKind::Other, "path has no file name"),
         });
     };
 
