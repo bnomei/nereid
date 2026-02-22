@@ -75,12 +75,7 @@ pub struct FlowNode {
 
 impl FlowNode {
     pub fn new(label: impl Into<String>) -> Self {
-        Self {
-            mermaid_id: None,
-            label: label.into(),
-            shape: "rect".to_owned(),
-            note: None,
-        }
+        Self { mermaid_id: None, label: label.into(), shape: "rect".to_owned(), note: None }
     }
 
     pub fn new_with(
@@ -88,12 +83,7 @@ impl FlowNode {
         shape: impl Into<String>,
         mermaid_id: Option<String>,
     ) -> Self {
-        Self {
-            mermaid_id,
-            label: label.into(),
-            shape: shape.into(),
-            note: None,
-        }
+        Self { mermaid_id, label: label.into(), shape: shape.into(), note: None }
     }
 
     pub fn set_mermaid_id<T: Into<String>>(&mut self, mermaid_id: Option<T>) {
@@ -146,17 +136,11 @@ pub struct FlowGroup {
 
 impl FlowGroup {
     pub fn new(label: impl Into<String>) -> Self {
-        Self {
-            mermaid_id: None,
-            label: label.into(),
-        }
+        Self { mermaid_id: None, label: label.into() }
     }
 
     pub fn new_with(label: impl Into<String>, mermaid_id: Option<String>) -> Self {
-        Self {
-            mermaid_id,
-            label: label.into(),
-        }
+        Self { mermaid_id, label: label.into() }
     }
 
     pub fn set_mermaid_id<T: Into<String>>(&mut self, mermaid_id: Option<T>) {
@@ -178,13 +162,7 @@ impl FlowGroup {
 
 impl FlowEdge {
     pub fn new(from_node_id: ObjectId, to_node_id: ObjectId) -> Self {
-        Self {
-            from_node_id,
-            to_node_id,
-            label: None,
-            connector: None,
-            style: None,
-        }
+        Self { from_node_id, to_node_id, label: None, connector: None, style: None }
     }
 
     pub fn new_with(
@@ -193,13 +171,7 @@ impl FlowEdge {
         label: Option<String>,
         style: Option<String>,
     ) -> Self {
-        Self {
-            from_node_id,
-            to_node_id,
-            label,
-            connector: None,
-            style,
-        }
+        Self { from_node_id, to_node_id, label, connector: None, style }
     }
 
     pub fn set_label<T: Into<String>>(&mut self, label: Option<T>) {

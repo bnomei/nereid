@@ -95,17 +95,13 @@ pub fn render_walkthrough_unicode(
     }
 
     for edge in walkthrough.edges() {
-        let from_idx = nodes
-            .iter()
-            .position(|n| n.node_id() == edge.from_node_id())
-            .ok_or_else(|| WalkthroughRenderError::MissingNode {
-                node_id: edge.from_node_id().clone(),
+        let from_idx =
+            nodes.iter().position(|n| n.node_id() == edge.from_node_id()).ok_or_else(|| {
+                WalkthroughRenderError::MissingNode { node_id: edge.from_node_id().clone() }
             })?;
-        let to_idx = nodes
-            .iter()
-            .position(|n| n.node_id() == edge.to_node_id())
-            .ok_or_else(|| WalkthroughRenderError::MissingNode {
-                node_id: edge.to_node_id().clone(),
+        let to_idx =
+            nodes.iter().position(|n| n.node_id() == edge.to_node_id()).ok_or_else(|| {
+                WalkthroughRenderError::MissingNode { node_id: edge.to_node_id().clone() }
             })?;
 
         if from_idx + 1 == to_idx {
@@ -174,25 +170,17 @@ mod tests {
 
     #[test]
     fn snapshot_two_nodes_one_edge() {
-        let mut wt = Walkthrough::new(
-            WalkthroughId::new("wt:demo").expect("walkthrough id"),
-            "Demo",
-        );
+        let mut wt =
+            Walkthrough::new(WalkthroughId::new("wt:demo").expect("walkthrough id"), "Demo");
 
         let n_start = WalkthroughNodeId::new("wtn:start").expect("node id");
         let n_end = WalkthroughNodeId::new("wtn:end").expect("node id");
 
-        wt.nodes_mut()
-            .push(WalkthroughNode::new(n_start.clone(), "Start"));
-        wt.nodes_mut()
-            .push(WalkthroughNode::new(n_end.clone(), "End"));
-        wt.edges_mut()
-            .push(WalkthroughEdge::new(n_start, n_end, "next"));
+        wt.nodes_mut().push(WalkthroughNode::new(n_start.clone(), "Start"));
+        wt.nodes_mut().push(WalkthroughNode::new(n_end.clone(), "End"));
+        wt.edges_mut().push(WalkthroughEdge::new(n_start, n_end, "next"));
 
         let rendered = render_walkthrough_unicode(&wt).expect("render");
-        assert_eq!(
-            rendered,
-            "┌───────┐    ┌─────┐\n│ Start │───▶│ End │\n└───────┘    └─────┘"
-        );
+        assert_eq!(rendered, "┌───────┐    ┌─────┐\n│ Start │───▶│ End │\n└───────┘    └─────┘");
     }
 }

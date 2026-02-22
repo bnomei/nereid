@@ -142,9 +142,7 @@ impl NereidMcp {
     }
 
     pub async fn serve_stdio(self) -> Result<(), rmcp::RmcpError> {
-        let service = self
-            .serve((tokio::io::stdin(), tokio::io::stdout()))
-            .await?;
+        let service = self.serve((tokio::io::stdin(), tokio::io::stdout())).await?;
         service.waiting().await?;
         Ok(())
     }
@@ -167,9 +165,8 @@ impl NereidMcp {
 
         if let Some(ui_state) = self.ui_state.as_ref() {
             let snapshot = ui_state.lock().await.clone();
-            context.human_active_diagram_id = snapshot
-                .human_active_diagram_id()
-                .map(|diagram_id| diagram_id.as_str().to_owned());
+            context.human_active_diagram_id =
+                snapshot.human_active_diagram_id().map(|diagram_id| diagram_id.as_str().to_owned());
             context.human_active_object_ref =
                 snapshot.human_active_object_ref().map(ToString::to_string);
             context.follow_ai = Some(snapshot.follow_ai());
@@ -207,21 +204,11 @@ impl NereidMcp {
         state.session = disk_session;
 
         state.delta_history.retain(|diagram_id, _| {
-            previous
-                .diagrams()
-                .get(diagram_id)
-                .map(|diagram| diagram.rev())
-                == state
-                    .session
-                    .diagrams()
-                    .get(diagram_id)
-                    .map(|diagram| diagram.rev())
+            previous.diagrams().get(diagram_id).map(|diagram| diagram.rev())
+                == state.session.diagrams().get(diagram_id).map(|diagram| diagram.rev())
         });
         state.walkthrough_delta_history.retain(|walkthrough_id, _| {
-            previous
-                .walkthroughs()
-                .get(walkthrough_id)
-                .map(|walkthrough| walkthrough.rev())
+            previous.walkthroughs().get(walkthrough_id).map(|walkthrough| walkthrough.rev())
                 == state
                     .session
                     .walkthroughs()
@@ -237,10 +224,8 @@ impl NereidMcp {
     #[tool(name = "diagram.list")]
     async fn diagram_list(&self) -> Result<Json<ListDiagramsResponse>, ErrorData> {
         let state = self.lock_state_synced().await?;
-        let session_active_diagram_id = state
-            .session
-            .active_diagram_id()
-            .map(|diagram_id| diagram_id.as_str().to_owned());
+        let session_active_diagram_id =
+            state.session.active_diagram_id().map(|diagram_id| diagram_id.as_str().to_owned());
         let diagrams = state
             .session
             .diagrams()
@@ -265,12 +250,7 @@ impl NereidMcp {
         &self,
         params: Parameters<DiagramCreateFromMermaidParams>,
     ) -> Result<Json<DiagramCreateFromMermaidResponse>, ErrorData> {
-        let DiagramCreateFromMermaidParams {
-            mermaid,
-            diagram_id,
-            name,
-            make_active,
-        } = params.0;
+        let DiagramCreateFromMermaidParams { mermaid, diagram_id, name, make_active } = params.0;
 
         let Some(kind) = detect_mermaid_kind(&mermaid) else {
             return Err(ErrorData::invalid_params(
@@ -357,14 +337,9 @@ impl NereidMcp {
 
             state.session = candidate;
         } else {
-            state
-                .session
-                .diagrams_mut()
-                .insert(diagram_id.clone(), diagram);
+            state.session.diagrams_mut().insert(diagram_id.clone(), diagram);
             if make_active {
-                state
-                    .session
-                    .set_active_diagram_id(Some(diagram_id.clone()));
+                state.session.set_active_diagram_id(Some(diagram_id.clone()));
             }
         }
 
@@ -429,9 +404,7 @@ impl NereidMcp {
             state.session.set_active_diagram_id(Some(parsed.clone()));
         }
 
-        let response = Json(DiagramOpenResponse {
-            active_diagram_id: parsed.as_str().to_owned(),
-        });
+        let response = Json(DiagramOpenResponse { active_diagram_id: parsed.as_str().to_owned() });
         drop(state);
         self.notify_ui_session_changed().await;
         Ok(response)
@@ -463,10 +436,7 @@ impl NereidMcp {
             let mut candidate = state.session.clone();
             candidate.diagrams_mut().remove(&parsed);
 
-            if candidate
-                .active_diagram_id()
-                .is_some_and(|active| active == &parsed)
-            {
+            if candidate.active_diagram_id().is_some_and(|active| active == &parsed) {
                 let next_active = candidate.diagrams().keys().next().cloned();
                 candidate.set_active_diagram_id(next_active);
             }
@@ -490,11 +460,7 @@ impl NereidMcp {
             state.session = candidate;
         } else {
             state.session.diagrams_mut().remove(&parsed);
-            if state
-                .session
-                .active_diagram_id()
-                .is_some_and(|active| active == &parsed)
-            {
+            if state.session.active_diagram_id().is_some_and(|active| active == &parsed) {
                 let next_active = state.session.diagrams().keys().next().cloned();
                 state.session.set_active_diagram_id(next_active);
             }
@@ -504,10 +470,8 @@ impl NereidMcp {
         }
 
         state.delta_history.remove(&parsed);
-        let active_diagram_id = state
-            .session
-            .active_diagram_id()
-            .map(|active| active.as_str().to_owned());
+        let active_diagram_id =
+            state.session.active_diagram_id().map(|active| active.as_str().to_owned());
         drop(state);
 
         let mut agent_highlights = self.agent_highlights.lock().await;
@@ -526,17 +490,12 @@ impl NereidMcp {
     #[tool(name = "diagram.current")]
     async fn diagram_current(&self) -> Result<Json<DiagramCurrentResponse>, ErrorData> {
         let state = self.lock_state_synced().await?;
-        let active_diagram_id = state
-            .session
-            .active_diagram_id()
-            .map(|diagram_id| diagram_id.as_str().to_owned());
+        let active_diagram_id =
+            state.session.active_diagram_id().map(|diagram_id| diagram_id.as_str().to_owned());
         drop(state);
         let context = self.read_context(active_diagram_id.clone()).await;
 
-        Ok(Json(DiagramCurrentResponse {
-            active_diagram_id,
-            context,
-        }))
+        Ok(Json(DiagramCurrentResponse { active_diagram_id, context }))
     }
 
     /// Set the active walkthrough default for walkthrough-scoped tools; usually after
@@ -575,14 +534,11 @@ impl NereidMcp {
             })?;
             state.session = candidate;
         } else {
-            state
-                .session
-                .set_active_walkthrough_id(Some(parsed.clone()));
+            state.session.set_active_walkthrough_id(Some(parsed.clone()));
         }
 
-        let response = Json(WalkthroughOpenResponse {
-            active_walkthrough_id: parsed.as_str().to_owned(),
-        });
+        let response =
+            Json(WalkthroughOpenResponse { active_walkthrough_id: parsed.as_str().to_owned() });
         drop(state);
         self.notify_ui_session_changed().await;
         Ok(response)
@@ -593,10 +549,8 @@ impl NereidMcp {
     #[tool(name = "walkthrough.current")]
     async fn walkthrough_current(&self) -> Result<Json<WalkthroughCurrentResponse>, ErrorData> {
         let state = self.lock_state_synced().await?;
-        let session_active_diagram_id = state
-            .session
-            .active_diagram_id()
-            .map(|diagram_id| diagram_id.as_str().to_owned());
+        let session_active_diagram_id =
+            state.session.active_diagram_id().map(|diagram_id| diagram_id.as_str().to_owned());
         let active_walkthrough_id = state
             .session
             .active_walkthrough_id()
@@ -604,10 +558,7 @@ impl NereidMcp {
         drop(state);
         let context = self.read_context(session_active_diagram_id).await;
 
-        Ok(Json(WalkthroughCurrentResponse {
-            active_walkthrough_id,
-            context,
-        }))
+        Ok(Json(WalkthroughCurrentResponse { active_walkthrough_id, context }))
     }
 
     /// Read human-owned attention from live TUI state; call early in a turn, then localize with
@@ -615,10 +566,8 @@ impl NereidMcp {
     #[tool(name = "attention.human.read")]
     async fn attention_human_read(&self) -> Result<Json<AttentionReadResponse>, ErrorData> {
         let state = self.lock_state_synced().await?;
-        let session_active_diagram_id = state
-            .session
-            .active_diagram_id()
-            .map(|diagram_id| diagram_id.as_str().to_owned());
+        let session_active_diagram_id =
+            state.session.active_diagram_id().map(|diagram_id| diagram_id.as_str().to_owned());
         drop(state);
         let context = self.read_context(session_active_diagram_id).await;
         Ok(Json(AttentionReadResponse {
@@ -633,15 +582,12 @@ impl NereidMcp {
     #[tool(name = "attention.agent.read")]
     async fn attention_agent_read(&self) -> Result<Json<AttentionReadResponse>, ErrorData> {
         let state = self.lock_state_synced().await?;
-        let session_active_diagram_id = state
-            .session
-            .active_diagram_id()
-            .map(|diagram_id| diagram_id.as_str().to_owned());
+        let session_active_diagram_id =
+            state.session.active_diagram_id().map(|diagram_id| diagram_id.as_str().to_owned());
         drop(state);
         let object_ref = self.agent_highlights.lock().await.iter().next().cloned();
-        let diagram_id = object_ref
-            .as_ref()
-            .map(|object_ref| object_ref.diagram_id().as_str().to_owned());
+        let diagram_id =
+            object_ref.as_ref().map(|object_ref| object_ref.diagram_id().as_str().to_owned());
         let context = self.read_context(session_active_diagram_id).await;
 
         Ok(Json(AttentionReadResponse {
@@ -695,10 +641,8 @@ impl NereidMcp {
     #[tool(name = "follow_ai.read")]
     async fn follow_ai_read(&self) -> Result<Json<FollowAiReadResponse>, ErrorData> {
         let state = self.lock_state_synced().await?;
-        let session_active_diagram_id = state
-            .session
-            .active_diagram_id()
-            .map(|diagram_id| diagram_id.as_str().to_owned());
+        let session_active_diagram_id =
+            state.session.active_diagram_id().map(|diagram_id| diagram_id.as_str().to_owned());
         drop(state);
         let context = self.read_context(session_active_diagram_id).await;
         let enabled = context.follow_ai.unwrap_or(true);
@@ -728,9 +672,7 @@ impl NereidMcp {
             let meta = session_folder.load_meta().map_err(|err| {
                 ErrorData::internal_error(format!("failed to load session meta: {err}"), None)
             })?;
-            state
-                .session
-                .set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
+            state.session.set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
             retain_existing_selected_object_refs(&mut state.session);
         }
         let object_refs = state
@@ -739,17 +681,12 @@ impl NereidMcp {
             .iter()
             .map(ToString::to_string)
             .collect::<Vec<_>>();
-        let session_active_diagram_id = state
-            .session
-            .active_diagram_id()
-            .map(|diagram_id| diagram_id.as_str().to_owned());
+        let session_active_diagram_id =
+            state.session.active_diagram_id().map(|diagram_id| diagram_id.as_str().to_owned());
         drop(state);
         let context = self.read_context(session_active_diagram_id).await;
 
-        Ok(Json(SelectionGetResponse {
-            object_refs,
-            context,
-        }))
+        Ok(Json(SelectionGetResponse { object_refs, context }))
     }
 
     /// Update shared multi-selection (`replace`/`add`/`remove`); use to mark a temporary working
@@ -774,10 +711,7 @@ impl NereidMcp {
             }
         }
 
-        let applied = applied_refs
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>();
+        let applied = applied_refs.iter().map(ToString::to_string).collect::<Vec<_>>();
 
         fn apply_mode(session: &mut Session, mode: UpdateMode, object_refs: &BTreeSet<ObjectRef>) {
             match mode {
@@ -787,9 +721,7 @@ impl NereidMcp {
                     selected.extend(object_refs.iter().cloned());
                 }
                 UpdateMode::Add => {
-                    session
-                        .selected_object_refs_mut()
-                        .extend(object_refs.iter().cloned());
+                    session.selected_object_refs_mut().extend(object_refs.iter().cloned());
                 }
                 UpdateMode::Remove => {
                     let selected = session.selected_object_refs_mut();
@@ -808,25 +740,21 @@ impl NereidMcp {
             candidate.set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
             retain_existing_selected_object_refs(&mut candidate);
             apply_mode(&mut candidate, mode, &applied_refs);
-            session_folder
-                .save_selected_object_refs(&candidate)
-                .map_err(|err| {
-                    ErrorData::internal_error(
-                        format!("failed to persist selected object refs: {err}"),
-                        Some(serde_json::json!({
-                            "selected_count": candidate.selected_object_refs().len() as u64,
-                        })),
-                    )
-                })?;
+            session_folder.save_selected_object_refs(&candidate).map_err(|err| {
+                ErrorData::internal_error(
+                    format!("failed to persist selected object refs: {err}"),
+                    Some(serde_json::json!({
+                        "selected_count": candidate.selected_object_refs().len() as u64,
+                    })),
+                )
+            })?;
             state.session = candidate;
         } else {
             apply_mode(&mut state.session, mode, &applied_refs);
         }
 
-        let response = Json(SelectionUpdateResponse {
-            applied,
-            ignored: ignored_refs.into_iter().collect(),
-        });
+        let response =
+            Json(SelectionUpdateResponse { applied, ignored: ignored_refs.into_iter().collect() });
         drop(state);
         self.notify_ui_session_changed().await;
         Ok(response)
@@ -837,10 +765,8 @@ impl NereidMcp {
     #[tool(name = "view.read_state")]
     async fn view_get_state(&self) -> Result<Json<ViewGetStateResponse>, ErrorData> {
         let state = self.lock_state_synced().await?;
-        let active_diagram_id = state
-            .session
-            .active_diagram_id()
-            .map(|diagram_id| diagram_id.as_str().to_owned());
+        let active_diagram_id =
+            state.session.active_diagram_id().map(|diagram_id| diagram_id.as_str().to_owned());
         drop(state);
         let context = self.read_context(active_diagram_id.clone()).await;
 
@@ -857,10 +783,8 @@ impl NereidMcp {
     #[tool(name = "walkthrough.list")]
     async fn walkthrough_list(&self) -> Result<Json<ListWalkthroughsResponse>, ErrorData> {
         let state = self.lock_state_synced().await?;
-        let session_active_diagram_id = state
-            .session
-            .active_diagram_id()
-            .map(|diagram_id| diagram_id.as_str().to_owned());
+        let session_active_diagram_id =
+            state.session.active_diagram_id().map(|diagram_id| diagram_id.as_str().to_owned());
         let mut walkthroughs = state
             .session
             .walkthroughs()
@@ -877,10 +801,7 @@ impl NereidMcp {
         drop(state);
         let context = self.read_context(session_active_diagram_id).await;
 
-        Ok(Json(ListWalkthroughsResponse {
-            walkthroughs,
-            context,
-        }))
+        Ok(Json(ListWalkthroughsResponse { walkthroughs, context }))
     }
 
     /// Read a full walkthrough (nodes/edges/refs); call after `walkthrough.stat` when you need
@@ -894,10 +815,8 @@ impl NereidMcp {
         let parsed = parse_walkthrough_id(&walkthrough_id)?;
 
         let state = self.lock_state_synced().await?;
-        let session_active_diagram_id = state
-            .session
-            .active_diagram_id()
-            .map(|diagram_id| diagram_id.as_str().to_owned());
+        let session_active_diagram_id =
+            state.session.active_diagram_id().map(|diagram_id| diagram_id.as_str().to_owned());
         let walkthrough = state.session.walkthroughs().get(&parsed).ok_or_else(|| {
             ErrorData::resource_not_found(
                 "walkthrough not found",
@@ -939,10 +858,7 @@ impl NereidMcp {
         drop(state);
         let context = self.read_context(session_active_diagram_id).await;
 
-        Ok(Json(WalkthroughGetResponse {
-            walkthrough,
-            context,
-        }))
+        Ok(Json(WalkthroughGetResponse { walkthrough, context }))
     }
 
     /// Get one walkthrough node by id; use for drill-down after `walkthrough.list` or
@@ -952,42 +868,33 @@ impl NereidMcp {
         &self,
         params: Parameters<WalkthroughGetNodeParams>,
     ) -> Result<Json<WalkthroughGetNodeResponse>, ErrorData> {
-        let WalkthroughGetNodeParams {
-            walkthrough_id,
-            node_id,
-        } = params.0;
+        let WalkthroughGetNodeParams { walkthrough_id, node_id } = params.0;
         let parsed_walkthrough_id = parse_walkthrough_id(&walkthrough_id)?;
         let parsed_node_id = parse_walkthrough_node_id(&node_id)?;
 
         let state = self.lock_state_synced().await?;
-        let session_active_diagram_id = state
-            .session
-            .active_diagram_id()
-            .map(|diagram_id| diagram_id.as_str().to_owned());
-        let walkthrough = state
-            .session
-            .walkthroughs()
-            .get(&parsed_walkthrough_id)
-            .ok_or_else(|| {
+        let session_active_diagram_id =
+            state.session.active_diagram_id().map(|diagram_id| diagram_id.as_str().to_owned());
+        let walkthrough =
+            state.session.walkthroughs().get(&parsed_walkthrough_id).ok_or_else(|| {
                 ErrorData::resource_not_found(
                     "walkthrough not found",
                     Some(serde_json::json!({ "walkthrough_id": walkthrough_id.as_str() })),
                 )
             })?;
 
-        let node = walkthrough
-            .nodes()
-            .iter()
-            .find(|node| node.node_id() == &parsed_node_id)
-            .ok_or_else(|| {
-                ErrorData::resource_not_found(
-                    "walkthrough node not found",
-                    Some(serde_json::json!({
-                        "walkthrough_id": walkthrough_id.as_str(),
-                        "node_id": node_id.as_str(),
-                    })),
-                )
-            })?;
+        let node =
+            walkthrough.nodes().iter().find(|node| node.node_id() == &parsed_node_id).ok_or_else(
+                || {
+                    ErrorData::resource_not_found(
+                        "walkthrough node not found",
+                        Some(serde_json::json!({
+                            "walkthrough_id": walkthrough_id.as_str(),
+                            "node_id": node_id.as_str(),
+                        })),
+                    )
+                },
+            )?;
         let node = McpWalkthroughNode {
             node_id: node.node_id().as_str().to_owned(),
             title: node.title().to_owned(),
@@ -1013,10 +920,8 @@ impl NereidMcp {
         let parsed = parse_walkthrough_id(&walkthrough_id)?;
 
         let state = self.lock_state_synced().await?;
-        let session_active_diagram_id = state
-            .session
-            .active_diagram_id()
-            .map(|diagram_id| diagram_id.as_str().to_owned());
+        let session_active_diagram_id =
+            state.session.active_diagram_id().map(|diagram_id| diagram_id.as_str().to_owned());
         let walkthrough = state.session.walkthroughs().get(&parsed).ok_or_else(|| {
             ErrorData::resource_not_found(
                 "walkthrough not found",
@@ -1041,10 +946,8 @@ impl NereidMcp {
         let parsed = parse_walkthrough_id(&walkthrough_id)?;
 
         let state = self.lock_state_synced().await?;
-        let session_active_diagram_id = state
-            .session
-            .active_diagram_id()
-            .map(|diagram_id| diagram_id.as_str().to_owned());
+        let session_active_diagram_id =
+            state.session.active_diagram_id().map(|diagram_id| diagram_id.as_str().to_owned());
         let walkthrough = state.session.walkthroughs().get(&parsed).ok_or_else(|| {
             ErrorData::resource_not_found(
                 "walkthrough not found",
@@ -1099,29 +1002,17 @@ impl NereidMcp {
         }
 
         let Some(history) = state.walkthrough_delta_history.get(&parsed) else {
-            return Err(walkthrough_delta_unavailable(
-                since_rev,
-                current_rev,
-                current_rev,
-            ));
+            return Err(walkthrough_delta_unavailable(since_rev, current_rev, current_rev));
         };
 
         let supported_since_rev = history.front().map(|d| d.from_rev).unwrap_or(current_rev);
         if since_rev < supported_since_rev {
-            return Err(walkthrough_delta_unavailable(
-                since_rev,
-                current_rev,
-                supported_since_rev,
-            ));
+            return Err(walkthrough_delta_unavailable(since_rev, current_rev, supported_since_rev));
         }
 
         let Some(delta) = walkthrough_delta_response_from_history(history, since_rev, current_rev)
         else {
-            return Err(walkthrough_delta_unavailable(
-                since_rev,
-                current_rev,
-                supported_since_rev,
-            ));
+            return Err(walkthrough_delta_unavailable(since_rev, current_rev, supported_since_rev));
         };
 
         Ok(Json(delta))
@@ -1133,21 +1024,15 @@ impl NereidMcp {
         &self,
         params: Parameters<WalkthroughApplyOpsParams>,
     ) -> Result<Json<ApplyOpsResponse>, ErrorData> {
-        let WalkthroughApplyOpsParams {
-            walkthrough_id,
-            base_rev,
-            ops,
-        } = params.0;
+        let WalkthroughApplyOpsParams { walkthrough_id, base_rev, ops } = params.0;
         let parsed = parse_walkthrough_id(&walkthrough_id)?;
 
         let mut state = self.lock_state_synced().await?;
 
         if let Some(session_folder) = &self.session_folder {
             let mut candidate_session = state.session.clone();
-            let walkthrough = candidate_session
-                .walkthroughs_mut()
-                .get_mut(&parsed)
-                .ok_or_else(|| {
+            let walkthrough =
+                candidate_session.walkthroughs_mut().get_mut(&parsed).ok_or_else(|| {
                     ErrorData::resource_not_found(
                         "walkthrough not found",
                         Some(serde_json::json!({ "walkthrough_id": walkthrough_id })),
@@ -1190,11 +1075,8 @@ impl NereidMcp {
             walkthrough.bump_rev();
             let new_rev = walkthrough.rev();
 
-            let mut history = state
-                .walkthrough_delta_history
-                .get(&parsed)
-                .cloned()
-                .unwrap_or_else(VecDeque::new);
+            let mut history =
+                state.walkthrough_delta_history.get(&parsed).cloned().unwrap_or_else(VecDeque::new);
             history.push_back(WalkthroughLastDelta {
                 from_rev: base_rev,
                 to_rev: new_rev,
@@ -1236,16 +1118,12 @@ impl NereidMcp {
             return Ok(response);
         }
 
-        let walkthrough = state
-            .session
-            .walkthroughs_mut()
-            .get_mut(&parsed)
-            .ok_or_else(|| {
-                ErrorData::resource_not_found(
-                    "walkthrough not found",
-                    Some(serde_json::json!({ "walkthrough_id": walkthrough_id })),
-                )
-            })?;
+        let walkthrough = state.session.walkthroughs_mut().get_mut(&parsed).ok_or_else(|| {
+            ErrorData::resource_not_found(
+                "walkthrough not found",
+                Some(serde_json::json!({ "walkthrough_id": walkthrough_id })),
+            )
+        })?;
 
         let current_rev = walkthrough.rev();
         if base_rev != current_rev {
@@ -1271,11 +1149,7 @@ impl NereidMcp {
             return Ok(Json(ApplyOpsResponse {
                 new_rev: current_rev,
                 applied: 0,
-                delta: DeltaSummary {
-                    added: Vec::new(),
-                    removed: Vec::new(),
-                    updated: Vec::new(),
-                },
+                delta: DeltaSummary { added: Vec::new(), removed: Vec::new(), updated: Vec::new() },
             }));
         }
 
@@ -1283,10 +1157,7 @@ impl NereidMcp {
         walkthrough.bump_rev();
         let new_rev = walkthrough.rev();
 
-        let history = state
-            .walkthrough_delta_history
-            .entry(parsed)
-            .or_insert_with(VecDeque::new);
+        let history = state.walkthrough_delta_history.entry(parsed).or_insert_with(VecDeque::new);
         history.push_back(WalkthroughLastDelta {
             from_rev: base_rev,
             to_rev: new_rev,
@@ -1317,13 +1188,7 @@ impl NereidMcp {
         &self,
         params: Parameters<RouteFindParams>,
     ) -> Result<Json<RouteFindResponse>, ErrorData> {
-        let RouteFindParams {
-            from_ref,
-            to_ref,
-            limit,
-            max_hops,
-            ordering,
-        } = params.0;
+        let RouteFindParams { from_ref, to_ref, limit, max_hops, ordering } = params.0;
 
         let from_ref = parse_object_ref_from_ref(&from_ref)?;
         let to_ref = parse_object_ref_to_ref(&to_ref)?;
@@ -1404,10 +1269,7 @@ impl NereidMcp {
 
         let kind = kind.filter(|kind| !kind.is_empty());
         let label_contains = label_contains.filter(|label_contains| !label_contains.is_empty());
-        let from_ref = from_ref
-            .as_deref()
-            .map(parse_object_ref_from_ref)
-            .transpose()?;
+        let from_ref = from_ref.as_deref().map(parse_object_ref_from_ref).transpose()?;
         let to_ref = to_ref.as_deref().map(parse_object_ref_to_ref).transpose()?;
         let involves_ref = involves_ref
             .as_deref()
@@ -1449,10 +1311,7 @@ impl NereidMcp {
                     return None;
                 }
 
-                if from_ref
-                    .as_ref()
-                    .is_some_and(|from_ref| xref.from() != from_ref)
-                {
+                if from_ref.as_ref().is_some_and(|from_ref| xref.from() != from_ref) {
                     return None;
                 }
                 if to_ref.as_ref().is_some_and(|to_ref| xref.to() != to_ref) {
@@ -1464,13 +1323,10 @@ impl NereidMcp {
                     return None;
                 }
 
-                if label_contains
-                    .as_deref()
-                    .is_some_and(|needle| match xref.label() {
-                        Some(label) => !label.contains(needle),
-                        None => true,
-                    })
-                {
+                if label_contains.as_deref().is_some_and(|needle| match xref.label() {
+                    Some(label) => !label.contains(needle),
+                    None => true,
+                }) {
                     return None;
                 }
 
@@ -1504,10 +1360,7 @@ impl NereidMcp {
         &self,
         params: Parameters<XRefNeighborsParams>,
     ) -> Result<Json<XRefNeighborsResponse>, ErrorData> {
-        let XRefNeighborsParams {
-            object_ref,
-            direction,
-        } = params.0;
+        let XRefNeighborsParams { object_ref, direction } = params.0;
 
         let object_ref_parsed = parse_object_ref(&object_ref)?;
         let direction = direction.as_deref().unwrap_or("both");
@@ -1534,9 +1387,7 @@ impl NereidMcp {
             }
         }
 
-        Ok(Json(XRefNeighborsResponse {
-            neighbors: neighbors.into_iter().collect(),
-        }))
+        Ok(Json(XRefNeighborsResponse { neighbors: neighbors.into_iter().collect() }))
     }
 
     /// Add a cross-diagram xref; use to persist discovered relationships from route/trace analysis
@@ -1546,13 +1397,7 @@ impl NereidMcp {
         &self,
         params: Parameters<XRefAddParams>,
     ) -> Result<Json<XRefAddResponse>, ErrorData> {
-        let XRefAddParams {
-            xref_id,
-            from,
-            to,
-            kind,
-            label,
-        } = params.0;
+        let XRefAddParams { xref_id, from, to, kind, label } = params.0;
 
         let xref_id_parsed = parse_xref_id(&xref_id)?;
         let from = parse_object_ref_from(&from)?;
@@ -1613,10 +1458,7 @@ impl NereidMcp {
 
         let mut xref = XRef::new(from, to, kind, status);
         xref.set_label(label);
-        state
-            .session
-            .xrefs_mut()
-            .insert(xref_id_parsed.clone(), xref);
+        state.session.xrefs_mut().insert(xref_id_parsed.clone(), xref);
 
         let response = Json(XRefAddResponse {
             xref_id: xref_id_parsed.as_str().to_owned(),
@@ -1687,10 +1529,7 @@ impl NereidMcp {
         &self,
         params: Parameters<ObjectGetParams>,
     ) -> Result<Json<ObjectGetResponse>, ErrorData> {
-        let ObjectGetParams {
-            object_ref,
-            object_refs,
-        } = params.0;
+        let ObjectGetParams { object_ref, object_refs } = params.0;
 
         let object_refs = match (object_ref, object_refs) {
             (Some(_), Some(_)) => {
@@ -1710,34 +1549,25 @@ impl NereidMcp {
         };
 
         if object_refs.is_empty() {
-            return Err(ErrorData::invalid_params(
-                "object_refs must not be empty",
-                None,
-            ));
+            return Err(ErrorData::invalid_params("object_refs must not be empty", None));
         }
 
         let state = self.lock_state_synced().await?;
-        let session_active_diagram_id = state
-            .session
-            .active_diagram_id()
-            .map(|diagram_id| diagram_id.as_str().to_owned());
+        let session_active_diagram_id =
+            state.session.active_diagram_id().map(|diagram_id| diagram_id.as_str().to_owned());
         let mut objects = Vec::with_capacity(object_refs.len());
 
         for object_ref in object_refs {
             let parsed = parse_object_ref(&object_ref)?;
-            let diagram = state
-                .session
-                .diagrams()
-                .get(parsed.diagram_id())
-                .ok_or_else(|| {
-                    ErrorData::resource_not_found(
-                        "diagram not found",
-                        Some(serde_json::json!({
-                            "diagram_id": parsed.diagram_id().as_str(),
-                            "object_ref": object_ref.as_str(),
-                        })),
-                    )
-                })?;
+            let diagram = state.session.diagrams().get(parsed.diagram_id()).ok_or_else(|| {
+                ErrorData::resource_not_found(
+                    "diagram not found",
+                    Some(serde_json::json!({
+                        "diagram_id": parsed.diagram_id().as_str(),
+                        "object_ref": object_ref.as_str(),
+                    })),
+                )
+            })?;
 
             let segments = parsed.category().segments();
             let object_id = parsed.object_id();
@@ -1804,16 +1634,15 @@ impl NereidMcp {
                 ([left, right], DiagramAst::Sequence(ast))
                     if left == "seq" && right == "message" =>
                 {
-                    let message = ast
-                        .messages()
-                        .iter()
-                        .find(|m| m.message_id() == object_id)
-                        .ok_or_else(|| {
-                            ErrorData::resource_not_found(
-                                "seq message not found",
-                                Some(serde_json::json!({ "object_ref": object_ref.as_str() })),
-                            )
-                        })?;
+                    let message =
+                        ast.messages().iter().find(|m| m.message_id() == object_id).ok_or_else(
+                            || {
+                                ErrorData::resource_not_found(
+                                    "seq message not found",
+                                    Some(serde_json::json!({ "object_ref": object_ref.as_str() })),
+                                )
+                            },
+                        )?;
 
                     McpObject::SeqMessage {
                         from_participant_id: message.from_participant_id().to_string(),
@@ -1886,12 +1715,7 @@ impl NereidMcp {
         &self,
         params: Parameters<SeqTraceParams>,
     ) -> Result<Json<SeqTraceResponse>, ErrorData> {
-        let SeqTraceParams {
-            diagram_id,
-            from_message_id,
-            direction,
-            limit,
-        } = params.0;
+        let SeqTraceParams { diagram_id, from_message_id, direction, limit } = params.0;
 
         #[derive(Debug, Clone, Copy)]
         enum TraceDirection {
@@ -1918,10 +1742,7 @@ impl NereidMcp {
             )
         })?;
 
-        let from_message_id = from_message_id
-            .as_deref()
-            .map(parse_object_id)
-            .transpose()?;
+        let from_message_id = from_message_id.as_deref().map(parse_object_id).transpose()?;
 
         let state = self.lock_state_synced().await?;
         let diagram_id = resolve_diagram_id(&state.session, diagram_id.as_deref())?;
@@ -1988,12 +1809,7 @@ impl NereidMcp {
         &self,
         params: Parameters<SeqSearchParams>,
     ) -> Result<Json<SeqSearchResponse>, ErrorData> {
-        let SeqSearchParams {
-            diagram_id,
-            needle,
-            mode,
-            case_insensitive,
-        } = params.0;
+        let SeqSearchParams { diagram_id, needle, mode, case_insensitive } = params.0;
 
         if needle.is_empty() {
             return Err(ErrorData::invalid_params(
@@ -2059,11 +1875,7 @@ impl NereidMcp {
         &self,
         params: Parameters<SeqMessagesParams>,
     ) -> Result<Json<SeqMessagesResponse>, ErrorData> {
-        let SeqMessagesParams {
-            diagram_id,
-            from_participant_id,
-            to_participant_id,
-        } = params.0;
+        let SeqMessagesParams { diagram_id, from_participant_id, to_participant_id } = params.0;
 
         let from_participant_id = from_participant_id
             .as_deref()
@@ -2111,14 +1923,10 @@ impl NereidMcp {
             .messages()
             .iter()
             .filter(|msg| {
-                from_participant_id
-                    .as_ref()
-                    .map_or(true, |from| msg.from_participant_id() == from)
+                from_participant_id.as_ref().map_or(true, |from| msg.from_participant_id() == from)
             })
             .filter(|msg| {
-                to_participant_id
-                    .as_ref()
-                    .map_or(true, |to| msg.to_participant_id() == to)
+                to_participant_id.as_ref().map_or(true, |to| msg.to_participant_id() == to)
             })
             .collect::<Vec<_>>();
         messages.sort_by(|a, b| crate::model::SequenceMessage::cmp_in_order(a, b));
@@ -2138,11 +1946,7 @@ impl NereidMcp {
         &self,
         params: Parameters<FlowReachableParams>,
     ) -> Result<Json<FlowReachableResponse>, ErrorData> {
-        let FlowReachableParams {
-            diagram_id,
-            from_node_id,
-            direction,
-        } = params.0;
+        let FlowReachableParams { diagram_id, from_node_id, direction } = params.0;
 
         let direction_label = direction.as_deref().unwrap_or("out");
         let direction = match direction_label {
@@ -2206,13 +2010,8 @@ impl NereidMcp {
         &self,
         params: Parameters<FlowPathsParams>,
     ) -> Result<Json<FlowPathsResponse>, ErrorData> {
-        let FlowPathsParams {
-            diagram_id,
-            from_node_id,
-            to_node_id,
-            limit,
-            max_extra_hops,
-        } = params.0;
+        let FlowPathsParams { diagram_id, from_node_id, to_node_id, limit, max_extra_hops } =
+            params.0;
 
         let limit_u64 = limit.unwrap_or(10);
         let max_extra_hops_u64 = max_extra_hops.unwrap_or(0);
@@ -2386,11 +2185,7 @@ impl NereidMcp {
             Total,
         }
 
-        let FlowDegreesParams {
-            diagram_id,
-            top,
-            sort_by,
-        } = params.0;
+        let FlowDegreesParams { diagram_id, top, sort_by } = params.0;
 
         let top_u64 = top.unwrap_or(10);
         let top = usize::try_from(top_u64).map_err(|_| {
@@ -2461,9 +2256,7 @@ impl NereidMcp {
                 SortBy::Out => b.out_degree,
                 SortBy::Total => b.in_degree.saturating_add(b.out_degree),
             };
-            score_b
-                .cmp(&score_a)
-                .then_with(|| a.node_ref.cmp(&b.node_ref))
+            score_b.cmp(&score_a).then_with(|| a.node_ref.cmp(&b.node_ref))
         });
 
         nodes.truncate(top);
@@ -2478,10 +2271,7 @@ impl NereidMcp {
         &self,
         params: Parameters<FlowUnreachableParams>,
     ) -> Result<Json<FlowUnreachableResponse>, ErrorData> {
-        let FlowUnreachableParams {
-            diagram_id,
-            start_node_id,
-        } = params.0;
+        let FlowUnreachableParams { diagram_id, start_node_id } = params.0;
 
         let start_node_id = start_node_id
             .as_deref()
@@ -2526,10 +2316,7 @@ impl NereidMcp {
             let from = edge.from_node_id();
             let to = edge.to_node_id();
             if outgoing.contains_key(from) && outgoing.contains_key(to) {
-                outgoing
-                    .get_mut(from)
-                    .expect("node exists")
-                    .insert(to.clone());
+                outgoing.get_mut(from).expect("node exists").insert(to.clone());
                 *indegree.get_mut(to).expect("node exists") += 1;
             }
         }
@@ -2606,10 +2393,8 @@ impl NereidMcp {
         params: Parameters<DiagramTargetParams>,
     ) -> Result<Json<DiagramDigest>, ErrorData> {
         let state = self.lock_state_synced().await?;
-        let session_active_diagram_id = state
-            .session
-            .active_diagram_id()
-            .map(|diagram_id| diagram_id.as_str().to_owned());
+        let session_active_diagram_id =
+            state.session.active_diagram_id().map(|diagram_id| diagram_id.as_str().to_owned());
         let diagram_id = resolve_diagram_id(&state.session, params.0.diagram_id.as_deref())?;
         let diagram = state
             .session
@@ -2631,10 +2416,8 @@ impl NereidMcp {
         params: Parameters<DiagramTargetParams>,
     ) -> Result<Json<DiagramSnapshot>, ErrorData> {
         let state = self.lock_state_synced().await?;
-        let session_active_diagram_id = state
-            .session
-            .active_diagram_id()
-            .map(|diagram_id| diagram_id.as_str().to_owned());
+        let session_active_diagram_id =
+            state.session.active_diagram_id().map(|diagram_id| diagram_id.as_str().to_owned());
         let diagram_id = resolve_diagram_id(&state.session, params.0.diagram_id.as_deref())?;
         let diagram = state
             .session
@@ -2684,13 +2467,7 @@ impl NereidMcp {
         &self,
         params: Parameters<DiagramGetSliceParams>,
     ) -> Result<Json<DiagramGetSliceResponse>, ErrorData> {
-        let DiagramGetSliceParams {
-            diagram_id,
-            center_ref,
-            radius,
-            depth,
-            filters,
-        } = params.0;
+        let DiagramGetSliceParams { diagram_id, center_ref, radius, depth, filters } = params.0;
 
         let requested_diagram_id = diagram_id
             .as_deref()
@@ -2808,14 +2585,8 @@ impl NereidMcp {
                     let from = edge.from_node_id();
                     let to = edge.to_node_id();
                     if adjacency.contains_key(from) && adjacency.contains_key(to) {
-                        adjacency
-                            .get_mut(from)
-                            .expect("from node exists")
-                            .insert(to.clone());
-                        adjacency
-                            .get_mut(to)
-                            .expect("to node exists")
-                            .insert(from.clone());
+                        adjacency.get_mut(from).expect("from node exists").insert(to.clone());
+                        adjacency.get_mut(to).expect("to node exists").insert(from.clone());
                     }
                 }
 
@@ -2948,11 +2719,7 @@ impl NereidMcp {
                     )
                 };
                 let seq_block_ref = |block_id: &ObjectId| {
-                    ObjectRef::new(
-                        diagram_id.clone(),
-                        seq_block_category.clone(),
-                        block_id.clone(),
-                    )
+                    ObjectRef::new(diagram_id.clone(), seq_block_category.clone(), block_id.clone())
                 };
                 let seq_section_ref = |section_id: &ObjectId| {
                     ObjectRef::new(
@@ -3005,14 +2772,8 @@ impl NereidMcp {
                     adjacency.entry(block_ref.clone()).or_default();
 
                     if let Some(parent_ref) = parent.as_ref() {
-                        adjacency
-                            .entry(parent_ref.clone())
-                            .or_default()
-                            .insert(block_ref.clone());
-                        adjacency
-                            .entry(block_ref.clone())
-                            .or_default()
-                            .insert(parent_ref.clone());
+                        adjacency.entry(parent_ref.clone()).or_default().insert(block_ref.clone());
+                        adjacency.entry(block_ref.clone()).or_default().insert(parent_ref.clone());
                     }
 
                     for section in block.sections() {
@@ -3022,14 +2783,8 @@ impl NereidMcp {
                             section.section_id().clone(),
                         );
                         adjacency.entry(section_ref.clone()).or_default();
-                        adjacency
-                            .entry(block_ref.clone())
-                            .or_default()
-                            .insert(section_ref.clone());
-                        adjacency
-                            .entry(section_ref.clone())
-                            .or_default()
-                            .insert(block_ref.clone());
+                        adjacency.entry(block_ref.clone()).or_default().insert(section_ref.clone());
+                        adjacency.entry(section_ref.clone()).or_default().insert(block_ref.clone());
 
                         for message_id in section.message_ids() {
                             let message_ref = ObjectRef::new(
@@ -3042,10 +2797,7 @@ impl NereidMcp {
                                 .entry(section_ref.clone())
                                 .or_default()
                                 .insert(message_ref.clone());
-                            adjacency
-                                .entry(message_ref)
-                                .or_default()
-                                .insert(section_ref.clone());
+                            adjacency.entry(message_ref).or_default().insert(section_ref.clone());
                         }
                     }
 
@@ -3198,10 +2950,8 @@ impl NereidMcp {
         params: Parameters<DiagramTargetParams>,
     ) -> Result<Json<DiagramRenderTextResponse>, ErrorData> {
         let state = self.lock_state_synced().await?;
-        let session_active_diagram_id = state
-            .session
-            .active_diagram_id()
-            .map(|active| active.as_str().to_owned());
+        let session_active_diagram_id =
+            state.session.active_diagram_id().map(|active| active.as_str().to_owned());
         let diagram_id = resolve_diagram_id(&state.session, params.0.diagram_id.as_deref())?;
         let diagram = state
             .session
@@ -3259,19 +3009,11 @@ impl NereidMcp {
 
         let supported_since_rev = history.front().map(|d| d.from_rev).unwrap_or(current_rev);
         if since_rev < supported_since_rev {
-            return Err(delta_unavailable(
-                since_rev,
-                current_rev,
-                supported_since_rev,
-            ));
+            return Err(delta_unavailable(since_rev, current_rev, supported_since_rev));
         }
 
         let Some(delta) = delta_response_from_history(history, since_rev, current_rev) else {
-            return Err(delta_unavailable(
-                since_rev,
-                current_rev,
-                supported_since_rev,
-            ));
+            return Err(delta_unavailable(since_rev, current_rev, supported_since_rev));
         };
 
         Ok(Json(delta))
@@ -3292,12 +3034,7 @@ impl NereidMcp {
             .get(&diagram_id)
             .ok_or_else(|| ErrorData::resource_not_found("diagram not found", None))?;
 
-        let ops = params
-            .0
-            .ops
-            .iter()
-            .map(mcp_op_to_internal)
-            .collect::<Result<Vec<_>, _>>()?;
+        let ops = params.0.ops.iter().map(mcp_op_to_internal).collect::<Result<Vec<_>, _>>()?;
 
         let base_rev = params.0.base_rev;
         let current_rev = diagram.rev();
@@ -3344,15 +3081,10 @@ impl NereidMcp {
                     })),
                 )
             })?;
-            candidate_session
-                .diagrams_mut()
-                .insert(diagram_id.clone(), candidate_diagram);
+            candidate_session.diagrams_mut().insert(diagram_id.clone(), candidate_diagram);
 
-            let mut history = state
-                .delta_history
-                .get(&diagram_id)
-                .cloned()
-                .unwrap_or_else(VecDeque::new);
+            let mut history =
+                state.delta_history.get(&diagram_id).cloned().unwrap_or_else(VecDeque::new);
             history.push_back(LastDelta {
                 from_rev: base_rev,
                 to_rev: result.new_rev,
@@ -3385,18 +3117,8 @@ impl NereidMcp {
                 applied: result.applied as u64,
                 delta: DeltaSummary {
                     added: result.delta.added.iter().map(ToString::to_string).collect(),
-                    removed: result
-                        .delta
-                        .removed
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    updated: result
-                        .delta
-                        .updated
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
+                    removed: result.delta.removed.iter().map(ToString::to_string).collect(),
+                    updated: result.delta.updated.iter().map(ToString::to_string).collect(),
                 },
             });
             drop(state);
@@ -3423,14 +3145,8 @@ impl NereidMcp {
                 })),
             )
         })?;
-        state
-            .session
-            .diagrams_mut()
-            .insert(diagram_id.clone(), candidate_diagram);
-        let history = state
-            .delta_history
-            .entry(diagram_id)
-            .or_insert_with(VecDeque::new);
+        state.session.diagrams_mut().insert(diagram_id.clone(), candidate_diagram);
+        let history = state.delta_history.entry(diagram_id).or_insert_with(VecDeque::new);
         history.push_back(LastDelta {
             from_rev: base_rev,
             to_rev: result.new_rev,
@@ -3445,18 +3161,8 @@ impl NereidMcp {
             applied: result.applied as u64,
             delta: DeltaSummary {
                 added: result.delta.added.iter().map(ToString::to_string).collect(),
-                removed: result
-                    .delta
-                    .removed
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect(),
-                updated: result
-                    .delta
-                    .updated
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect(),
+                removed: result.delta.removed.iter().map(ToString::to_string).collect(),
+                updated: result.delta.updated.iter().map(ToString::to_string).collect(),
             },
         });
         drop(state);
@@ -3480,12 +3186,7 @@ impl NereidMcp {
             .get(&diagram_id)
             .ok_or_else(|| ErrorData::resource_not_found("diagram not found", None))?;
 
-        let ops = params
-            .0
-            .ops
-            .iter()
-            .map(mcp_op_to_internal)
-            .collect::<Result<Vec<_>, _>>()?;
+        let ops = params.0.ops.iter().map(mcp_op_to_internal).collect::<Result<Vec<_>, _>>()?;
 
         let base_rev = params.0.base_rev;
 
@@ -3508,18 +3209,8 @@ impl NereidMcp {
             applied: result.applied as u64,
             delta: DeltaSummary {
                 added: result.delta.added.iter().map(ToString::to_string).collect(),
-                removed: result
-                    .delta
-                    .removed
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect(),
-                updated: result
-                    .delta
-                    .updated
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect(),
+                removed: result.delta.removed.iter().map(ToString::to_string).collect(),
+                updated: result.delta.updated.iter().map(ToString::to_string).collect(),
             },
         }))
     }

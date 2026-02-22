@@ -30,21 +30,13 @@ use std::collections::BTreeSet;
 fn text_to_string(text: &ratatui::text::Text<'_>) -> String {
     text.lines
         .iter()
-        .map(|line| {
-            line.spans
-                .iter()
-                .map(|span| span.content.as_ref())
-                .collect::<String>()
-        })
+        .map(|line| line.spans.iter().map(|span| span.content.as_ref()).collect::<String>())
         .collect::<Vec<_>>()
         .join("\n")
 }
 
 fn line_to_string(line: &ratatui::text::Line<'_>) -> String {
-    line.spans
-        .iter()
-        .map(|span| span.content.as_ref())
-        .collect::<String>()
+    line.spans.iter().map(|span| span.content.as_ref()).collect::<String>()
 }
 
 fn single_flowchart_session() -> Session {
@@ -96,30 +88,18 @@ fn diagram_and_objects_focus_use_bright_blue_for_agent_owner() {
 
 #[test]
 fn objects_selected_cursor_uses_bright_green_when_focused() {
-    assert_eq!(
-        objects_item_bg(true, true, true, FocusOwner::Human),
-        Some(Color::LightGreen)
-    );
+    assert_eq!(objects_item_bg(true, true, true, FocusOwner::Human), Some(Color::LightGreen));
 }
 
 #[test]
 fn objects_selected_cursor_uses_bright_black_when_not_focused() {
-    assert_eq!(
-        objects_item_bg(true, true, false, FocusOwner::Human),
-        Some(Color::DarkGray)
-    );
+    assert_eq!(objects_item_bg(true, true, false, FocusOwner::Human), Some(Color::DarkGray));
 }
 
 #[test]
 fn objects_cursor_uses_owner_focus_color_when_not_selected() {
-    assert_eq!(
-        objects_item_bg(true, false, true, FocusOwner::Human),
-        Some(Color::LightGreen)
-    );
-    assert_eq!(
-        objects_item_bg(true, false, true, FocusOwner::Agent),
-        Some(Color::LightBlue)
-    );
+    assert_eq!(objects_item_bg(true, false, true, FocusOwner::Human), Some(Color::LightGreen));
+    assert_eq!(objects_item_bg(true, false, true, FocusOwner::Agent), Some(Color::LightBlue));
 }
 
 #[test]
@@ -139,33 +119,13 @@ fn note_cells_render_with_bright_black_foreground() {
 
 #[test]
 fn main_panes_stack_vertically_with_raymon_breakpoints() {
-    let narrow_two = Rect {
-        x: 0,
-        y: 0,
-        width: 89,
-        height: 40,
-    };
-    let wide_two = Rect {
-        x: 0,
-        y: 0,
-        width: 90,
-        height: 40,
-    };
+    let narrow_two = Rect { x: 0, y: 0, width: 89, height: 40 };
+    let wide_two = Rect { x: 0, y: 0, width: 90, height: 40 };
     assert!(stack_main_panes_vertically(narrow_two, 2));
     assert!(!stack_main_panes_vertically(wide_two, 2));
 
-    let narrow_three = Rect {
-        x: 0,
-        y: 0,
-        width: 109,
-        height: 40,
-    };
-    let wide_three = Rect {
-        x: 0,
-        y: 0,
-        width: 110,
-        height: 40,
-    };
+    let narrow_three = Rect { x: 0, y: 0, width: 109, height: 40 };
+    let wide_three = Rect { x: 0, y: 0, width: 110, height: 40 };
     assert!(stack_main_panes_vertically(narrow_three, 3));
     assert!(!stack_main_panes_vertically(wide_three, 3));
 }
@@ -274,14 +234,9 @@ fn diagram_text_does_not_extend_corner_branch_for_flow_edge_cursor() {
 
     app.base_diagram = "──│─\n  │ ".to_owned();
     app.base_highlight_index = crate::render::HighlightIndex::new();
-    app.base_highlight_index.insert(
-        edge_ref.clone(),
-        vec![(0usize, 0usize, 2usize), (1usize, 2usize, 2usize)],
-    );
-    app.objects = vec![SelectableObject {
-        label: "edge e:ab".to_owned(),
-        object_ref: edge_ref,
-    }];
+    app.base_highlight_index
+        .insert(edge_ref.clone(), vec![(0usize, 0usize, 2usize), (1usize, 2usize, 2usize)]);
+    app.objects = vec![SelectableObject { label: "edge e:ab".to_owned(), object_ref: edge_ref }];
     app.visible_object_indices = vec![0];
     app.objects_state.select(Some(0));
     app.session.selected_object_refs_mut().clear();
@@ -307,14 +262,9 @@ fn diagram_text_does_not_extend_corner_branch_for_node_cursor() {
 
     app.base_diagram = "──│─\n  │ ".to_owned();
     app.base_highlight_index = crate::render::HighlightIndex::new();
-    app.base_highlight_index.insert(
-        node_ref.clone(),
-        vec![(0usize, 0usize, 2usize), (1usize, 2usize, 2usize)],
-    );
-    app.objects = vec![SelectableObject {
-        label: "node n:a".to_owned(),
-        object_ref: node_ref,
-    }];
+    app.base_highlight_index
+        .insert(node_ref.clone(), vec![(0usize, 0usize, 2usize), (1usize, 2usize, 2usize)]);
+    app.objects = vec![SelectableObject { label: "node n:a".to_owned(), object_ref: node_ref }];
     app.visible_object_indices = vec![0];
     app.objects_state.select(Some(0));
     app.session.selected_object_refs_mut().clear();
@@ -340,10 +290,8 @@ fn diagram_text_does_not_extend_corner_branch_for_selected_flow_edge() {
 
     app.base_diagram = "──│─\n  │ ".to_owned();
     app.base_highlight_index = crate::render::HighlightIndex::new();
-    app.base_highlight_index.insert(
-        edge_ref.clone(),
-        vec![(0usize, 0usize, 2usize), (1usize, 2usize, 2usize)],
-    );
+    app.base_highlight_index
+        .insert(edge_ref.clone(), vec![(0usize, 0usize, 2usize), (1usize, 2usize, 2usize)]);
     app.objects_state.select(None);
     app.session.selected_object_refs_mut().clear();
     app.session.selected_object_refs_mut().insert(edge_ref);
@@ -519,11 +467,8 @@ fn footer_diagram_hotkeys_dim_when_follow_ai_is_active() {
         assert_eq!(span.style.fg, Some(Color::DarkGray));
     }
 
-    let ai_span = line
-        .spans
-        .iter()
-        .find(|span| span.content.as_ref() == "a◼ ")
-        .expect("AI toggle span");
+    let ai_span =
+        line.spans.iter().find(|span| span.content.as_ref() == "a◼ ").expect("AI toggle span");
     assert_eq!(ai_span.style.fg, Some(Color::Cyan));
 }
 
@@ -562,11 +507,8 @@ fn diagram_counter_label_pads_index_to_total_width() {
 fn diagram_title_renders_counter_in_bright_green() {
     let title = diagram_view_title("om-02-gear", true, Some(4), 12);
 
-    let counter_span = title
-        .spans
-        .iter()
-        .find(|span| span.content.as_ref() == "[04/12]")
-        .expect("counter span");
+    let counter_span =
+        title.spans.iter().find(|span| span.content.as_ref() == "[04/12]").expect("counter span");
     assert_eq!(counter_span.style.fg, Some(Color::LightGreen));
 }
 
@@ -582,11 +524,8 @@ fn search_footer_shows_accept_and_close_with_key_style() {
     assert!(rendered.contains("Accept:Enter"));
     assert!(rendered.contains("Close:Esc"));
 
-    let enter_span = line
-        .spans
-        .iter()
-        .find(|span| span.content.as_ref() == "Enter")
-        .expect("Enter span");
+    let enter_span =
+        line.spans.iter().find(|span| span.content.as_ref() == "Enter").expect("Enter span");
     assert_eq!(enter_span.style.fg, Some(Color::Cyan));
 }
 
@@ -605,18 +544,11 @@ fn search_footer_renders_count_in_bright_green() {
     let mut app = App::new(demo_session());
     app.search_mode = SearchMode::Results;
     app.search_query = "arrow".to_owned();
-    app.search_results.push(
-        "d:demo-00-index/flow/node/n:seq_demo"
-            .parse()
-            .expect("object ref"),
-    );
+    app.search_results.push("d:demo-00-index/flow/node/n:seq_demo".parse().expect("object ref"));
 
     let line = search_footer_line(&app, "");
-    let count_span = line
-        .spans
-        .iter()
-        .find(|span| span.content.as_ref() == "1/1")
-        .expect("count span");
+    let count_span =
+        line.spans.iter().find(|span| span.content.as_ref() == "1/1").expect("count span");
     assert_eq!(count_span.style.fg, Some(Color::LightGreen));
 }
 
@@ -625,11 +557,7 @@ fn search_results_footer_keeps_next_hint_and_adds_accept_close() {
     let mut app = App::new(demo_session());
     app.search_mode = SearchMode::Results;
     app.search_query = "arrow".to_owned();
-    app.search_results.push(
-        "d:demo-00-index/flow/node/n:seq_demo"
-            .parse()
-            .expect("object ref"),
-    );
+    app.search_results.push("d:demo-00-index/flow/node/n:seq_demo".parse().expect("object ref"));
 
     let line = line_to_string(&search_footer_line(&app, ""));
     assert!(line.contains("Next:n/N"));
@@ -656,37 +584,23 @@ fn key_e_queues_edit_external_action() {
 
     app.handle_key_code(KeyCode::Char('e'));
 
-    assert_eq!(
-        app.take_external_action(),
-        Some(ExternalAction::EditActiveDiagram)
-    );
+    assert_eq!(app.take_external_action(), Some(ExternalAction::EditActiveDiagram));
 }
 
 #[test]
 fn applying_edited_mermaid_updates_active_diagram_and_rev() {
     let mut app = App::new(single_flowchart_session());
     let diagram_id = app.active_diagram_id().cloned().expect("active diagram");
-    let diagram = app
-        .session
-        .diagrams()
-        .get(&diagram_id)
-        .cloned()
-        .expect("diagram");
+    let diagram = app.session.diagrams().get(&diagram_id).cloned().expect("diagram");
     let baseline_rev = diagram.rev();
 
     let edited_mermaid =
-        export_diagram_mermaid(&diagram)
-            .expect("export")
-            .replacen("Start", "Start edited", 1);
+        export_diagram_mermaid(&diagram).expect("export").replacen("Start", "Start edited", 1);
 
     app.apply_edited_mermaid_to_diagram(&diagram_id, diagram.kind(), baseline_rev, &edited_mermaid)
         .expect("apply edited mermaid");
 
-    let updated = app
-        .session
-        .diagrams()
-        .get(&diagram_id)
-        .expect("updated diagram");
+    let updated = app.session.diagrams().get(&diagram_id).expect("updated diagram");
     assert_eq!(updated.rev(), baseline_rev + 1);
     assert!(app.pending_diagram_sync.is_none());
 }
@@ -695,63 +609,42 @@ fn applying_edited_mermaid_updates_active_diagram_and_rev() {
 fn applying_comment_only_change_does_not_bump_rev() {
     let mut app = App::new(single_flowchart_session());
     let diagram_id = app.active_diagram_id().cloned().expect("active diagram");
-    let diagram = app
-        .session
-        .diagrams()
-        .get(&diagram_id)
-        .cloned()
-        .expect("diagram");
+    let diagram = app.session.diagrams().get(&diagram_id).cloned().expect("diagram");
     let baseline_rev = diagram.rev();
 
-    let edited_mermaid = format!(
-        "{}\n%% comment-only edit",
-        export_diagram_mermaid(&diagram).expect("export")
-    );
+    let edited_mermaid =
+        format!("{}\n%% comment-only edit", export_diagram_mermaid(&diagram).expect("export"));
 
     app.apply_edited_mermaid_to_diagram(&diagram_id, diagram.kind(), baseline_rev, &edited_mermaid)
         .expect("apply edited mermaid");
 
-    let updated = app
-        .session
-        .diagrams()
-        .get(&diagram_id)
-        .expect("updated diagram");
+    let updated = app.session.diagrams().get(&diagram_id).expect("updated diagram");
     assert_eq!(updated.rev(), baseline_rev);
 }
 
 #[test]
 fn enabling_follow_ai_jumps_to_agent_highlight_diagram() {
     let mut app = App::new(demo_session());
-    let target: ObjectRef = "d:demo-seq/seq/participant/p:alice"
-        .parse()
-        .expect("object ref");
+    let target: ObjectRef = "d:demo-seq/seq/participant/p:alice".parse().expect("object ref");
     app.agent_highlights.blocking_lock().insert(target.clone());
     app.follow_ai = false;
 
     app.handle_key_code(KeyCode::Char('a'));
 
-    assert_eq!(
-        app.active_diagram_id().map(ToString::to_string).as_deref(),
-        Some("demo-seq")
-    );
+    assert_eq!(app.active_diagram_id().map(ToString::to_string).as_deref(), Some("demo-seq"));
     assert_eq!(app.selected_ref(), Some(&target));
 }
 
 #[test]
 fn sync_ignores_agent_highlight_when_follow_ai_is_disabled() {
     let mut app = App::new(demo_session());
-    let target: ObjectRef = "d:demo-seq/seq/participant/p:alice"
-        .parse()
-        .expect("object ref");
+    let target: ObjectRef = "d:demo-seq/seq/participant/p:alice".parse().expect("object ref");
     app.agent_highlights.blocking_lock().insert(target);
     app.follow_ai = false;
 
     app.sync_from_ui_state();
 
-    assert_eq!(
-        app.active_diagram_id().map(ToString::to_string).as_deref(),
-        Some("demo-00-index")
-    );
+    assert_eq!(app.active_diagram_id().map(ToString::to_string).as_deref(), Some("demo-00-index"));
 }
 
 #[test]
@@ -834,30 +727,18 @@ fn diagram_space_toggles_selected_object() {
 #[test]
 fn key_d_deselects_only_current_diagram_objects() {
     let mut app = App::new(demo_session());
-    let current_diagram_ref = app
-        .selected_ref()
-        .cloned()
-        .expect("default selected ref in current diagram");
+    let current_diagram_ref =
+        app.selected_ref().cloned().expect("default selected ref in current diagram");
     let other_diagram_ref: ObjectRef = "d:demo-flow/flow/edge/e:ab".parse().expect("object ref");
 
     app.session.selected_object_refs_mut().clear();
-    app.session
-        .selected_object_refs_mut()
-        .insert(current_diagram_ref.clone());
-    app.session
-        .selected_object_refs_mut()
-        .insert(other_diagram_ref.clone());
+    app.session.selected_object_refs_mut().insert(current_diagram_ref.clone());
+    app.session.selected_object_refs_mut().insert(other_diagram_ref.clone());
 
     app.handle_key_code(KeyCode::Char('d'));
 
-    assert!(!app
-        .session
-        .selected_object_refs()
-        .contains(&current_diagram_ref));
-    assert!(app
-        .session
-        .selected_object_refs()
-        .contains(&other_diagram_ref));
+    assert!(!app.session.selected_object_refs().contains(&current_diagram_ref));
+    assert!(app.session.selected_object_refs().contains(&other_diagram_ref));
 }
 
 #[test]
@@ -867,10 +748,7 @@ fn objects_focus_f_enters_hint_mode() {
 
     app.handle_key_code(KeyCode::Char('f'));
     let targets = match &app.hint_mode {
-        HintMode::AwaitingFirst {
-            kind: HintKind::Jump,
-            targets,
-        } => targets,
+        HintMode::AwaitingFirst { kind: HintKind::Jump, targets } => targets,
         other => panic!("expected AwaitingFirst, got {other:?}"),
     };
     assert!(!targets.is_empty());
@@ -889,11 +767,10 @@ fn diagram_text_highlights_selected_object() {
     let app = App::new(demo_session());
     let text = app.diagram_text();
 
-    let has_highlight = text.lines.iter().any(|line| {
-        line.spans
-            .iter()
-            .any(|span| span.style.bg == Some(Color::LightGreen))
-    });
+    let has_highlight = text
+        .lines
+        .iter()
+        .any(|line| line.spans.iter().any(|span| span.style.bg == Some(Color::LightGreen)));
 
     assert!(has_highlight);
 }
@@ -904,11 +781,10 @@ fn diagram_text_has_no_highlight_when_selection_is_none() {
     app.objects_state.select(None);
 
     let text = app.diagram_text();
-    let has_highlight = text.lines.iter().any(|line| {
-        line.spans
-            .iter()
-            .any(|span| span.style.bg == Some(Color::LightGreen))
-    });
+    let has_highlight = text
+        .lines
+        .iter()
+        .any(|line| line.spans.iter().any(|span| span.style.bg == Some(Color::LightGreen)));
 
     assert!(!has_highlight);
 }
@@ -916,19 +792,15 @@ fn diagram_text_has_no_highlight_when_selection_is_none() {
 #[test]
 fn diagram_text_dims_unselected_lines_when_objects_are_selected() {
     let mut app = App::new(demo_session());
-    let object_ref = app
-        .selected_ref()
-        .expect("default selection exists")
-        .clone();
+    let object_ref = app.selected_ref().expect("default selection exists").clone();
     app.objects_state.select(None);
     app.session.selected_object_refs_mut().insert(object_ref);
 
     let text = app.diagram_text();
-    let has_gray_lines = text.lines.iter().any(|line| {
-        line.spans
-            .iter()
-            .any(|span| span.style.fg == Some(Color::DarkGray))
-    });
+    let has_gray_lines = text
+        .lines
+        .iter()
+        .any(|line| line.spans.iter().any(|span| span.style.fg == Some(Color::DarkGray)));
 
     assert!(has_gray_lines);
 }
@@ -965,10 +837,7 @@ fn diagram_text_uses_white_foreground_for_cursor_highlight() {
 #[test]
 fn diagram_text_renders_selected_objects_on_bright_black_when_not_focused() {
     let mut app = App::new(demo_session());
-    let object_ref = app
-        .selected_ref()
-        .expect("default selection exists")
-        .clone();
+    let object_ref = app.selected_ref().expect("default selection exists").clone();
     app.objects_state.select(None);
     app.session.selected_object_refs_mut().insert(object_ref);
 
@@ -985,10 +854,7 @@ fn diagram_text_renders_selected_objects_on_bright_black_when_not_focused() {
 #[test]
 fn diagram_text_uses_bright_black_when_cursor_is_selected() {
     let mut app = App::new(demo_session());
-    let object_ref = app
-        .selected_ref()
-        .expect("default selection exists")
-        .clone();
+    let object_ref = app.selected_ref().expect("default selection exists").clone();
     app.session.selected_object_refs_mut().insert(object_ref);
 
     let text = app.diagram_text();
@@ -1004,16 +870,12 @@ fn diagram_text_uses_bright_black_when_cursor_is_selected() {
 #[test]
 fn diagram_text_fills_selected_bridge_gaps_under_crossing_lines() {
     let mut app = App::new(demo_session());
-    let object_ref: ObjectRef = "d:demo-00-index/flow/edge/e:0003"
-        .parse()
-        .expect("object ref");
+    let object_ref: ObjectRef = "d:demo-00-index/flow/edge/e:0003".parse().expect("object ref");
 
     app.base_diagram = "─│─".to_owned();
     app.base_highlight_index = crate::render::HighlightIndex::new();
-    app.base_highlight_index.insert(
-        object_ref.clone(),
-        vec![(0usize, 0usize, 0usize), (0usize, 2usize, 2usize)],
-    );
+    app.base_highlight_index
+        .insert(object_ref.clone(), vec![(0usize, 0usize, 0usize), (0usize, 2usize, 2usize)]);
     app.session.selected_object_refs_mut().clear();
     app.session.selected_object_refs_mut().insert(object_ref);
     app.objects_state.select(None);
@@ -1036,16 +898,12 @@ fn diagram_text_fills_selected_bridge_gaps_under_crossing_lines() {
 #[test]
 fn diagram_text_fills_multi_cell_selected_bridge_gaps_for_flow_edges() {
     let mut app = App::new(demo_session());
-    let object_ref: ObjectRef = "d:demo-00-index/flow/edge/e:0003"
-        .parse()
-        .expect("object ref");
+    let object_ref: ObjectRef = "d:demo-00-index/flow/edge/e:0003".parse().expect("object ref");
 
     app.base_diagram = "─│││─".to_owned();
     app.base_highlight_index = crate::render::HighlightIndex::new();
-    app.base_highlight_index.insert(
-        object_ref.clone(),
-        vec![(0usize, 0usize, 0usize), (0usize, 4usize, 4usize)],
-    );
+    app.base_highlight_index
+        .insert(object_ref.clone(), vec![(0usize, 0usize, 0usize), (0usize, 4usize, 4usize)]);
     app.session.selected_object_refs_mut().clear();
     app.session.selected_object_refs_mut().insert(object_ref);
     app.objects_state.select(None);
@@ -1070,19 +928,15 @@ fn diagram_text_fills_multi_cell_selected_bridge_gaps_for_flow_edges() {
 #[test]
 fn diagram_text_highlights_agent_objects() {
     let mut app = App::new(demo_session());
-    let object_ref = app
-        .selected_ref()
-        .expect("default selection exists")
-        .clone();
+    let object_ref = app.selected_ref().expect("default selection exists").clone();
     app.objects_state.select(None);
     app.agent_highlights.blocking_lock().insert(object_ref);
 
     let text = app.diagram_text();
-    let has_highlight = text.lines.iter().any(|line| {
-        line.spans
-            .iter()
-            .any(|span| span.style.bg == Some(Color::LightBlue))
-    });
+    let has_highlight = text
+        .lines
+        .iter()
+        .any(|line| line.spans.iter().any(|span| span.style.bg == Some(Color::LightBlue)));
 
     assert!(has_highlight);
 }
@@ -1093,11 +947,10 @@ fn diagram_text_uses_bright_blue_cursor_for_agent_owner() {
     app.focus_owner = FocusOwner::Agent;
     let text = app.diagram_text();
 
-    let has_bright_blue = text.lines.iter().any(|line| {
-        line.spans
-            .iter()
-            .any(|span| span.style.bg == Some(Color::LightBlue))
-    });
+    let has_bright_blue = text
+        .lines
+        .iter()
+        .any(|line| line.spans.iter().any(|span| span.style.bg == Some(Color::LightBlue)));
 
     assert!(has_bright_blue);
 }
@@ -1105,18 +958,14 @@ fn diagram_text_uses_bright_blue_cursor_for_agent_owner() {
 #[test]
 fn diagram_text_highlights_overlap_as_magenta() {
     let app = App::new(demo_session());
-    let object_ref = app
-        .selected_ref()
-        .expect("default selection exists")
-        .clone();
+    let object_ref = app.selected_ref().expect("default selection exists").clone();
     app.agent_highlights.blocking_lock().insert(object_ref);
 
     let text = app.diagram_text();
-    let has_highlight = text.lines.iter().any(|line| {
-        line.spans
-            .iter()
-            .any(|span| span.style.bg == Some(Color::LightBlue))
-    });
+    let has_highlight = text
+        .lines
+        .iter()
+        .any(|line| line.spans.iter().any(|span| span.style.bg == Some(Color::LightBlue)));
 
     assert!(has_highlight);
 }
@@ -1190,13 +1039,7 @@ fn objects_c_enters_select_hint_mode() {
 
     app.handle_key_code(KeyCode::Char('c'));
 
-    assert!(matches!(
-        app.hint_mode,
-        HintMode::AwaitingFirst {
-            kind: HintKind::SelectChain,
-            ..
-        }
-    ));
+    assert!(matches!(app.hint_mode, HintMode::AwaitingFirst { kind: HintKind::SelectChain, .. }));
 }
 
 #[test]
@@ -1260,9 +1103,8 @@ fn jumping_from_xref_selects_object() {
 fn diagram_t_follows_first_outgoing_xref_for_selected_object() {
     let mut app = App::new(demo_session());
     app.set_active_diagram_id(DiagramId::new("demo-00-index").expect("diagram id"));
-    let selected_ref: ObjectRef = "d:demo-00-index/flow/node/n:seq_blocks"
-        .parse()
-        .expect("object ref");
+    let selected_ref: ObjectRef =
+        "d:demo-00-index/flow/node/n:seq_blocks".parse().expect("object ref");
     app.select_object_ref(&selected_ref);
     app.focus = Focus::Diagram;
 
@@ -1282,9 +1124,7 @@ fn diagram_t_follows_first_outgoing_xref_for_selected_object() {
 #[test]
 fn diagram_t_toasts_when_multiple_outgoing_xrefs_exist() {
     let mut session = demo_session();
-    let from: ObjectRef = "d:demo-00-index/flow/node/n:seq_blocks"
-        .parse()
-        .expect("object ref");
+    let from: ObjectRef = "d:demo-00-index/flow/node/n:seq_blocks".parse().expect("object ref");
     let to: ObjectRef = "d:demo-flow/flow/node/n:a".parse().expect("object ref");
     session.xrefs_mut().insert(
         XRefId::new("x:nav:blocks:alt").expect("xref id"),
@@ -1311,19 +1151,15 @@ fn diagram_t_toasts_when_multiple_outgoing_xrefs_exist() {
 fn diagram_g_follows_first_incoming_xref_for_selected_object() {
     let mut app = App::new(demo_session());
     app.set_active_diagram_id(DiagramId::new("demo-t-seq-blocks").expect("diagram id"));
-    let selected_ref: ObjectRef = "d:demo-t-seq-blocks/seq/participant/p:client"
-        .parse()
-        .expect("object ref");
+    let selected_ref: ObjectRef =
+        "d:demo-t-seq-blocks/seq/participant/p:client".parse().expect("object ref");
     app.select_object_ref(&selected_ref);
     app.focus = Focus::Diagram;
 
     app.handle_key_code(KeyCode::Char('g'));
 
     assert_eq!(app.focus, Focus::Diagram);
-    assert_eq!(
-        app.active_diagram_id().map(ToString::to_string).as_deref(),
-        Some("demo-00-index")
-    );
+    assert_eq!(app.active_diagram_id().map(ToString::to_string).as_deref(), Some("demo-00-index"));
     assert_eq!(
         app.selected_ref().map(ToString::to_string).as_deref(),
         Some("d:demo-00-index/flow/node/n:seq_blocks")
@@ -1333,12 +1169,8 @@ fn diagram_g_follows_first_incoming_xref_for_selected_object() {
 #[test]
 fn diagram_g_toasts_when_multiple_incoming_xrefs_exist() {
     let mut session = demo_session();
-    let from: ObjectRef = "d:demo-00-index/flow/node/n:seq_demo"
-        .parse()
-        .expect("object ref");
-    let to: ObjectRef = "d:demo-t-seq-blocks/seq/participant/p:client"
-        .parse()
-        .expect("object ref");
+    let from: ObjectRef = "d:demo-00-index/flow/node/n:seq_demo".parse().expect("object ref");
+    let to: ObjectRef = "d:demo-t-seq-blocks/seq/participant/p:client".parse().expect("object ref");
     session.xrefs_mut().insert(
         XRefId::new("x:nav:blocks:back").expect("xref id"),
         XRef::new(from, to.clone(), "nav", XRefStatus::Ok),
@@ -1364,9 +1196,8 @@ fn diagram_g_toasts_when_multiple_incoming_xrefs_exist() {
 fn objects_t_follows_first_outgoing_xref_for_selected_object() {
     let mut app = App::new(demo_session());
     app.set_active_diagram_id(DiagramId::new("demo-00-index").expect("diagram id"));
-    let selected_ref: ObjectRef = "d:demo-00-index/flow/node/n:seq_blocks"
-        .parse()
-        .expect("object ref");
+    let selected_ref: ObjectRef =
+        "d:demo-00-index/flow/node/n:seq_blocks".parse().expect("object ref");
     app.select_object_ref(&selected_ref);
     app.focus = Focus::Objects;
 
@@ -1387,19 +1218,15 @@ fn objects_t_follows_first_outgoing_xref_for_selected_object() {
 fn objects_g_follows_first_incoming_xref_for_selected_object() {
     let mut app = App::new(demo_session());
     app.set_active_diagram_id(DiagramId::new("demo-t-seq-blocks").expect("diagram id"));
-    let selected_ref: ObjectRef = "d:demo-t-seq-blocks/seq/participant/p:client"
-        .parse()
-        .expect("object ref");
+    let selected_ref: ObjectRef =
+        "d:demo-t-seq-blocks/seq/participant/p:client".parse().expect("object ref");
     app.select_object_ref(&selected_ref);
     app.focus = Focus::Objects;
 
     app.handle_key_code(KeyCode::Char('g'));
 
     assert_eq!(app.focus, Focus::Objects);
-    assert_eq!(
-        app.active_diagram_id().map(ToString::to_string).as_deref(),
-        Some("demo-00-index")
-    );
+    assert_eq!(app.active_diagram_id().map(ToString::to_string).as_deref(), Some("demo-00-index"));
     assert_eq!(
         app.selected_ref().map(ToString::to_string).as_deref(),
         Some("d:demo-00-index/flow/node/n:seq_blocks")
@@ -1420,9 +1247,7 @@ fn diagram_view_prefixes_only_objects_with_outgoing_xrefs() {
 fn diagram_view_prefixes_support_incoming_and_outgoing_markers() {
     let mut session = demo_session();
     let from: ObjectRef = "d:demo-flow/flow/node/n:a".parse().expect("object ref");
-    let to: ObjectRef = "d:demo-00-index/flow/node/n:flow_demo"
-        .parse()
-        .expect("object ref");
+    let to: ObjectRef = "d:demo-00-index/flow/node/n:flow_demo".parse().expect("object ref");
     session.xrefs_mut().insert(
         XRefId::new("x:back:flow_demo").expect("xref id"),
         XRef::new(from, to, "nav", XRefStatus::Ok),
@@ -1445,22 +1270,14 @@ fn diagram_view_renders_direction_markers_in_cyan() {
         .iter()
         .flat_map(|line| {
             line.spans.iter().flat_map(|span| {
-                span.content
-                    .chars()
-                    .filter(|ch| matches!(ch, '▾' | '▴'))
-                    .map(move |_| span.style)
+                span.content.chars().filter(|ch| matches!(ch, '▾' | '▴')).map(move |_| span.style)
             })
         })
         .collect::<Vec<_>>();
 
+    assert!(!marker_styles.is_empty(), "expected at least one direction marker");
     assert!(
-        !marker_styles.is_empty(),
-        "expected at least one direction marker"
-    );
-    assert!(
-        marker_styles
-            .iter()
-            .all(|style| style.fg == Some(Color::Cyan)),
+        marker_styles.iter().all(|style| style.fg == Some(Color::Cyan)),
         "expected all direction markers to render in cyan"
     );
 }
@@ -1476,10 +1293,7 @@ fn diagram_switching_updates_active_diagram_and_objects() {
     assert_ne!(before_diagram, after_diagram);
 
     let active = app.active_diagram_id().expect("active diagram");
-    assert!(app
-        .objects
-        .iter()
-        .all(|obj| obj.object_ref.diagram_id() == active));
+    assert!(app.objects.iter().all(|obj| obj.object_ref.diagram_id() == active));
 
     app.handle_key_code(KeyCode::Char('['));
     let back_diagram = app.active_diagram_id().map(ToString::to_string);
@@ -1507,10 +1321,7 @@ fn diagram_switching_persists_active_diagram_with_session_folder() {
 
     let before = app.active_diagram_id().cloned().expect("active diagram");
     app.handle_key_code(KeyCode::Char(']'));
-    let after = app
-        .active_diagram_id()
-        .cloned()
-        .expect("active diagram after switch");
+    let after = app.active_diagram_id().cloned().expect("active diagram after switch");
     assert_ne!(before, after);
 
     let meta = folder.load_meta().expect("load session meta");
@@ -1558,10 +1369,7 @@ fn cross_diagram_xref_jump_switches_diagram_and_selects_object() {
 #[test]
 fn regular_search_switches_diagram_and_selects_object() {
     let mut app = App::new(demo_session());
-    assert_eq!(
-        app.active_diagram_id().map(ToString::to_string).as_deref(),
-        Some("demo-00-index")
-    );
+    assert_eq!(app.active_diagram_id().map(ToString::to_string).as_deref(), Some("demo-00-index"));
 
     app.handle_key_code(KeyCode::Char('/'));
     for ch in "alice".chars() {
@@ -1578,10 +1386,7 @@ fn regular_search_switches_diagram_and_selects_object() {
 fn regular_search_does_not_match_flab_example() {
     let mut app = App::new(demo_session());
     app.set_active_diagram_id(DiagramId::new("demo-seq").expect("diagram id"));
-    assert_eq!(
-        app.active_diagram_id().map(ToString::to_string).as_deref(),
-        Some("demo-seq")
-    );
+    assert_eq!(app.active_diagram_id().map(ToString::to_string).as_deref(), Some("demo-seq"));
 
     app.handle_key_code(KeyCode::Char('/'));
     for ch in "flab".chars() {
@@ -1656,17 +1461,10 @@ fn search_results_group_current_diagram_first_for_regular_and_fuzzy() {
     let candidates = search_candidates_from_session(&session);
     let active = DiagramId::new("demo-seq").expect("diagram id");
 
-    let regular = ranked_search_results(
-        &candidates,
-        "participant",
-        SearchKind::Regular,
-        Some(&active),
-    );
+    let regular =
+        ranked_search_results(&candidates, "participant", SearchKind::Regular, Some(&active));
     assert!(!regular.is_empty());
-    assert_eq!(
-        regular.first().map(|oref| oref.diagram_id().as_str()),
-        Some("demo-seq")
-    );
+    assert_eq!(regular.first().map(|oref| oref.diagram_id().as_str()), Some("demo-seq"));
     let mut seen_regular = BTreeSet::<String>::new();
     let mut last_regular = String::new();
     for object_ref in regular {
@@ -1683,10 +1481,7 @@ fn search_results_group_current_diagram_first_for_regular_and_fuzzy() {
 
     let fuzzy = ranked_search_results(&candidates, "particpant", SearchKind::Fuzzy, Some(&active));
     assert!(!fuzzy.is_empty());
-    assert_eq!(
-        fuzzy.first().map(|oref| oref.diagram_id().as_str()),
-        Some("demo-seq")
-    );
+    assert_eq!(fuzzy.first().map(|oref| oref.diagram_id().as_str()), Some("demo-seq"));
     let mut seen_fuzzy = BTreeSet::<String>::new();
     let mut last_fuzzy = String::new();
     for object_ref in fuzzy {
@@ -1834,21 +1629,9 @@ fn demo_flow_routing_nodes_have_labels() {
     )
     .expect("render");
 
-    assert!(
-        rendered.text.contains("Analyze"),
-        "rendered:\n{}",
-        rendered.text
-    );
-    assert!(
-        rendered.text.contains("Diagnostics"),
-        "rendered:\n{}",
-        rendered.text
-    );
-    assert!(
-        rendered.text.contains("Options"),
-        "rendered:\n{}",
-        rendered.text
-    );
+    assert!(rendered.text.contains("Analyze"), "rendered:\n{}", rendered.text);
+    assert!(rendered.text.contains("Diagnostics"), "rendered:\n{}", rendered.text);
+    assert!(rendered.text.contains("Options"), "rendered:\n{}", rendered.text);
 }
 
 #[test]
@@ -1858,10 +1641,7 @@ fn diagram_hints_show_only_nodes_for_flowchart() {
 
     app.handle_key_code(KeyCode::Char('f'));
     let targets = match &app.hint_mode {
-        HintMode::AwaitingFirst {
-            kind: HintKind::Jump,
-            targets,
-        } => targets,
+        HintMode::AwaitingFirst { kind: HintKind::Jump, targets } => targets,
         other => panic!("expected AwaitingFirst Jump, got {other:?}"),
     };
 
@@ -1882,17 +1662,12 @@ fn diagram_hints_show_only_participants_for_sequence() {
 
     app.handle_key_code(KeyCode::Char('f'));
     let targets = match &app.hint_mode {
-        HintMode::AwaitingFirst {
-            kind: HintKind::Jump,
-            targets,
-        } => targets,
+        HintMode::AwaitingFirst { kind: HintKind::Jump, targets } => targets,
         other => panic!("expected AwaitingFirst Jump, got {other:?}"),
     };
 
     assert_eq!(targets.len(), 3);
-    assert!(targets
-        .iter()
-        .any(|target| target.object_ref.to_string().contains("/seq/message/")));
+    assert!(targets.iter().any(|target| target.object_ref.to_string().contains("/seq/message/")));
     for target in targets {
         let r = target.object_ref.to_string();
         assert!(r.contains("/seq/participant/") || r.contains("/seq/message/"));
@@ -1913,28 +1688,16 @@ fn xref_direction_prefix_marks_from_and_to() {
     );
 
     let xref_from = XRef::new(selected.clone(), other.clone(), "uses", XRefStatus::Ok);
-    assert_eq!(
-        super::xref_direction_prefix(Some(&selected), &xref_from),
-        "▴ "
-    );
+    assert_eq!(super::xref_direction_prefix(Some(&selected), &xref_from), "▴ ");
 
     let xref_to = XRef::new(other.clone(), selected.clone(), "uses", XRefStatus::Ok);
-    assert_eq!(
-        super::xref_direction_prefix(Some(&selected), &xref_to),
-        "▾ "
-    );
+    assert_eq!(super::xref_direction_prefix(Some(&selected), &xref_to), "▾ ");
 
     let xref_both = XRef::new(selected.clone(), selected.clone(), "uses", XRefStatus::Ok);
-    assert_eq!(
-        super::xref_direction_prefix(Some(&selected), &xref_both),
-        "▾▴ "
-    );
+    assert_eq!(super::xref_direction_prefix(Some(&selected), &xref_both), "▾▴ ");
 
     let xref_neither = XRef::new(other.clone(), other.clone(), "uses", XRefStatus::Ok);
-    assert_eq!(
-        super::xref_direction_prefix(Some(&selected), &xref_neither),
-        ""
-    );
+    assert_eq!(super::xref_direction_prefix(Some(&selected), &xref_neither), "");
 
     assert_eq!(super::xref_direction_prefix(None, &xref_from), "");
 }
@@ -1947,10 +1710,7 @@ fn diagram_hints_filter_and_select_on_second_letter() {
 
     app.handle_key_code(KeyCode::Char('f'));
     let first_targets = match &app.hint_mode {
-        HintMode::AwaitingFirst {
-            kind: HintKind::Jump,
-            targets,
-        } => targets.clone(),
+        HintMode::AwaitingFirst { kind: HintKind::Jump, targets } => targets.clone(),
         _ => panic!("expected AwaitingFirst"),
     };
 
@@ -1958,19 +1718,13 @@ fn diagram_hints_filter_and_select_on_second_letter() {
     app.handle_key_code(KeyCode::Char(chosen.label[0].to_ascii_lowercase()));
 
     let second_targets = match &app.hint_mode {
-        HintMode::AwaitingSecond {
-            kind: HintKind::Jump,
-            first,
-            targets,
-        } => {
+        HintMode::AwaitingSecond { kind: HintKind::Jump, first, targets } => {
             assert_eq!(*first, chosen.label[0]);
             targets.clone()
         }
         _ => panic!("expected AwaitingSecond"),
     };
-    assert!(second_targets
-        .iter()
-        .all(|target| target.label[0] == chosen.label[0]));
+    assert!(second_targets.iter().all(|target| target.label[0] == chosen.label[0]));
 
     let hint_text = app.diagram_text();
     let has_typed_grey = hint_text.lines.iter().any(|line| {
@@ -1993,10 +1747,7 @@ fn diagram_hints_render_plain_space_before_tag_letters() {
 
     app.handle_key_code(KeyCode::Char('f'));
     let targets = match &app.hint_mode {
-        HintMode::AwaitingFirst {
-            kind: HintKind::Jump,
-            targets,
-        } => targets.clone(),
+        HintMode::AwaitingFirst { kind: HintKind::Jump, targets } => targets.clone(),
         _ => panic!("expected AwaitingFirst"),
     };
 
@@ -2037,10 +1788,7 @@ fn diagram_hints_space_before_tag_inherits_focused_node_background() {
 
     app.handle_key_code(KeyCode::Char('f'));
     let targets = match &app.hint_mode {
-        HintMode::AwaitingFirst {
-            kind: HintKind::Jump,
-            targets,
-        } => targets.clone(),
+        HintMode::AwaitingFirst { kind: HintKind::Jump, targets } => targets.clone(),
         _ => panic!("expected AwaitingFirst"),
     };
     let target = targets.first().expect("at least one hint target").clone();
@@ -2078,16 +1826,11 @@ fn diagram_hints_space_before_tag_inherits_selected_node_background() {
 
     app.handle_key_code(KeyCode::Char('f'));
     let targets = match &app.hint_mode {
-        HintMode::AwaitingFirst {
-            kind: HintKind::Jump,
-            targets,
-        } => targets.clone(),
+        HintMode::AwaitingFirst { kind: HintKind::Jump, targets } => targets.clone(),
         _ => panic!("expected AwaitingFirst"),
     };
     let target = targets.first().expect("at least one hint target").clone();
-    app.session
-        .selected_object_refs_mut()
-        .insert(target.object_ref.clone());
+    app.session.selected_object_refs_mut().insert(target.object_ref.clone());
     app.objects_state.select(None);
 
     let hint_text = app.diagram_text();
@@ -2123,10 +1866,7 @@ fn diagram_hints_wrong_second_letter_cancels_without_selection() {
 
     app.handle_key_code(KeyCode::Char('f'));
     let first_targets = match &app.hint_mode {
-        HintMode::AwaitingFirst {
-            kind: HintKind::Jump,
-            targets,
-        } => targets.clone(),
+        HintMode::AwaitingFirst { kind: HintKind::Jump, targets } => targets.clone(),
         _ => panic!("expected AwaitingFirst"),
     };
 
@@ -2158,10 +1898,7 @@ fn diagram_select_hints_selects_edge_between_consecutive_flow_nodes() {
 
     app.handle_key_code(KeyCode::Char('c'));
     let targets = match &app.hint_mode {
-        HintMode::AwaitingFirst {
-            kind: HintKind::SelectChain,
-            targets,
-        } => targets.clone(),
+        HintMode::AwaitingFirst { kind: HintKind::SelectChain, targets } => targets.clone(),
         other => panic!("expected AwaitingFirst SelectChain, got {other:?}"),
     };
 
@@ -2181,39 +1918,21 @@ fn diagram_select_hints_selects_edge_between_consecutive_flow_nodes() {
         ObjectId::new("e:ab").expect("object id"),
     );
 
-    let a_target = targets
-        .iter()
-        .find(|t| t.object_ref == a_ref)
-        .expect("hint target for n:a")
-        .clone();
-    let b_target = targets
-        .iter()
-        .find(|t| t.object_ref == b_ref)
-        .expect("hint target for n:b")
-        .clone();
+    let a_target =
+        targets.iter().find(|t| t.object_ref == a_ref).expect("hint target for n:a").clone();
+    let b_target =
+        targets.iter().find(|t| t.object_ref == b_ref).expect("hint target for n:b").clone();
 
     app.handle_key_code(KeyCode::Char(a_target.label[0].to_ascii_lowercase()));
     app.handle_key_code(KeyCode::Char(a_target.label[1].to_ascii_lowercase()));
     assert!(app.session.selected_object_refs().contains(&a_ref));
-    assert!(matches!(
-        app.hint_mode,
-        HintMode::AwaitingFirst {
-            kind: HintKind::SelectChain,
-            ..
-        }
-    ));
+    assert!(matches!(app.hint_mode, HintMode::AwaitingFirst { kind: HintKind::SelectChain, .. }));
 
     app.handle_key_code(KeyCode::Char(b_target.label[0].to_ascii_lowercase()));
     app.handle_key_code(KeyCode::Char(b_target.label[1].to_ascii_lowercase()));
     assert!(app.session.selected_object_refs().contains(&b_ref));
     assert!(app.session.selected_object_refs().contains(&edge_ref));
-    assert!(matches!(
-        app.hint_mode,
-        HintMode::AwaitingFirst {
-            kind: HintKind::SelectChain,
-            ..
-        }
-    ));
+    assert!(matches!(app.hint_mode, HintMode::AwaitingFirst { kind: HintKind::SelectChain, .. }));
 
     app.handle_key_code(KeyCode::Esc);
     assert!(matches!(app.hint_mode, HintMode::Inactive));
@@ -2227,17 +1946,12 @@ fn diagram_select_hints_selects_message_between_consecutive_sequence_participant
 
     app.handle_key_code(KeyCode::Char('c'));
     let targets = match &app.hint_mode {
-        HintMode::AwaitingFirst {
-            kind: HintKind::SelectChain,
-            targets,
-        } => targets.clone(),
+        HintMode::AwaitingFirst { kind: HintKind::SelectChain, targets } => targets.clone(),
         other => panic!("expected AwaitingFirst SelectChain, got {other:?}"),
     };
 
     assert_eq!(targets.len(), 2);
-    assert!(!targets
-        .iter()
-        .any(|t| t.object_ref.to_string().contains("/seq/message/")));
+    assert!(!targets.iter().any(|t| t.object_ref.to_string().contains("/seq/message/")));
 
     let alice_ref = ObjectRef::new(
         seq_id.clone(),
@@ -2260,11 +1974,8 @@ fn diagram_select_hints_selects_message_between_consecutive_sequence_participant
         .find(|t| t.object_ref == alice_ref)
         .expect("hint target for p:alice")
         .clone();
-    let bob_target = targets
-        .iter()
-        .find(|t| t.object_ref == bob_ref)
-        .expect("hint target for p:bob")
-        .clone();
+    let bob_target =
+        targets.iter().find(|t| t.object_ref == bob_ref).expect("hint target for p:bob").clone();
 
     app.handle_key_code(KeyCode::Char(alice_target.label[0].to_ascii_lowercase()));
     app.handle_key_code(KeyCode::Char(alice_target.label[1].to_ascii_lowercase()));

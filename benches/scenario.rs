@@ -24,28 +24,17 @@ struct TouchSpec {
 
 fn touch_first_flow_node_spec(session: &Session, new_label: &str) -> TouchSpec {
     let diagram_id = DiagramId::new("flow_000").expect("diagram id");
-    let diagram = session
-        .diagrams()
-        .get(&diagram_id)
-        .expect("session has flow_000");
+    let diagram = session.diagrams().get(&diagram_id).expect("session has flow_000");
     let DiagramAst::Flowchart(ast) = diagram.ast() else {
         panic!("flow_000 should be a flowchart");
     };
-    let node_id = ast
-        .nodes()
-        .keys()
-        .next()
-        .expect("flowchart has >= 1 node")
-        .clone();
+    let node_id = ast.nodes().keys().next().expect("flowchart has >= 1 node").clone();
 
     TouchSpec {
         diagram_id,
         ops: vec![Op::Flow(FlowOp::UpdateNode {
             node_id,
-            patch: FlowNodePatch {
-                label: Some(new_label.to_owned()),
-                shape: None,
-            },
+            patch: FlowNodePatch { label: Some(new_label.to_owned()), shape: None },
         })],
     }
 }
@@ -57,30 +46,20 @@ struct PersistEditInput {
 }
 
 fn checksum_persist_edit(input: &mut PersistEditInput, touch: &TouchSpec) -> u64 {
-    let diagram = input
-        .session
-        .diagrams_mut()
-        .get_mut(&touch.diagram_id)
-        .expect("diagram exists");
+    let diagram = input.session.diagrams_mut().get_mut(&touch.diagram_id).expect("diagram exists");
     let base_rev = diagram.rev();
     let apply = apply_ops(diagram, base_rev, &touch.ops).expect("apply_ops");
 
     let folder = SessionFolder::new(input.tmp.path());
-    folder
-        .save_session(black_box(&input.session))
-        .expect("save_session");
+    folder.save_session(black_box(&input.session)).expect("save_session");
 
     let mut acc = 0u64;
     acc = acc.wrapping_mul(131).wrapping_add(apply.new_rev);
     acc = acc.wrapping_mul(131).wrapping_add(apply.applied as u64);
-    acc = acc.wrapping_mul(131).wrapping_add(
-        std::fs::metadata(folder.meta_path())
-            .expect("meta_path metadata")
-            .len(),
-    );
     acc = acc
         .wrapping_mul(131)
-        .wrapping_add(fixtures::checksum_session(&input.session));
+        .wrapping_add(std::fs::metadata(folder.meta_path()).expect("meta_path metadata").len());
+    acc = acc.wrapping_mul(131).wrapping_add(fixtures::checksum_session(&input.session));
     acc
 }
 
@@ -138,18 +117,12 @@ fn benches_scenario(c: &mut Criterion) {
                 };
 
                 let folder = SessionFolder::new(input.tmp.path());
-                folder
-                    .save_session(black_box(&input.session))
-                    .expect("save_session");
+                folder.save_session(black_box(&input.session)).expect("save_session");
 
                 input
             },
             |input| {
-                let touch = if input.flip {
-                    &touch_medium_a
-                } else {
-                    &touch_medium_b
-                };
+                let touch = if input.flip { &touch_medium_a } else { &touch_medium_b };
                 input.flip = !input.flip;
                 black_box(checksum_persist_edit(input, touch))
             },

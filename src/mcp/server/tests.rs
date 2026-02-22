@@ -20,10 +20,8 @@ fn temp_session_dir(test_name: &str) -> std::path::PathBuf {
 
     let mut dir = std::env::temp_dir();
     let pid = std::process::id();
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("clock is monotonic")
-        .as_nanos();
+    let nanos =
+        SystemTime::now().duration_since(UNIX_EPOCH).expect("clock is monotonic").as_nanos();
     dir.push(format!("nereid-{test_name}-{pid}-{nanos}"));
     std::fs::create_dir_all(&dir).expect("create temp dir");
     dir
@@ -57,12 +55,8 @@ fn demo_session() -> Session {
     let mut seq_ast = SequenceAst::default();
     let p_a = oid("p:a");
     let p_b = oid("p:b");
-    seq_ast
-        .participants_mut()
-        .insert(p_a.clone(), SequenceParticipant::new("A"));
-    seq_ast
-        .participants_mut()
-        .insert(p_b.clone(), SequenceParticipant::new("B"));
+    seq_ast.participants_mut().insert(p_a.clone(), SequenceParticipant::new("A"));
+    seq_ast.participants_mut().insert(p_b.clone(), SequenceParticipant::new("B"));
     seq_ast.messages_mut().push(SequenceMessage::new(
         oid("m:1"),
         p_a.clone(),
@@ -71,10 +65,9 @@ fn demo_session() -> Session {
         "Hi",
         1000,
     ));
-    session.diagrams_mut().insert(
-        seq_id.clone(),
-        Diagram::new(seq_id.clone(), "Seq", DiagramAst::Sequence(seq_ast)),
-    );
+    session
+        .diagrams_mut()
+        .insert(seq_id.clone(), Diagram::new(seq_id.clone(), "Seq", DiagramAst::Sequence(seq_ast)));
 
     let flow_id = DiagramId::new("d-flow").expect("diagram id");
     let mut flow_ast = FlowchartAst::default();
@@ -82,13 +75,10 @@ fn demo_session() -> Session {
     let n_b = oid("n:b");
     flow_ast.nodes_mut().insert(n_a.clone(), FlowNode::new("A"));
     flow_ast.nodes_mut().insert(n_b.clone(), FlowNode::new("B"));
-    flow_ast
-        .edges_mut()
-        .insert(oid("e:ab"), FlowEdge::new(n_a, n_b));
-    session.diagrams_mut().insert(
-        flow_id.clone(),
-        Diagram::new(flow_id, "Flow", DiagramAst::Flowchart(flow_ast)),
-    );
+    flow_ast.edges_mut().insert(oid("e:ab"), FlowEdge::new(n_a, n_b));
+    session
+        .diagrams_mut()
+        .insert(flow_id.clone(), Diagram::new(flow_id, "Flow", DiagramAst::Flowchart(flow_ast)));
 
     session.set_active_diagram_id(Some(seq_id));
     session
@@ -101,12 +91,8 @@ fn demo_session_with_seq_blocks() -> Session {
     let mut seq_ast = SequenceAst::default();
     let p_a = oid("p:a");
     let p_b = oid("p:b");
-    seq_ast
-        .participants_mut()
-        .insert(p_a.clone(), SequenceParticipant::new("A"));
-    seq_ast
-        .participants_mut()
-        .insert(p_b.clone(), SequenceParticipant::new("B"));
+    seq_ast.participants_mut().insert(p_a.clone(), SequenceParticipant::new("A"));
+    seq_ast.participants_mut().insert(p_b.clone(), SequenceParticipant::new("B"));
 
     let m_main = oid("m:1");
     let m_else = oid("m:2");
@@ -163,12 +149,8 @@ fn demo_session_for_seq_trace() -> Session {
     let mut seq_ast = SequenceAst::default();
     let p_a = oid("p:a");
     let p_b = oid("p:b");
-    seq_ast
-        .participants_mut()
-        .insert(p_a.clone(), SequenceParticipant::new("A"));
-    seq_ast
-        .participants_mut()
-        .insert(p_b.clone(), SequenceParticipant::new("B"));
+    seq_ast.participants_mut().insert(p_a.clone(), SequenceParticipant::new("A"));
+    seq_ast.participants_mut().insert(p_b.clone(), SequenceParticipant::new("B"));
 
     // Intentionally insert out of order to validate deterministic ordering.
     seq_ast.messages_mut().push(SequenceMessage::new(
@@ -224,20 +206,12 @@ fn demo_session_for_flow_reachable() -> Session {
     flow_ast.nodes_mut().insert(n_a.clone(), FlowNode::new("A"));
     flow_ast.nodes_mut().insert(n_b.clone(), FlowNode::new("B"));
     flow_ast.nodes_mut().insert(n_c.clone(), FlowNode::new("C"));
-    flow_ast
-        .edges_mut()
-        .insert(oid("e:ab"), FlowEdge::new(n_a.clone(), n_b.clone()));
-    flow_ast
-        .edges_mut()
-        .insert(oid("e:bc"), FlowEdge::new(n_b.clone(), n_c.clone()));
+    flow_ast.edges_mut().insert(oid("e:ab"), FlowEdge::new(n_a.clone(), n_b.clone()));
+    flow_ast.edges_mut().insert(oid("e:bc"), FlowEdge::new(n_b.clone(), n_c.clone()));
 
     session.diagrams_mut().insert(
         flow_id.clone(),
-        Diagram::new(
-            flow_id.clone(),
-            "Flow Reach",
-            DiagramAst::Flowchart(flow_ast),
-        ),
+        Diagram::new(flow_id.clone(), "Flow Reach", DiagramAst::Flowchart(flow_ast)),
     );
 
     session.set_active_diagram_id(Some(flow_id));
@@ -252,11 +226,7 @@ fn demo_session_for_flow_paths() -> Session {
 
     session.diagrams_mut().insert(
         flow_id.clone(),
-        Diagram::new(
-            flow_id.clone(),
-            "Flow Paths",
-            DiagramAst::Flowchart(flow_ast),
-        ),
+        Diagram::new(flow_id.clone(), "Flow Paths", DiagramAst::Flowchart(flow_ast)),
     );
 
     session.set_active_diagram_id(Some(flow_id));
@@ -276,29 +246,15 @@ fn demo_session_for_flow_degrees() -> Session {
     flow_ast.nodes_mut().insert(n_b.clone(), FlowNode::new("B"));
     flow_ast.nodes_mut().insert(n_c.clone(), FlowNode::new("C"));
     flow_ast.nodes_mut().insert(n_d.clone(), FlowNode::new("D"));
-    flow_ast
-        .edges_mut()
-        .insert(oid("e:ab"), FlowEdge::new(n_a.clone(), n_b.clone()));
-    flow_ast
-        .edges_mut()
-        .insert(oid("e:ac"), FlowEdge::new(n_a.clone(), n_c.clone()));
-    flow_ast
-        .edges_mut()
-        .insert(oid("e:ad"), FlowEdge::new(n_a, n_d.clone()));
-    flow_ast
-        .edges_mut()
-        .insert(oid("e:cb"), FlowEdge::new(n_c, n_b.clone()));
-    flow_ast
-        .edges_mut()
-        .insert(oid("e:db"), FlowEdge::new(n_d, n_b));
+    flow_ast.edges_mut().insert(oid("e:ab"), FlowEdge::new(n_a.clone(), n_b.clone()));
+    flow_ast.edges_mut().insert(oid("e:ac"), FlowEdge::new(n_a.clone(), n_c.clone()));
+    flow_ast.edges_mut().insert(oid("e:ad"), FlowEdge::new(n_a, n_d.clone()));
+    flow_ast.edges_mut().insert(oid("e:cb"), FlowEdge::new(n_c, n_b.clone()));
+    flow_ast.edges_mut().insert(oid("e:db"), FlowEdge::new(n_d, n_b));
 
     session.diagrams_mut().insert(
         flow_id.clone(),
-        Diagram::new(
-            flow_id.clone(),
-            "Flow Degrees",
-            DiagramAst::Flowchart(flow_ast),
-        ),
+        Diagram::new(flow_id.clone(), "Flow Degrees", DiagramAst::Flowchart(flow_ast)),
     );
 
     session.set_active_diagram_id(Some(flow_id));
@@ -322,23 +278,13 @@ fn demo_session_for_flow_cycles() -> Session {
     flow_ast.nodes_mut().insert(oid("n:y"), FlowNode::new("Y"));
     flow_ast.nodes_mut().insert(oid("n:z"), FlowNode::new("Z"));
 
-    flow_ast
-        .edges_mut()
-        .insert(oid("e:xy"), FlowEdge::new(oid("n:x"), oid("n:y")));
-    flow_ast
-        .edges_mut()
-        .insert(oid("e:yx"), FlowEdge::new(oid("n:y"), oid("n:x")));
-    flow_ast
-        .edges_mut()
-        .insert(oid("e:zz"), FlowEdge::new(oid("n:z"), oid("n:z")));
+    flow_ast.edges_mut().insert(oid("e:xy"), FlowEdge::new(oid("n:x"), oid("n:y")));
+    flow_ast.edges_mut().insert(oid("e:yx"), FlowEdge::new(oid("n:y"), oid("n:x")));
+    flow_ast.edges_mut().insert(oid("e:zz"), FlowEdge::new(oid("n:z"), oid("n:z")));
 
     session.diagrams_mut().insert(
         flow_id.clone(),
-        Diagram::new(
-            flow_id.clone(),
-            "Flow Cycles",
-            DiagramAst::Flowchart(flow_ast),
-        ),
+        Diagram::new(flow_id.clone(), "Flow Cycles", DiagramAst::Flowchart(flow_ast)),
     );
 
     session.set_active_diagram_id(Some(flow_id));
@@ -358,26 +304,14 @@ fn demo_session_for_flow_unreachable() -> Session {
     flow_ast.nodes_mut().insert(oid("n:c"), FlowNode::new("C"));
     flow_ast.nodes_mut().insert(oid("n:b"), FlowNode::new("B"));
 
-    flow_ast
-        .edges_mut()
-        .insert(oid("e:ab"), FlowEdge::new(oid("n:a"), oid("n:b")));
-    flow_ast
-        .edges_mut()
-        .insert(oid("e:bc"), FlowEdge::new(oid("n:b"), oid("n:c")));
-    flow_ast
-        .edges_mut()
-        .insert(oid("e:xy"), FlowEdge::new(oid("n:x"), oid("n:y")));
-    flow_ast
-        .edges_mut()
-        .insert(oid("e:yx"), FlowEdge::new(oid("n:y"), oid("n:x")));
+    flow_ast.edges_mut().insert(oid("e:ab"), FlowEdge::new(oid("n:a"), oid("n:b")));
+    flow_ast.edges_mut().insert(oid("e:bc"), FlowEdge::new(oid("n:b"), oid("n:c")));
+    flow_ast.edges_mut().insert(oid("e:xy"), FlowEdge::new(oid("n:x"), oid("n:y")));
+    flow_ast.edges_mut().insert(oid("e:yx"), FlowEdge::new(oid("n:y"), oid("n:x")));
 
     session.diagrams_mut().insert(
         flow_id.clone(),
-        Diagram::new(
-            flow_id.clone(),
-            "Flow Unreachable",
-            DiagramAst::Flowchart(flow_ast),
-        ),
+        Diagram::new(flow_id.clone(), "Flow Unreachable", DiagramAst::Flowchart(flow_ast)),
     );
 
     session.set_active_diagram_id(Some(flow_id));
@@ -389,12 +323,7 @@ fn demo_session_with_xrefs() -> Session {
 
     session.xrefs_mut().insert(
         XRefId::new("x:2").expect("xref id"),
-        XRef::new(
-            oref("d-seq", "p:a"),
-            oref("d-flow", "n:a"),
-            "relates_to",
-            XRefStatus::Ok,
-        ),
+        XRef::new(oref("d-seq", "p:a"), oref("d-flow", "n:a"), "relates_to", XRefStatus::Ok),
     );
 
     session.xrefs_mut().insert(
@@ -413,16 +342,10 @@ fn demo_session_with_xrefs() -> Session {
 fn demo_session_with_xrefs_varied() -> Session {
     let mut session = demo_session();
 
-    let mut x2 = XRef::new(
-        oref("d-seq", "p:a"),
-        oref("d-flow", "n:a"),
-        "relates_to",
-        XRefStatus::Ok,
-    );
+    let mut x2 =
+        XRef::new(oref("d-seq", "p:a"), oref("d-flow", "n:a"), "relates_to", XRefStatus::Ok);
     x2.set_label(Some("Alpha".to_owned()));
-    session
-        .xrefs_mut()
-        .insert(XRefId::new("x:2").expect("xref id"), x2);
+    session.xrefs_mut().insert(XRefId::new("x:2").expect("xref id"), x2);
 
     let mut x1 = XRef::new(
         oref("d-seq", "p:b"),
@@ -431,9 +354,7 @@ fn demo_session_with_xrefs_varied() -> Session {
         XRefStatus::DanglingTo,
     );
     x1.set_label(Some("Beta".to_owned()));
-    session
-        .xrefs_mut()
-        .insert(XRefId::new("x:1").expect("xref id"), x1);
+    session.xrefs_mut().insert(XRefId::new("x:1").expect("xref id"), x1);
 
     let mut x3 = XRef::new(
         oref("d-seq", "p:a"),
@@ -442,9 +363,7 @@ fn demo_session_with_xrefs_varied() -> Session {
         XRefStatus::DanglingFrom,
     );
     x3.set_label(Some("Auth step".to_owned()));
-    session
-        .xrefs_mut()
-        .insert(XRefId::new("x:3").expect("xref id"), x3);
+    session.xrefs_mut().insert(XRefId::new("x:3").expect("xref id"), x3);
 
     session
 }
@@ -492,12 +411,8 @@ fn demo_session_with_route() -> Session {
     let mut seq_ast = SequenceAst::default();
     let p_a = oid("p:a");
     let p_b = oid("p:b");
-    seq_ast
-        .participants_mut()
-        .insert(p_a.clone(), SequenceParticipant::new("A"));
-    seq_ast
-        .participants_mut()
-        .insert(p_b.clone(), SequenceParticipant::new("B"));
+    seq_ast.participants_mut().insert(p_a.clone(), SequenceParticipant::new("A"));
+    seq_ast.participants_mut().insert(p_b.clone(), SequenceParticipant::new("B"));
     seq_ast.messages_mut().push(SequenceMessage::new(
         oid("m:1"),
         p_a.clone(),
@@ -514,10 +429,9 @@ fn demo_session_with_route() -> Session {
         "Second",
         2000,
     ));
-    session.diagrams_mut().insert(
-        seq_id.clone(),
-        Diagram::new(seq_id.clone(), "Seq", DiagramAst::Sequence(seq_ast)),
-    );
+    session
+        .diagrams_mut()
+        .insert(seq_id.clone(), Diagram::new(seq_id.clone(), "Seq", DiagramAst::Sequence(seq_ast)));
 
     let flow_id = DiagramId::new("d-flow").expect("diagram id");
     let mut flow_ast = FlowchartAst::default();
@@ -525,9 +439,7 @@ fn demo_session_with_route() -> Session {
     let n_b = oid("n:b");
     flow_ast.nodes_mut().insert(n_a.clone(), FlowNode::new("A"));
     flow_ast.nodes_mut().insert(n_b.clone(), FlowNode::new("B"));
-    flow_ast
-        .edges_mut()
-        .insert(oid("e:ab"), FlowEdge::new(n_a, n_b));
+    flow_ast.edges_mut().insert(oid("e:ab"), FlowEdge::new(n_a, n_b));
     let flow_diagram = Diagram::new(flow_id.clone(), "Flow", DiagramAst::Flowchart(flow_ast));
     session.diagrams_mut().insert(flow_id, flow_diagram);
 
@@ -563,10 +475,8 @@ fn demo_session_with_multiple_routes() -> Session {
 fn demo_session_with_walkthroughs() -> Session {
     let mut session = Session::new(SessionId::new("s:mcp-walkthroughs").expect("session id"));
 
-    let mut wt_2 = Walkthrough::new(
-        WalkthroughId::new("w:2").expect("walkthrough id"),
-        "Second walkthrough",
-    );
+    let mut wt_2 =
+        Walkthrough::new(WalkthroughId::new("w:2").expect("walkthrough id"), "Second walkthrough");
     wt_2.bump_rev();
     wt_2.bump_rev();
     wt_2.nodes_mut().push(WalkthroughNode::new(
@@ -574,40 +484,29 @@ fn demo_session_with_walkthroughs() -> Session {
         "Only node",
     ));
 
-    let mut wt_1 = Walkthrough::new(
-        WalkthroughId::new("w:1").expect("walkthrough id"),
-        "First walkthrough",
-    );
+    let mut wt_1 =
+        Walkthrough::new(WalkthroughId::new("w:1").expect("walkthrough id"), "First walkthrough");
     let w1_n1 = WalkthroughNodeId::new("wn:2").expect("walkthrough node id");
     let w1_n2 = WalkthroughNodeId::new("wn:3").expect("walkthrough node id");
     let mut start = WalkthroughNode::new(w1_n1.clone(), "Start");
     start.set_body_md(Some("Start body".to_owned()));
-    start
-        .refs_mut()
-        .push(ObjectRef::from_str("d:d-seq/seq/message/m:1").expect("ref"));
-    start
-        .refs_mut()
-        .push(ObjectRef::from_str("d:d-flow/flow/node/n:a").expect("ref"));
+    start.refs_mut().push(ObjectRef::from_str("d:d-seq/seq/message/m:1").expect("ref"));
+    start.refs_mut().push(ObjectRef::from_str("d:d-flow/flow/node/n:a").expect("ref"));
     start.tags_mut().push("intro".to_owned());
     start.tags_mut().push("evidence".to_owned());
     start.set_status(Some("draft".to_owned()));
     wt_1.nodes_mut().push(start);
 
     let mut end = WalkthroughNode::new(w1_n2.clone(), "End");
-    end.refs_mut()
-        .push(ObjectRef::from_str("d:d-flow/flow/edge/e:ab").expect("ref"));
+    end.refs_mut().push(ObjectRef::from_str("d:d-flow/flow/edge/e:ab").expect("ref"));
     wt_1.nodes_mut().push(end);
 
     let mut edge = WalkthroughEdge::new(w1_n1, w1_n2, "next");
     edge.set_label(Some("continue".to_owned()));
     wt_1.edges_mut().push(edge);
 
-    session
-        .walkthroughs_mut()
-        .insert(wt_2.walkthrough_id().clone(), wt_2);
-    session
-        .walkthroughs_mut()
-        .insert(wt_1.walkthrough_id().clone(), wt_1);
+    session.walkthroughs_mut().insert(wt_2.walkthrough_id().clone(), wt_2);
+    session.walkthroughs_mut().insert(wt_1.walkthrough_id().clone(), wt_1);
 
     session
 }
@@ -626,16 +525,10 @@ fn tools_advertise_descriptions_and_schemas() {
 
     for tool in tools {
         let name = tool.name.to_string();
-        assert!(
-            seen_names.insert(name.clone()),
-            "duplicate tool name: {name}"
-        );
+        assert!(seen_names.insert(name.clone()), "duplicate tool name: {name}");
 
-        let desc_missing = tool
-            .description
-            .as_deref()
-            .map(|desc| desc.trim().is_empty())
-            .unwrap_or(true);
+        let desc_missing =
+            tool.description.as_deref().map(|desc| desc.trim().is_empty()).unwrap_or(true);
         if desc_missing {
             missing_description.push(name.clone());
         }
@@ -654,10 +547,7 @@ fn tools_advertise_descriptions_and_schemas() {
         }
     }
 
-    assert!(
-        missing_description.is_empty(),
-        "tools missing description: {missing_description:?}"
-    );
+    assert!(missing_description.is_empty(), "tools missing description: {missing_description:?}");
     assert!(
         missing_output_schema.is_empty(),
         "tools missing output_schema: {missing_output_schema:?}"
@@ -675,17 +565,11 @@ fn tools_advertise_descriptions_and_schemas() {
 #[tokio::test]
 async fn attention_human_and_follow_ai_read_return_stable_defaults_without_ui_state() {
     let server = NereidMcp::new(demo_session());
-    let Json(attention) = server
-        .attention_human_read()
-        .await
-        .expect("attention.human.read");
+    let Json(attention) = server.attention_human_read().await.expect("attention.human.read");
 
     assert_eq!(attention.object_ref, None);
     assert_eq!(attention.diagram_id, None);
-    assert_eq!(
-        attention.context.session_active_diagram_id.as_deref(),
-        Some("d-seq")
-    );
+    assert_eq!(attention.context.session_active_diagram_id.as_deref(), Some("d-seq"));
     assert_eq!(attention.context.human_active_diagram_id, None);
     assert_eq!(attention.context.human_active_object_ref, None);
     assert_eq!(attention.context.follow_ai, None);
@@ -694,10 +578,7 @@ async fn attention_human_and_follow_ai_read_return_stable_defaults_without_ui_st
 
     let Json(follow_ai) = server.follow_ai_read().await.expect("follow_ai.read");
     assert!(follow_ai.enabled);
-    assert_eq!(
-        follow_ai.context.session_active_diagram_id.as_deref(),
-        Some("d-seq")
-    );
+    assert_eq!(follow_ai.context.session_active_diagram_id.as_deref(), Some("d-seq"));
     assert_eq!(follow_ai.context.human_active_diagram_id, None);
     assert_eq!(follow_ai.context.human_active_object_ref, None);
     assert_eq!(follow_ai.context.follow_ai, None);
@@ -714,10 +595,7 @@ async fn follow_ai_set_updates_shared_ui_state_when_available() {
         Some(ui_state.clone()),
     );
 
-    let Json(initial) = server
-        .follow_ai_read()
-        .await
-        .expect("follow_ai.read initial");
+    let Json(initial) = server.follow_ai_read().await.expect("follow_ai.read initial");
     assert!(initial.enabled);
     assert_eq!(initial.context.follow_ai, Some(true));
 
@@ -727,10 +605,7 @@ async fn follow_ai_set_updates_shared_ui_state_when_available() {
         .expect("follow_ai.set");
     assert!(!updated.enabled);
 
-    let Json(current) = server
-        .follow_ai_read()
-        .await
-        .expect("follow_ai.read current");
+    let Json(current) = server.follow_ai_read().await.expect("follow_ai.read current");
     assert!(!current.enabled);
     assert_eq!(current.context.follow_ai, Some(false));
     assert!(!ui_state.lock().await.follow_ai());
@@ -745,10 +620,7 @@ async fn view_get_state_returns_stable_defaults() {
     assert_eq!(result.scroll.x, 0.0);
     assert_eq!(result.scroll.y, 0.0);
     assert!(result.panes.is_empty());
-    assert_eq!(
-        result.context.session_active_diagram_id.as_deref(),
-        Some("d-seq")
-    );
+    assert_eq!(result.context.session_active_diagram_id.as_deref(), Some("d-seq"));
     assert_eq!(result.context.human_active_diagram_id, None);
     assert_eq!(result.context.human_active_object_ref, None);
     assert_eq!(result.context.follow_ai, None);
@@ -762,10 +634,7 @@ async fn selection_update_get_ignores_missing_and_is_deterministic() {
 
     let Json(initial) = server.selection_get().await.expect("get initial selection");
     assert!(initial.object_refs.is_empty());
-    assert_eq!(
-        initial.context.session_active_diagram_id.as_deref(),
-        Some("d-seq")
-    );
+    assert_eq!(initial.context.session_active_diagram_id.as_deref(), Some("d-seq"));
     assert_eq!(initial.context.human_active_diagram_id, None);
     assert_eq!(initial.context.human_active_object_ref, None);
     assert_eq!(initial.context.follow_ai, None);
@@ -787,17 +656,11 @@ async fn selection_update_get_ignores_missing_and_is_deterministic() {
 
     assert_eq!(
         result.applied,
-        vec![
-            "d:d-flow/flow/edge/e:ab".to_owned(),
-            "d:d-seq/seq/participant/p:a".to_owned(),
-        ]
+        vec!["d:d-flow/flow/edge/e:ab".to_owned(), "d:d-seq/seq/participant/p:a".to_owned(),]
     );
     assert_eq!(
         result.ignored,
-        vec![
-            "d:d-missing/seq/participant/p:a".to_owned(),
-            "d:d-seq/seq/message/m:999".to_owned(),
-        ]
+        vec!["d:d-missing/seq/participant/p:a".to_owned(), "d:d-seq/seq/message/m:999".to_owned(),]
     );
 
     let Json(get) = server.selection_get().await.expect("get selection");
@@ -814,10 +677,7 @@ async fn selection_update_get_ignores_missing_and_is_deterministic() {
         .await
         .expect("add selection");
 
-    let Json(get_after_add) = server
-        .selection_get()
-        .await
-        .expect("get selection after add");
+    let Json(get_after_add) = server.selection_get().await.expect("get selection after add");
     assert_eq!(
         get_after_add.object_refs,
         vec![
@@ -835,16 +695,10 @@ async fn selection_update_get_ignores_missing_and_is_deterministic() {
         .await
         .expect("remove selection");
 
-    let Json(get_after_remove) = server
-        .selection_get()
-        .await
-        .expect("get selection after remove");
+    let Json(get_after_remove) = server.selection_get().await.expect("get selection after remove");
     assert_eq!(
         get_after_remove.object_refs,
-        vec![
-            "d:d-flow/flow/edge/e:ab".to_owned(),
-            "d:d-seq/seq/message/m:1".to_owned(),
-        ]
+        vec!["d:d-flow/flow/edge/e:ab".to_owned(), "d:d-seq/seq/message/m:1".to_owned(),]
     );
 }
 
@@ -863,14 +717,8 @@ async fn selection_get_includes_human_active_diagram_when_ui_state_is_shared() {
     );
 
     let Json(selection) = server.selection_get().await.expect("selection.read");
-    assert_eq!(
-        selection.context.session_active_diagram_id.as_deref(),
-        Some("d-seq")
-    );
-    assert_eq!(
-        selection.context.human_active_diagram_id.as_deref(),
-        Some("d-flow")
-    );
+    assert_eq!(selection.context.session_active_diagram_id.as_deref(), Some("d-seq"));
+    assert_eq!(selection.context.human_active_diagram_id.as_deref(), Some("d-flow"));
     assert_eq!(selection.context.human_active_object_ref, None);
     assert_eq!(selection.context.follow_ai, Some(true));
     assert_eq!(selection.context.ui_rev, Some(1));
@@ -881,16 +729,10 @@ async fn selection_get_includes_human_active_diagram_when_ui_state_is_shared() {
 async fn attention_agent_set_read_clear_validates_refs() {
     let server = NereidMcp::new(demo_session());
 
-    let Json(initial) = server
-        .attention_agent_read()
-        .await
-        .expect("attention.agent.read initial");
+    let Json(initial) = server.attention_agent_read().await.expect("attention.agent.read initial");
     assert_eq!(initial.object_ref, None);
     assert_eq!(initial.diagram_id, None);
-    assert_eq!(
-        initial.context.session_active_diagram_id.as_deref(),
-        Some("d-seq")
-    );
+    assert_eq!(initial.context.session_active_diagram_id.as_deref(), Some("d-seq"));
 
     let err = match server
         .attention_agent_set(Parameters(AttentionAgentSetParams {
@@ -905,41 +747,25 @@ async fn attention_agent_set_read_clear_validates_refs() {
 
     let object_ref = "d:d-flow/flow/edge/e:ab".to_owned();
     let Json(set) = server
-        .attention_agent_set(Parameters(AttentionAgentSetParams {
-            object_ref: object_ref.clone(),
-        }))
+        .attention_agent_set(Parameters(AttentionAgentSetParams { object_ref: object_ref.clone() }))
         .await
         .expect("attention.agent.set");
     assert_eq!(set.object_ref, object_ref);
     assert_eq!(set.diagram_id, "d-flow");
 
-    let Json(read) = server
-        .attention_agent_read()
-        .await
-        .expect("attention.agent.read");
+    let Json(read) = server.attention_agent_read().await.expect("attention.agent.read");
     assert_eq!(read.object_ref.as_deref(), Some("d:d-flow/flow/edge/e:ab"));
     assert_eq!(read.diagram_id.as_deref(), Some("d-flow"));
-    assert_eq!(
-        read.context.session_active_diagram_id.as_deref(),
-        Some("d-seq")
-    );
+    assert_eq!(read.context.session_active_diagram_id.as_deref(), Some("d-seq"));
 
-    let Json(cleared) = server
-        .attention_agent_clear()
-        .await
-        .expect("attention.agent.clear");
+    let Json(cleared) = server.attention_agent_clear().await.expect("attention.agent.clear");
     assert_eq!(cleared.cleared, 1);
 
-    let Json(after_clear) = server
-        .attention_agent_read()
-        .await
-        .expect("attention.agent.read after clear");
+    let Json(after_clear) =
+        server.attention_agent_read().await.expect("attention.agent.read after clear");
     assert_eq!(after_clear.object_ref, None);
     assert_eq!(after_clear.diagram_id, None);
-    assert_eq!(
-        after_clear.context.session_active_diagram_id.as_deref(),
-        Some("d-seq")
-    );
+    assert_eq!(after_clear.context.session_active_diagram_id.as_deref(), Some("d-seq"));
 }
 
 #[tokio::test]
@@ -964,27 +790,16 @@ async fn attention_agent_set_overwrites_previous_value() {
     assert_eq!(second.object_ref, "d:d-seq/seq/message/m:1");
     assert_eq!(second.diagram_id, "d-seq");
 
-    let Json(read) = server
-        .attention_agent_read()
-        .await
-        .expect("attention.agent.read");
+    let Json(read) = server.attention_agent_read().await.expect("attention.agent.read");
     assert_eq!(read.object_ref.as_deref(), Some("d:d-seq/seq/message/m:1"));
     assert_eq!(read.diagram_id.as_deref(), Some("d-seq"));
-    assert_eq!(
-        read.context.session_active_diagram_id.as_deref(),
-        Some("d-seq")
-    );
+    assert_eq!(read.context.session_active_diagram_id.as_deref(), Some("d-seq"));
 
-    let Json(cleared) = server
-        .attention_agent_clear()
-        .await
-        .expect("attention.agent.clear");
+    let Json(cleared) = server.attention_agent_clear().await.expect("attention.agent.clear");
     assert_eq!(cleared.cleared, 1);
 
-    let Json(cleared_again) = server
-        .attention_agent_clear()
-        .await
-        .expect("attention.agent.clear again");
+    let Json(cleared_again) =
+        server.attention_agent_clear().await.expect("attention.agent.clear again");
     assert_eq!(cleared_again.cleared, 0);
 }
 
@@ -1030,10 +845,7 @@ async fn streamable_http_tools_call_updates_shared_agent_attention_state() {
             Request::builder()
                 .method("POST")
                 .uri("/mcp")
-                .header(
-                    axum::http::header::ACCEPT,
-                    "application/json, text/event-stream",
-                )
+                .header(axum::http::header::ACCEPT, "application/json, text/event-stream")
                 .header(axum::http::header::CONTENT_TYPE, "application/json")
                 .body(Body::from(body))
                 .expect("request"),
@@ -1059,25 +871,16 @@ async fn streamable_http_tools_call_updates_shared_agent_attention_state() {
 
     let highlights = agent_highlights.lock().await;
     assert_eq!(highlights.len(), 1);
-    assert!(highlights
-        .iter()
-        .any(|oref| oref.to_string() == "d:d-seq/seq/participant/p:a"));
+    assert!(highlights.iter().any(|oref| oref.to_string() == "d:d-seq/seq/participant/p:a"));
 }
 
 #[tokio::test]
 async fn list_diagrams_returns_deterministic_order() {
     let server = NereidMcp::new(demo_session());
     let Json(result) = server.diagram_list().await.expect("list");
-    let ids = result
-        .diagrams
-        .iter()
-        .map(|d| d.diagram_id.as_str())
-        .collect::<Vec<_>>();
+    let ids = result.diagrams.iter().map(|d| d.diagram_id.as_str()).collect::<Vec<_>>();
     assert_eq!(ids, vec!["d-flow", "d-seq"]);
-    assert_eq!(
-        result.context.session_active_diagram_id.as_deref(),
-        Some("d-seq")
-    );
+    assert_eq!(result.context.session_active_diagram_id.as_deref(), Some("d-seq"));
 }
 
 #[tokio::test]
@@ -1085,11 +888,7 @@ async fn walkthrough_list_returns_deterministic_order_and_counts() {
     let server = NereidMcp::new(demo_session_with_walkthroughs());
     let Json(result) = server.walkthrough_list().await.expect("walkthrough list");
 
-    let ids = result
-        .walkthroughs
-        .iter()
-        .map(|w| w.walkthrough_id.as_str())
-        .collect::<Vec<_>>();
+    let ids = result.walkthroughs.iter().map(|w| w.walkthrough_id.as_str()).collect::<Vec<_>>();
     assert_eq!(ids, vec!["w:1", "w:2"]);
 
     assert_eq!(result.walkthroughs[0].title, "First walkthrough");
@@ -1108,9 +907,7 @@ async fn walkthrough_list_returns_deterministic_order_and_counts() {
 async fn walkthrough_read_returns_nodes_edges_and_refs() {
     let server = NereidMcp::new(demo_session_with_walkthroughs());
     let Json(result) = server
-        .walkthrough_read(Parameters(WalkthroughGetParams {
-            walkthrough_id: "w:1".into(),
-        }))
+        .walkthrough_read(Parameters(WalkthroughGetParams { walkthrough_id: "w:1".into() }))
         .await
         .expect("walkthrough read");
 
@@ -1121,10 +918,7 @@ async fn walkthrough_read_returns_nodes_edges_and_refs() {
     assert_eq!(result.walkthrough.nodes.len(), 2);
     assert_eq!(result.walkthrough.nodes[0].node_id, "wn:2");
     assert_eq!(result.walkthrough.nodes[0].title, "Start");
-    assert_eq!(
-        result.walkthrough.nodes[0].body_md.as_deref(),
-        Some("Start body")
-    );
+    assert_eq!(result.walkthrough.nodes[0].body_md.as_deref(), Some("Start body"));
     assert_eq!(
         result.walkthrough.nodes[0].refs,
         vec!["d:d-seq/seq/message/m:1", "d:d-flow/flow/node/n:a"]
@@ -1135,10 +929,7 @@ async fn walkthrough_read_returns_nodes_edges_and_refs() {
     assert_eq!(result.walkthrough.nodes[1].node_id, "wn:3");
     assert_eq!(result.walkthrough.nodes[1].title, "End");
     assert_eq!(result.walkthrough.nodes[1].body_md, None);
-    assert_eq!(
-        result.walkthrough.nodes[1].refs,
-        vec!["d:d-flow/flow/edge/e:ab"]
-    );
+    assert_eq!(result.walkthrough.nodes[1].refs, vec!["d:d-flow/flow/edge/e:ab"]);
     assert!(result.walkthrough.nodes[1].tags.is_empty());
     assert_eq!(result.walkthrough.nodes[1].status, None);
 
@@ -1146,10 +937,7 @@ async fn walkthrough_read_returns_nodes_edges_and_refs() {
     assert_eq!(result.walkthrough.edges[0].from_node_id, "wn:2");
     assert_eq!(result.walkthrough.edges[0].to_node_id, "wn:3");
     assert_eq!(result.walkthrough.edges[0].kind, "next");
-    assert_eq!(
-        result.walkthrough.edges[0].label.as_deref(),
-        Some("continue")
-    );
+    assert_eq!(result.walkthrough.edges[0].label.as_deref(), Some("continue"));
     assert_eq!(result.context.session_active_diagram_id, None);
 }
 
@@ -1167,10 +955,7 @@ async fn walkthrough_get_node_returns_single_node() {
     assert_eq!(result.node.node_id, "wn:2");
     assert_eq!(result.node.title, "Start");
     assert_eq!(result.node.body_md.as_deref(), Some("Start body"));
-    assert_eq!(
-        result.node.refs,
-        vec!["d:d-seq/seq/message/m:1", "d:d-flow/flow/node/n:a"]
-    );
+    assert_eq!(result.node.refs, vec!["d:d-seq/seq/message/m:1", "d:d-flow/flow/node/n:a"]);
     assert_eq!(result.node.tags, vec!["intro", "evidence"]);
     assert_eq!(result.node.status.as_deref(), Some("draft"));
     assert_eq!(result.context.session_active_diagram_id, None);
@@ -1228,9 +1013,7 @@ async fn walkthrough_get_node_returns_not_found_when_missing_node() {
 async fn walkthrough_read_rejects_invalid_ids() {
     let server = NereidMcp::new(demo_session_with_walkthroughs());
     let err = match server
-        .walkthrough_read(Parameters(WalkthroughGetParams {
-            walkthrough_id: "w/1".into(),
-        }))
+        .walkthrough_read(Parameters(WalkthroughGetParams { walkthrough_id: "w/1".into() }))
         .await
     {
         Ok(_) => panic!("expected invalid id error"),
@@ -1243,9 +1026,7 @@ async fn walkthrough_read_rejects_invalid_ids() {
 async fn walkthrough_read_returns_not_found_when_missing() {
     let server = NereidMcp::new(demo_session_with_walkthroughs());
     let err = match server
-        .walkthrough_read(Parameters(WalkthroughGetParams {
-            walkthrough_id: "w:missing".into(),
-        }))
+        .walkthrough_read(Parameters(WalkthroughGetParams { walkthrough_id: "w:missing".into() }))
         .await
     {
         Ok(_) => panic!("expected not found error"),
@@ -1258,9 +1039,7 @@ async fn walkthrough_read_returns_not_found_when_missing() {
 async fn walkthrough_stat_returns_rev_and_counts() {
     let server = NereidMcp::new(demo_session_with_walkthroughs());
     let Json(result) = server
-        .walkthrough_stat(Parameters(WalkthroughGetParams {
-            walkthrough_id: "w:1".into(),
-        }))
+        .walkthrough_stat(Parameters(WalkthroughGetParams { walkthrough_id: "w:1".into() }))
         .await
         .expect("walkthrough stat");
 
@@ -1274,9 +1053,7 @@ async fn walkthrough_stat_returns_rev_and_counts() {
 async fn walkthrough_stat_rejects_invalid_ids() {
     let server = NereidMcp::new(demo_session_with_walkthroughs());
     let err = match server
-        .walkthrough_stat(Parameters(WalkthroughGetParams {
-            walkthrough_id: "w/1".into(),
-        }))
+        .walkthrough_stat(Parameters(WalkthroughGetParams { walkthrough_id: "w/1".into() }))
         .await
     {
         Ok(_) => panic!("expected invalid id error"),
@@ -1289,9 +1066,7 @@ async fn walkthrough_stat_rejects_invalid_ids() {
 async fn walkthrough_stat_returns_not_found_when_missing() {
     let server = NereidMcp::new(demo_session_with_walkthroughs());
     let err = match server
-        .walkthrough_stat(Parameters(WalkthroughGetParams {
-            walkthrough_id: "w:missing".into(),
-        }))
+        .walkthrough_stat(Parameters(WalkthroughGetParams { walkthrough_id: "w:missing".into() }))
         .await
     {
         Ok(_) => panic!("expected not found error"),
@@ -1304,16 +1079,11 @@ async fn walkthrough_stat_returns_not_found_when_missing() {
 async fn walkthrough_render_text_renders_walkthrough() {
     let server = NereidMcp::new(demo_session_with_walkthroughs());
     let Json(result) = server
-        .walkthrough_render_text(Parameters(WalkthroughGetParams {
-            walkthrough_id: "w:1".into(),
-        }))
+        .walkthrough_render_text(Parameters(WalkthroughGetParams { walkthrough_id: "w:1".into() }))
         .await
         .expect("walkthrough render");
 
-    assert_eq!(
-        result.text,
-        "┌───────┐    ┌─────┐\n│ Start │───▶│ End │\n└───────┘    └─────┘"
-    );
+    assert_eq!(result.text, "┌───────┐    ┌─────┐\n│ Start │───▶│ End │\n└───────┘    └─────┘");
     assert_eq!(result.context.session_active_diagram_id, None);
 }
 
@@ -1321,9 +1091,7 @@ async fn walkthrough_render_text_renders_walkthrough() {
 async fn walkthrough_render_text_rejects_invalid_ids() {
     let server = NereidMcp::new(demo_session_with_walkthroughs());
     let err = match server
-        .walkthrough_render_text(Parameters(WalkthroughGetParams {
-            walkthrough_id: "w/1".into(),
-        }))
+        .walkthrough_render_text(Parameters(WalkthroughGetParams { walkthrough_id: "w/1".into() }))
         .await
     {
         Ok(_) => panic!("expected invalid id error"),
@@ -1354,9 +1122,7 @@ async fn walkthrough_apply_ops_conflicts_on_stale_base_rev() {
         .walkthrough_apply_ops(Parameters(WalkthroughApplyOpsParams {
             walkthrough_id: "w:1".into(),
             base_rev: 123,
-            ops: vec![McpWalkthroughOp::SetTitle {
-                title: "Updated".into(),
-            }],
+            ops: vec![McpWalkthroughOp::SetTitle { title: "Updated".into() }],
         }))
         .await
     {
@@ -1421,9 +1187,7 @@ async fn walkthrough_apply_ops_bumps_rev_and_returns_delta_for_add_update_remove
         .walkthrough_apply_ops(Parameters(WalkthroughApplyOpsParams {
             walkthrough_id: "w:1".into(),
             base_rev: 2,
-            ops: vec![McpWalkthroughOp::RemoveNode {
-                node_id: "wn:2".into(),
-            }],
+            ops: vec![McpWalkthroughOp::RemoveNode { node_id: "wn:2".into() }],
         }))
         .await
         .expect("remove node");
@@ -1431,10 +1195,7 @@ async fn walkthrough_apply_ops_bumps_rev_and_returns_delta_for_add_update_remove
     assert_eq!(result.new_rev, 3);
     assert_eq!(result.applied, 1);
     assert!(result.delta.added.is_empty());
-    assert_eq!(
-        result.delta.removed,
-        vec!["w:w:1/edge/wn:2/wn:3/next", "w:w:1/node/wn:2"]
-    );
+    assert_eq!(result.delta.removed, vec!["w:w:1/edge/wn:2/wn:3/next", "w:w:1/node/wn:2"]);
     assert!(result.delta.updated.is_empty());
 }
 
@@ -1462,9 +1223,7 @@ async fn walkthrough_diff_spans_multiple_revisions() {
         .walkthrough_apply_ops(Parameters(WalkthroughApplyOpsParams {
             walkthrough_id: "w:1".into(),
             base_rev: 1,
-            ops: vec![McpWalkthroughOp::SetTitle {
-                title: "Updated".into(),
-            }],
+            ops: vec![McpWalkthroughOp::SetTitle { title: "Updated".into() }],
         }))
         .await
         .expect("set title");
@@ -1494,10 +1253,7 @@ async fn walkthrough_diff_spans_multiple_revisions() {
     assert_eq!(updated.refs, vec!["w:w:1/meta"]);
 
     assert!(
-        delta
-            .changes
-            .iter()
-            .all(|change| change.kind != DeltaChangeKind::Removed),
+        delta.changes.iter().all(|change| change.kind != DeltaChangeKind::Removed),
         "should not include a removed change"
     );
 }
@@ -1596,11 +1352,7 @@ async fn route_find_can_return_multiple_routes_and_defaults_to_fewest_hops() {
     assert_eq!(result.routes.len(), 2);
     assert_eq!(
         result.routes[0],
-        vec![
-            "d:d-flow/flow/node/n:a",
-            "d:d-seq/seq/message/m:1",
-            "d:d-seq/seq/message/m:2",
-        ]
+        vec!["d:d-flow/flow/node/n:a", "d:d-seq/seq/message/m:1", "d:d-seq/seq/message/m:2",]
     );
     assert_eq!(
         result.routes[1],
@@ -1662,16 +1414,9 @@ async fn route_find_rejects_invalid_ordering_param() {
 #[tokio::test]
 async fn xref_list_returns_all_xrefs_ordered_by_id() {
     let server = NereidMcp::new(demo_session_with_xrefs());
-    let Json(result) = server
-        .xref_list(Parameters(xref_list_params()))
-        .await
-        .expect("xref list");
+    let Json(result) = server.xref_list(Parameters(xref_list_params())).await.expect("xref list");
 
-    let ids = result
-        .xrefs
-        .iter()
-        .map(|x| x.xref_id.as_str())
-        .collect::<Vec<_>>();
+    let ids = result.xrefs.iter().map(|x| x.xref_id.as_str()).collect::<Vec<_>>();
     assert_eq!(ids, vec!["x:1", "x:2"]);
     assert_eq!(result.xrefs.len(), 2);
 }
@@ -1681,10 +1426,7 @@ async fn xref_list_can_filter_to_dangling_only() {
     let server = NereidMcp::new(demo_session_with_xrefs());
     let mut params = xref_list_params();
     params.dangling_only = Some(true);
-    let Json(result) = server
-        .xref_list(Parameters(params))
-        .await
-        .expect("xref list");
+    let Json(result) = server.xref_list(Parameters(params)).await.expect("xref list");
 
     assert_eq!(result.xrefs.len(), 1);
     assert_ne!(result.xrefs[0].status, "ok");
@@ -1696,24 +1438,14 @@ async fn xref_list_can_filter_by_status() {
 
     let mut params = xref_list_params();
     params.status = Some("ok".into());
-    let Json(ok_only) = server
-        .xref_list(Parameters(params))
-        .await
-        .expect("xref list");
+    let Json(ok_only) = server.xref_list(Parameters(params)).await.expect("xref list");
     assert_eq!(ok_only.xrefs.len(), 1);
     assert_eq!(ok_only.xrefs[0].xref_id, "x:2");
 
     let mut params = xref_list_params();
     params.status = Some("dangling_*".into());
-    let Json(dangling) = server
-        .xref_list(Parameters(params))
-        .await
-        .expect("xref list");
-    let ids = dangling
-        .xrefs
-        .iter()
-        .map(|x| x.xref_id.as_str())
-        .collect::<Vec<_>>();
+    let Json(dangling) = server.xref_list(Parameters(params)).await.expect("xref list");
+    let ids = dangling.xrefs.iter().map(|x| x.xref_id.as_str()).collect::<Vec<_>>();
     assert_eq!(ids, vec!["x:1", "x:3"]);
 }
 
@@ -1723,54 +1455,31 @@ async fn xref_list_can_filter_by_kind_and_endpoints_and_label() {
 
     let mut params = xref_list_params();
     params.kind = Some("implements".into());
-    let Json(kind_only) = server
-        .xref_list(Parameters(params))
-        .await
-        .expect("xref list");
+    let Json(kind_only) = server.xref_list(Parameters(params)).await.expect("xref list");
     assert_eq!(kind_only.xrefs.len(), 1);
     assert_eq!(kind_only.xrefs[0].xref_id, "x:3");
 
     let mut params = xref_list_params();
     params.from_ref = Some("d:d-seq/obj/p:a".into());
-    let Json(from_filtered) = server
-        .xref_list(Parameters(params))
-        .await
-        .expect("xref list");
-    let ids = from_filtered
-        .xrefs
-        .iter()
-        .map(|x| x.xref_id.as_str())
-        .collect::<Vec<_>>();
+    let Json(from_filtered) = server.xref_list(Parameters(params)).await.expect("xref list");
+    let ids = from_filtered.xrefs.iter().map(|x| x.xref_id.as_str()).collect::<Vec<_>>();
     assert_eq!(ids, vec!["x:2", "x:3"]);
 
     let mut params = xref_list_params();
     params.to_ref = Some("d:d-flow/obj/n:missing".into());
-    let Json(to_filtered) = server
-        .xref_list(Parameters(params))
-        .await
-        .expect("xref list");
+    let Json(to_filtered) = server.xref_list(Parameters(params)).await.expect("xref list");
     assert_eq!(to_filtered.xrefs.len(), 1);
     assert_eq!(to_filtered.xrefs[0].xref_id, "x:1");
 
     let mut params = xref_list_params();
     params.involves_ref = Some("d:d-flow/obj/n:a".into());
-    let Json(involves) = server
-        .xref_list(Parameters(params))
-        .await
-        .expect("xref list");
-    let ids = involves
-        .xrefs
-        .iter()
-        .map(|x| x.xref_id.as_str())
-        .collect::<Vec<_>>();
+    let Json(involves) = server.xref_list(Parameters(params)).await.expect("xref list");
+    let ids = involves.xrefs.iter().map(|x| x.xref_id.as_str()).collect::<Vec<_>>();
     assert_eq!(ids, vec!["x:2"]);
 
     let mut params = xref_list_params();
     params.label_contains = Some("Auth".into());
-    let Json(label_filtered) = server
-        .xref_list(Parameters(params))
-        .await
-        .expect("xref list");
+    let Json(label_filtered) = server.xref_list(Parameters(params)).await.expect("xref list");
     assert_eq!(label_filtered.xrefs.len(), 1);
     assert_eq!(label_filtered.xrefs[0].xref_id, "x:3");
 }
@@ -1780,15 +1489,8 @@ async fn xref_list_applies_limit_after_sort() {
     let server = NereidMcp::new(demo_session_with_xrefs_varied());
     let mut params = xref_list_params();
     params.limit = Some(2);
-    let Json(result) = server
-        .xref_list(Parameters(params))
-        .await
-        .expect("xref list");
-    let ids = result
-        .xrefs
-        .iter()
-        .map(|x| x.xref_id.as_str())
-        .collect::<Vec<_>>();
+    let Json(result) = server.xref_list(Parameters(params)).await.expect("xref list");
+    let ids = result.xrefs.iter().map(|x| x.xref_id.as_str()).collect::<Vec<_>>();
     assert_eq!(ids, vec!["x:1", "x:2"]);
 }
 
@@ -1803,10 +1505,7 @@ async fn xref_neighbors_returns_out_neighbors_sorted() {
         .await
         .expect("xref neighbors");
 
-    assert_eq!(
-        result.neighbors,
-        vec!["d:d-flow/flow/node/n:a", "d:d-flow/flow/node/n:b"]
-    );
+    assert_eq!(result.neighbors, vec!["d:d-flow/flow/node/n:a", "d:d-flow/flow/node/n:b"]);
 }
 
 #[tokio::test]
@@ -1874,10 +1573,7 @@ async fn xref_add_returns_ok_status_when_endpoints_exist() {
     assert_eq!(result.xref_id, "x:new");
     assert_eq!(result.status, "ok");
 
-    let Json(list) = server
-        .xref_list(Parameters(xref_list_params()))
-        .await
-        .expect("xref list");
+    let Json(list) = server.xref_list(Parameters(xref_list_params())).await.expect("xref list");
     assert_eq!(list.xrefs.len(), 1);
     assert_eq!(list.xrefs[0].xref_id, "x:new");
     assert_eq!(list.xrefs[0].status, "ok");
@@ -1904,18 +1600,13 @@ async fn xref_add_marks_dangling_to_when_target_missing() {
 async fn xref_remove_deletes_existing_xref() {
     let server = NereidMcp::new(demo_session_with_xrefs());
     let Json(result) = server
-        .xref_remove(Parameters(XRefRemoveParams {
-            xref_id: "x:1".into(),
-        }))
+        .xref_remove(Parameters(XRefRemoveParams { xref_id: "x:1".into() }))
         .await
         .expect("xref remove");
 
     assert!(result.removed);
 
-    let Json(list) = server
-        .xref_list(Parameters(xref_list_params()))
-        .await
-        .expect("xref list");
+    let Json(list) = server.xref_list(Parameters(xref_list_params())).await.expect("xref list");
     assert_eq!(list.xrefs.len(), 1);
     assert_eq!(list.xrefs[0].xref_id, "x:2");
 }
@@ -1988,12 +1679,7 @@ async fn object_read_returns_seq_block() {
 
     assert_eq!(result.objects.len(), 1);
     match &result.objects[0].object {
-        McpObject::SeqBlock {
-            kind,
-            header,
-            section_ids,
-            child_block_ids,
-        } => {
+        McpObject::SeqBlock { kind, header, section_ids, child_block_ids } => {
             assert_eq!(*kind, McpSeqBlockKind::Alt);
             assert_eq!(header.as_deref(), Some("guard"));
             assert_eq!(
@@ -2019,11 +1705,7 @@ async fn object_read_returns_seq_section() {
 
     assert_eq!(result.objects.len(), 1);
     match &result.objects[0].object {
-        McpObject::SeqSection {
-            kind,
-            header,
-            message_ids,
-        } => {
+        McpObject::SeqSection { kind, header, message_ids } => {
             assert_eq!(*kind, McpSeqSectionKind::Main);
             assert_eq!(header.as_deref(), Some("ok"));
             assert_eq!(message_ids, &vec![String::from("m:1")]);
@@ -2047,10 +1729,7 @@ async fn seq_trace_after_from_message_returns_following_messages() {
 
     assert_eq!(
         result.messages,
-        vec![
-            "d:d-seq-trace/seq/message/m:0003",
-            "d:d-seq-trace/seq/message/m:0004",
-        ]
+        vec!["d:d-seq-trace/seq/message/m:0003", "d:d-seq-trace/seq/message/m:0004",]
     );
 }
 
@@ -2069,10 +1748,7 @@ async fn seq_trace_before_from_message_returns_preceding_messages() {
 
     assert_eq!(
         result.messages,
-        vec![
-            "d:d-seq-trace/seq/message/m:0002",
-            "d:d-seq-trace/seq/message/m:0001",
-        ]
+        vec!["d:d-seq-trace/seq/message/m:0002", "d:d-seq-trace/seq/message/m:0001",]
     );
 }
 
@@ -2092,10 +1768,7 @@ async fn seq_trace_from_message_omitted_returns_first_or_last_messages() {
 
     assert_eq!(
         result.messages,
-        vec![
-            "d:d-seq-trace/seq/message/m:0002",
-            "d:d-seq-trace/seq/message/m:0001",
-        ]
+        vec!["d:d-seq-trace/seq/message/m:0002", "d:d-seq-trace/seq/message/m:0001",]
     );
 
     let Json(result) = server
@@ -2110,10 +1783,7 @@ async fn seq_trace_from_message_omitted_returns_first_or_last_messages() {
 
     assert_eq!(
         result.messages,
-        vec![
-            "d:d-seq-trace/seq/message/m:0003",
-            "d:d-seq-trace/seq/message/m:0004",
-        ]
+        vec!["d:d-seq-trace/seq/message/m:0003", "d:d-seq-trace/seq/message/m:0004",]
     );
 }
 
@@ -2170,10 +1840,7 @@ async fn seq_search_returns_matches_in_deterministic_order() {
 
     assert_eq!(
         result.messages,
-        vec![
-            "d:d-seq-trace/seq/message/m:0001",
-            "d:d-seq-trace/seq/message/m:0003",
-        ]
+        vec!["d:d-seq-trace/seq/message/m:0001", "d:d-seq-trace/seq/message/m:0003",]
     );
 }
 
@@ -2324,15 +1991,9 @@ async fn seq_search_rejects_empty_needle() {
 async fn seq_messages_filters_and_orders_deterministically() {
     let server = NereidMcp::new(demo_session_for_seq_trace());
 
-    let params = SeqMessagesParams {
-        diagram_id: None,
-        from_participant_id: None,
-        to_participant_id: None,
-    };
-    let Json(all) = server
-        .seq_messages(Parameters(params.clone()))
-        .await
-        .expect("seq messages");
+    let params =
+        SeqMessagesParams { diagram_id: None, from_participant_id: None, to_participant_id: None };
+    let Json(all) = server.seq_messages(Parameters(params.clone())).await.expect("seq messages");
     assert_eq!(
         all.messages,
         vec![
@@ -2343,10 +2004,7 @@ async fn seq_messages_filters_and_orders_deterministically() {
         ]
     );
 
-    let Json(all_again) = server
-        .seq_messages(Parameters(params))
-        .await
-        .expect("seq messages");
+    let Json(all_again) = server.seq_messages(Parameters(params)).await.expect("seq messages");
     assert_eq!(all_again.messages, all.messages);
 
     let Json(from_filtered) = server
@@ -2374,10 +2032,7 @@ async fn seq_messages_filters_and_orders_deterministically() {
         }))
         .await
         .expect("seq messages");
-    assert_eq!(
-        to_filtered.messages,
-        vec!["d:d-seq-trace/seq/message/m:0003"]
-    );
+    assert_eq!(to_filtered.messages, vec!["d:d-seq-trace/seq/message/m:0003"]);
 
     let Json(both_filtered) = server
         .seq_messages(Parameters(SeqMessagesParams {
@@ -2420,13 +2075,7 @@ async fn flow_reachable_out_returns_reachable_nodes() {
         .await
         .expect("flow reachable");
 
-    assert_eq!(
-        result.nodes,
-        vec![
-            "d:d-flow-reach/flow/node/n:b",
-            "d:d-flow-reach/flow/node/n:c"
-        ]
-    );
+    assert_eq!(result.nodes, vec!["d:d-flow-reach/flow/node/n:b", "d:d-flow-reach/flow/node/n:c"]);
 }
 
 #[tokio::test]
@@ -2441,13 +2090,7 @@ async fn flow_reachable_in_returns_inbound_reachable_nodes() {
         .await
         .expect("flow reachable");
 
-    assert_eq!(
-        result.nodes,
-        vec![
-            "d:d-flow-reach/flow/node/n:a",
-            "d:d-flow-reach/flow/node/n:b"
-        ]
-    );
+    assert_eq!(result.nodes, vec!["d:d-flow-reach/flow/node/n:a", "d:d-flow-reach/flow/node/n:b"]);
 }
 
 #[tokio::test]
@@ -2589,10 +2232,7 @@ async fn flow_cycles_returns_self_loops_and_multi_node_cycles() {
     assert_eq!(
         result.cycles,
         vec![
-            vec![
-                "d:d-flow-cycles/flow/node/n:x",
-                "d:d-flow-cycles/flow/node/n:y",
-            ],
+            vec!["d:d-flow-cycles/flow/node/n:x", "d:d-flow-cycles/flow/node/n:y",],
             vec!["d:d-flow-cycles/flow/node/n:z"],
         ]
     );
@@ -2608,10 +2248,7 @@ async fn flow_dead_ends_returns_terminal_nodes() {
 
     assert_eq!(
         result.nodes,
-        vec![
-            "d:d-flow-cycles/flow/node/n:e",
-            "d:d-flow-cycles/flow/node/n:f",
-        ]
+        vec!["d:d-flow-cycles/flow/node/n:e", "d:d-flow-cycles/flow/node/n:f",]
     );
 }
 
@@ -2630,14 +2267,7 @@ async fn flow_degrees_defaults_to_sort_by_out_and_truncates() {
     let nodes = result
         .nodes
         .iter()
-        .map(|node| {
-            (
-                node.node_ref.as_str(),
-                node.label.as_str(),
-                node.in_degree,
-                node.out_degree,
-            )
-        })
+        .map(|node| (node.node_ref.as_str(), node.label.as_str(), node.in_degree, node.out_degree))
         .collect::<Vec<_>>();
     assert_eq!(
         nodes,
@@ -2757,9 +2387,7 @@ async fn flow_degrees_rejects_non_flowchart_diagram() {
 async fn flow_cycles_rejects_invalid_diagram_id() {
     let server = NereidMcp::new(demo_session_for_flow_cycles());
     let err = match server
-        .flow_cycles(Parameters(DiagramTargetParams {
-            diagram_id: Some("d/invalid".into()),
-        }))
+        .flow_cycles(Parameters(DiagramTargetParams { diagram_id: Some("d/invalid".into()) }))
         .await
     {
         Ok(_) => panic!("expected invalid diagram id error"),
@@ -2773,9 +2401,7 @@ async fn flow_cycles_rejects_invalid_diagram_id() {
 async fn flow_dead_ends_rejects_non_flowchart_diagram() {
     let server = NereidMcp::new(demo_session());
     let err = match server
-        .flow_dead_ends(Parameters(DiagramTargetParams {
-            diagram_id: Some("d-seq".into()),
-        }))
+        .flow_dead_ends(Parameters(DiagramTargetParams { diagram_id: Some("d-seq".into()) }))
         .await
     {
         Ok(_) => panic!("expected non-flowchart error"),
@@ -2789,26 +2415,15 @@ async fn flow_dead_ends_rejects_non_flowchart_diagram() {
 async fn flow_unreachable_returns_unreachable_nodes_in_deterministic_order() {
     let server = NereidMcp::new(demo_session_for_flow_unreachable());
 
-    let params = FlowUnreachableParams {
-        diagram_id: None,
-        start_node_id: None,
-    };
-    let Json(result) = server
-        .flow_unreachable(Parameters(params.clone()))
-        .await
-        .expect("flow unreachable");
+    let params = FlowUnreachableParams { diagram_id: None, start_node_id: None };
+    let Json(result) =
+        server.flow_unreachable(Parameters(params.clone())).await.expect("flow unreachable");
     assert_eq!(
         result.nodes,
-        vec![
-            "d:d-flow-unreach/flow/node/n:x",
-            "d:d-flow-unreach/flow/node/n:y",
-        ]
+        vec!["d:d-flow-unreach/flow/node/n:x", "d:d-flow-unreach/flow/node/n:y",]
     );
 
-    let Json(again) = server
-        .flow_unreachable(Parameters(params))
-        .await
-        .expect("flow unreachable");
+    let Json(again) = server.flow_unreachable(Parameters(params)).await.expect("flow unreachable");
     assert_eq!(again.nodes, result.nodes);
 }
 
@@ -2842,21 +2457,14 @@ async fn object_read_returns_flow_node() {
 
     assert_eq!(result.objects.len(), 1);
     assert_eq!(result.objects[0].object_ref, "d:d-flow/flow/node/n:a");
-    assert_eq!(
-        result.context.session_active_diagram_id.as_deref(),
-        Some("d-seq")
-    );
+    assert_eq!(result.context.session_active_diagram_id.as_deref(), Some("d-seq"));
     assert_eq!(result.context.human_active_diagram_id, None);
     assert_eq!(result.context.human_active_object_ref, None);
     assert_eq!(result.context.follow_ai, None);
     assert_eq!(result.context.ui_rev, None);
     assert_eq!(result.context.ui_session_rev, None);
     match &result.objects[0].object {
-        McpObject::FlowNode {
-            label,
-            shape,
-            mermaid_id,
-        } => {
+        McpObject::FlowNode { label, shape, mermaid_id } => {
             assert_eq!(label, "A");
             assert_eq!(shape, "rect");
             assert_eq!(mermaid_id.as_deref(), None);
@@ -2891,18 +2499,9 @@ async fn object_read_includes_shared_ui_context_when_available() {
         .await
         .expect("object read");
 
-    assert_eq!(
-        result.context.session_active_diagram_id.as_deref(),
-        Some("d-seq")
-    );
-    assert_eq!(
-        result.context.human_active_diagram_id.as_deref(),
-        Some("d-flow")
-    );
-    assert_eq!(
-        result.context.human_active_object_ref.as_deref(),
-        Some("d:d-flow/flow/node/n:b")
-    );
+    assert_eq!(result.context.session_active_diagram_id.as_deref(), Some("d-seq"));
+    assert_eq!(result.context.human_active_diagram_id.as_deref(), Some("d-flow"));
+    assert_eq!(result.context.human_active_object_ref.as_deref(), Some("d:d-flow/flow/node/n:b"));
     assert_eq!(result.context.follow_ai, Some(false));
     assert_eq!(result.context.ui_rev, Some(3));
     assert_eq!(result.context.ui_session_rev, Some(1));
@@ -2922,13 +2521,7 @@ async fn object_read_returns_flow_edge() {
     assert_eq!(result.objects.len(), 1);
     assert_eq!(result.objects[0].object_ref, "d:d-flow/flow/edge/e:ab");
     match &result.objects[0].object {
-        McpObject::FlowEdge {
-            from_node_id,
-            to_node_id,
-            label,
-            connector,
-            style,
-        } => {
+        McpObject::FlowEdge { from_node_id, to_node_id, label, connector, style } => {
             assert_eq!(from_node_id, "n:a");
             assert_eq!(to_node_id, "n:b");
             assert_eq!(label.as_deref(), None);
@@ -2956,14 +2549,8 @@ async fn object_read_accepts_object_refs_array() {
     assert_eq!(result.objects.len(), 2);
     assert_eq!(result.objects[0].object_ref, "d:d-seq/seq/participant/p:a");
     assert_eq!(result.objects[1].object_ref, "d:d-flow/flow/edge/e:ab");
-    assert!(matches!(
-        &result.objects[0].object,
-        McpObject::SeqParticipant { .. }
-    ));
-    assert!(matches!(
-        &result.objects[1].object,
-        McpObject::FlowEdge { .. }
-    ));
+    assert!(matches!(&result.objects[0].object, McpObject::SeqParticipant { .. }));
+    assert!(matches!(&result.objects[1].object, McpObject::FlowEdge { .. }));
 }
 
 #[tokio::test]
@@ -3001,18 +2588,13 @@ async fn diagram_current_returns_null_when_unset() {
 async fn diagram_current_returns_id_when_set() {
     let server = NereidMcp::new(demo_session());
     server
-        .diagram_open(Parameters(DiagramOpenParams {
-            diagram_id: "d-flow".into(),
-        }))
+        .diagram_open(Parameters(DiagramOpenParams { diagram_id: "d-flow".into() }))
         .await
         .expect("set active diagram");
 
     let Json(result) = server.diagram_current().await.expect("get active diagram");
     assert_eq!(result.active_diagram_id.as_deref(), Some("d-flow"));
-    assert_eq!(
-        result.context.session_active_diagram_id.as_deref(),
-        Some("d-flow")
-    );
+    assert_eq!(result.context.session_active_diagram_id.as_deref(), Some("d-flow"));
     assert_eq!(result.context.human_active_diagram_id, None);
     assert_eq!(result.context.human_active_object_ref, None);
     assert_eq!(result.context.follow_ai, None);
@@ -3024,10 +2606,7 @@ async fn diagram_current_returns_id_when_set() {
 async fn walkthrough_current_returns_null_when_unset() {
     let session = Session::new(SessionId::new("s:mcp-walkthrough-unset").expect("session id"));
     let server = NereidMcp::new(session);
-    let Json(result) = server
-        .walkthrough_current()
-        .await
-        .expect("get active walkthrough");
+    let Json(result) = server.walkthrough_current().await.expect("get active walkthrough");
     assert_eq!(result.active_walkthrough_id, None);
     assert_eq!(result.context.session_active_diagram_id, None);
 }
@@ -3036,17 +2615,12 @@ async fn walkthrough_current_returns_null_when_unset() {
 async fn walkthrough_open_then_current_returns_id() {
     let server = NereidMcp::new(demo_session_with_walkthroughs());
     let Json(result) = server
-        .walkthrough_open(Parameters(WalkthroughOpenParams {
-            walkthrough_id: "w:1".into(),
-        }))
+        .walkthrough_open(Parameters(WalkthroughOpenParams { walkthrough_id: "w:1".into() }))
         .await
         .expect("set active walkthrough");
     assert_eq!(result.active_walkthrough_id, "w:1");
 
-    let Json(after) = server
-        .walkthrough_current()
-        .await
-        .expect("get active walkthrough");
+    let Json(after) = server.walkthrough_current().await.expect("get active walkthrough");
     assert_eq!(after.active_walkthrough_id.as_deref(), Some("w:1"));
     assert_eq!(after.context.session_active_diagram_id, None);
 }
@@ -3055,9 +2629,7 @@ async fn walkthrough_open_then_current_returns_id() {
 async fn walkthrough_open_rejects_invalid_id() {
     let server = NereidMcp::new(demo_session_with_walkthroughs());
     let err = match server
-        .walkthrough_open(Parameters(WalkthroughOpenParams {
-            walkthrough_id: "w/1".into(),
-        }))
+        .walkthrough_open(Parameters(WalkthroughOpenParams { walkthrough_id: "w/1".into() }))
         .await
     {
         Ok(_) => panic!("expected invalid id error"),
@@ -3071,9 +2643,7 @@ async fn walkthrough_open_rejects_invalid_id() {
 async fn walkthrough_open_returns_not_found_when_missing() {
     let server = NereidMcp::new(demo_session_with_walkthroughs());
     let err = match server
-        .walkthrough_open(Parameters(WalkthroughOpenParams {
-            walkthrough_id: "w:missing".into(),
-        }))
+        .walkthrough_open(Parameters(WalkthroughOpenParams { walkthrough_id: "w:missing".into() }))
         .await
     {
         Ok(_) => panic!("expected not found error"),
@@ -3087,9 +2657,7 @@ async fn walkthrough_open_returns_not_found_when_missing() {
 async fn diagram_open_sets_active_diagram() {
     let server = NereidMcp::new(demo_session());
     let Json(result) = server
-        .diagram_open(Parameters(DiagramOpenParams {
-            diagram_id: "d-flow".into(),
-        }))
+        .diagram_open(Parameters(DiagramOpenParams { diagram_id: "d-flow".into() }))
         .await
         .expect("set active diagram");
     assert_eq!(result.active_diagram_id, "d-flow");
@@ -3128,16 +2696,8 @@ async fn diagram_create_from_mermaid_rejects_unrenderable_flowchart() {
         "unexpected message: {}",
         err.message
     );
-    assert!(
-        err.message.contains("flowchart layout error"),
-        "unexpected message: {}",
-        err.message
-    );
-    assert!(
-        err.message.contains("contains a cycle"),
-        "unexpected message: {}",
-        err.message
-    );
+    assert!(err.message.contains("flowchart layout error"), "unexpected message: {}", err.message);
+    assert!(err.message.contains("contains a cycle"), "unexpected message: {}", err.message);
 
     let Json(diagrams) = server.diagram_list().await.expect("diagram list");
     assert!(diagrams.diagrams.is_empty());
@@ -3150,9 +2710,7 @@ async fn diagram_create_from_mermaid_rejects_unrenderable_flowchart() {
 async fn diagram_delete_rejects_invalid_id() {
     let server = NereidMcp::new(demo_session());
     let err = match server
-        .diagram_delete(Parameters(DiagramDeleteParams {
-            diagram_id: "d/flow".into(),
-        }))
+        .diagram_delete(Parameters(DiagramDeleteParams { diagram_id: "d/flow".into() }))
         .await
     {
         Ok(_) => panic!("expected invalid id error"),
@@ -3166,9 +2724,7 @@ async fn diagram_delete_rejects_invalid_id() {
 async fn diagram_delete_returns_not_found_when_missing() {
     let server = NereidMcp::new(demo_session());
     let err = match server
-        .diagram_delete(Parameters(DiagramDeleteParams {
-            diagram_id: "d-missing".into(),
-        }))
+        .diagram_delete(Parameters(DiagramDeleteParams { diagram_id: "d-missing".into() }))
         .await
     {
         Ok(_) => panic!("expected not found error"),
@@ -3193,9 +2749,7 @@ async fn diagram_delete_retargets_active_and_prunes_selection() {
     let server = NereidMcp::new(session);
 
     server
-        .diagram_open(Parameters(DiagramOpenParams {
-            diagram_id: "d-flow".into(),
-        }))
+        .diagram_open(Parameters(DiagramOpenParams { diagram_id: "d-flow".into() }))
         .await
         .expect("set active diagram");
 
@@ -3218,9 +2772,7 @@ async fn diagram_delete_retargets_active_and_prunes_selection() {
         .expect("set agent attention");
 
     let Json(result) = server
-        .diagram_delete(Parameters(DiagramDeleteParams {
-            diagram_id: "d-flow".into(),
-        }))
+        .diagram_delete(Parameters(DiagramDeleteParams { diagram_id: "d-flow".into() }))
         .await
         .expect("delete diagram");
     assert_eq!(result.deleted_diagram_id, "d-flow");
@@ -3234,22 +2786,13 @@ async fn diagram_delete_retargets_active_and_prunes_selection() {
     assert_eq!(current.active_diagram_id.as_deref(), Some("d-seq"));
 
     let Json(selection) = server.selection_get().await.expect("selection");
-    assert_eq!(
-        selection.object_refs,
-        vec!["d:d-seq/seq/participant/p:a".to_owned()]
-    );
+    assert_eq!(selection.object_refs, vec!["d:d-seq/seq/participant/p:a".to_owned()]);
 
-    let Json(agent) = server
-        .attention_agent_read()
-        .await
-        .expect("agent attention");
+    let Json(agent) = server.attention_agent_read().await.expect("agent attention");
     assert!(agent.object_ref.is_none());
     assert!(agent.diagram_id.is_none());
 
-    let Json(xrefs) = server
-        .xref_list(Parameters(xref_list_params()))
-        .await
-        .expect("xref list");
+    let Json(xrefs) = server.xref_list(Parameters(xref_list_params())).await.expect("xref list");
     assert_eq!(xrefs.xrefs.len(), 1);
     assert_eq!(xrefs.xrefs[0].status, "dangling_to");
 }
@@ -3268,9 +2811,7 @@ async fn diagram_delete_last_diagram_clears_active_diagram() {
 
     let server = NereidMcp::new(session);
     let Json(result) = server
-        .diagram_delete(Parameters(DiagramDeleteParams {
-            diagram_id: "d-only".into(),
-        }))
+        .diagram_delete(Parameters(DiagramDeleteParams { diagram_id: "d-only".into() }))
         .await
         .expect("delete diagram");
     assert_eq!(result.deleted_diagram_id, "d-only");
@@ -3287,9 +2828,7 @@ async fn diagram_delete_last_diagram_clears_active_diagram() {
 async fn diagram_stat_uses_active_diagram_when_diagram_id_is_null() {
     let server = NereidMcp::new(demo_session());
     server
-        .diagram_open(Parameters(DiagramOpenParams {
-            diagram_id: "d-flow".into(),
-        }))
+        .diagram_open(Parameters(DiagramOpenParams { diagram_id: "d-flow".into() }))
         .await
         .expect("set active diagram");
 
@@ -3298,10 +2837,7 @@ async fn diagram_stat_uses_active_diagram_when_diagram_id_is_null() {
     let Json(digest) = server.diagram_stat(Parameters(params)).await.expect("stat");
     assert_eq!(digest.counts.nodes, 2);
     assert_eq!(digest.counts.edges, 1);
-    assert_eq!(
-        digest.context.session_active_diagram_id.as_deref(),
-        Some("d-flow")
-    );
+    assert_eq!(digest.context.session_active_diagram_id.as_deref(), Some("d-flow"));
     assert_eq!(digest.context.human_active_diagram_id, None);
     assert_eq!(digest.context.human_active_object_ref, None);
     assert_eq!(digest.context.follow_ai, None);
@@ -3318,10 +2854,7 @@ async fn diagram_stat_uses_active_diagram_when_omitted() {
         .expect("stat");
     assert_eq!(digest.counts.participants, 2);
     assert_eq!(digest.counts.messages, 1);
-    assert_eq!(
-        digest.context.session_active_diagram_id.as_deref(),
-        Some("d-seq")
-    );
+    assert_eq!(digest.context.session_active_diagram_id.as_deref(), Some("d-seq"));
     assert_eq!(digest.context.human_active_diagram_id, None);
     assert_eq!(digest.context.human_active_object_ref, None);
     assert_eq!(digest.context.follow_ai, None);
@@ -3339,10 +2872,7 @@ async fn diagram_read_returns_mermaid_and_kind() {
     assert_eq!(snapshot.rev, 0);
     assert_eq!(snapshot.kind, "Sequence");
     assert!(snapshot.mermaid.contains("sequenceDiagram"));
-    assert_eq!(
-        snapshot.context.session_active_diagram_id.as_deref(),
-        Some("d-seq")
-    );
+    assert_eq!(snapshot.context.session_active_diagram_id.as_deref(), Some("d-seq"));
     assert_eq!(snapshot.context.human_active_diagram_id, None);
     assert_eq!(snapshot.context.human_active_object_ref, None);
     assert_eq!(snapshot.context.follow_ai, None);
@@ -3362,8 +2892,7 @@ async fn diagram_get_ast_returns_sorted_sequence_ast() {
     let mut participant_b = SequenceParticipant::new("B");
     participant_b.set_note(Some("note-b"));
     ast.participants_mut().insert(p_b.clone(), participant_b);
-    ast.participants_mut()
-        .insert(p_a.clone(), SequenceParticipant::new("A"));
+    ast.participants_mut().insert(p_a.clone(), SequenceParticipant::new("A"));
 
     ast.messages_mut().push(SequenceMessage::new(
         oid("m:0002"),
@@ -3406,31 +2935,19 @@ async fn diagram_get_ast_returns_sorted_sequence_ast() {
     assert_eq!(result.kind, "Sequence");
     assert_eq!(result.rev, 0);
 
-    let McpDiagramAst::Sequence {
-        participants,
-        messages,
-        blocks,
-    } = result.ast
-    else {
+    let McpDiagramAst::Sequence { participants, messages, blocks } = result.ast else {
         panic!("expected sequence ast");
     };
 
-    let participant_ids = participants
-        .iter()
-        .map(|p| p.participant_id.as_str())
-        .collect::<Vec<_>>();
+    let participant_ids =
+        participants.iter().map(|p| p.participant_id.as_str()).collect::<Vec<_>>();
     assert_eq!(participant_ids, vec!["p:a", "p:b"]);
     assert!(participants[0].note.is_none());
     assert_eq!(participants[1].note.as_deref(), Some("note-b"));
 
-    let message_ids = messages
-        .iter()
-        .map(|m| (m.order_key, m.message_id.as_str()))
-        .collect::<Vec<_>>();
-    assert_eq!(
-        message_ids,
-        vec![(1000, "m:0001"), (2000, "m:0000"), (2000, "m:0002")]
-    );
+    let message_ids =
+        messages.iter().map(|m| (m.order_key, m.message_id.as_str())).collect::<Vec<_>>();
+    assert_eq!(message_ids, vec![(1000, "m:0001"), (2000, "m:0000"), (2000, "m:0002")]);
     assert!(blocks.is_empty());
 }
 
@@ -3442,10 +2959,8 @@ async fn diagram_get_ast_includes_sequence_blocks_and_sections() {
     let mut ast = SequenceAst::default();
     let p_a = oid("p:a");
     let p_b = oid("p:b");
-    ast.participants_mut()
-        .insert(p_a.clone(), SequenceParticipant::new("A"));
-    ast.participants_mut()
-        .insert(p_b.clone(), SequenceParticipant::new("B"));
+    ast.participants_mut().insert(p_a.clone(), SequenceParticipant::new("A"));
+    ast.participants_mut().insert(p_b.clone(), SequenceParticipant::new("B"));
 
     let m_main = oid("m:0001");
     let m_else = oid("m:0002");
@@ -3489,11 +3004,7 @@ async fn diagram_get_ast_includes_sequence_blocks_and_sections() {
 
     session.diagrams_mut().insert(
         diagram_id.clone(),
-        Diagram::new(
-            diagram_id.clone(),
-            "Seq AST Blocks",
-            DiagramAst::Sequence(ast),
-        ),
+        Diagram::new(diagram_id.clone(), "Seq AST Blocks", DiagramAst::Sequence(ast)),
     );
     session.set_active_diagram_id(Some(diagram_id));
 
@@ -3538,10 +3049,8 @@ async fn diagram_get_ast_returns_sorted_flowchart_ast() {
     node_b.set_note(Some("note-b"));
     ast.nodes_mut().insert(n_b.clone(), node_b);
     ast.nodes_mut().insert(n_a.clone(), FlowNode::new("A"));
-    ast.edges_mut()
-        .insert(oid("e:002"), FlowEdge::new(n_a.clone(), n_b.clone()));
-    ast.edges_mut()
-        .insert(oid("e:001"), FlowEdge::new(n_b, n_a));
+    ast.edges_mut().insert(oid("e:002"), FlowEdge::new(n_a.clone(), n_b.clone()));
+    ast.edges_mut().insert(oid("e:001"), FlowEdge::new(n_b, n_a));
 
     session.diagrams_mut().insert(
         diagram_id.clone(),
@@ -3551,9 +3060,7 @@ async fn diagram_get_ast_returns_sorted_flowchart_ast() {
 
     let server = NereidMcp::new(session);
     let Json(result) = server
-        .diagram_get_ast(Parameters(DiagramTargetParams {
-            diagram_id: Some("d-flow-ast".into()),
-        }))
+        .diagram_get_ast(Parameters(DiagramTargetParams { diagram_id: Some("d-flow-ast".into()) }))
         .await
         .expect("diagram ast");
 
@@ -3588,10 +3095,7 @@ async fn diagram_get_slice_flow_node_defaults_radius_to_one() {
         .await
         .expect("diagram slice");
 
-    assert_eq!(
-        result.objects,
-        vec!["d:d-flow/flow/node/n:a", "d:d-flow/flow/node/n:b"]
-    );
+    assert_eq!(result.objects, vec!["d:d-flow/flow/node/n:a", "d:d-flow/flow/node/n:b"]);
     assert_eq!(result.edges, vec!["d:d-flow/flow/edge/e:ab"]);
 }
 
@@ -3609,10 +3113,7 @@ async fn diagram_get_slice_depth_overrides_radius() {
         .await
         .expect("diagram slice");
 
-    assert_eq!(
-        result.objects,
-        vec!["d:d-flow/flow/node/n:a", "d:d-flow/flow/node/n:b"]
-    );
+    assert_eq!(result.objects, vec!["d:d-flow/flow/node/n:a", "d:d-flow/flow/node/n:b"]);
     assert_eq!(result.edges, vec!["d:d-flow/flow/edge/e:ab"]);
 }
 
@@ -3633,10 +3134,7 @@ async fn diagram_get_slice_filters_include_categories() {
         .await
         .expect("diagram slice");
 
-    assert_eq!(
-        result.objects,
-        vec!["d:d-flow/flow/node/n:a", "d:d-flow/flow/node/n:b"]
-    );
+    assert_eq!(result.objects, vec!["d:d-flow/flow/node/n:a", "d:d-flow/flow/node/n:b"]);
     assert!(result.edges.is_empty());
 }
 
@@ -3654,10 +3152,7 @@ async fn diagram_get_slice_seq_message_radius_zero_includes_endpoints() {
         .await
         .expect("diagram slice");
 
-    assert_eq!(
-        result.objects,
-        vec!["d:d-seq/seq/participant/p:a", "d:d-seq/seq/participant/p:b"]
-    );
+    assert_eq!(result.objects, vec!["d:d-seq/seq/participant/p:a", "d:d-seq/seq/participant/p:b"]);
     assert_eq!(result.edges, vec!["d:d-seq/seq/message/m:1"]);
 }
 
@@ -3675,21 +3170,11 @@ async fn diagram_get_slice_seq_block_includes_sections_and_messages() {
         .await
         .expect("diagram slice");
 
-    assert!(result
-        .objects
-        .contains(&"d:d-seq-blocks/seq/block/b:0000".into()));
-    assert!(result
-        .objects
-        .contains(&"d:d-seq-blocks/seq/section/sec:0000:00".into()));
-    assert!(result
-        .objects
-        .contains(&"d:d-seq-blocks/seq/section/sec:0000:01".into()));
-    assert!(result
-        .edges
-        .contains(&"d:d-seq-blocks/seq/message/m:1".into()));
-    assert!(result
-        .edges
-        .contains(&"d:d-seq-blocks/seq/message/m:2".into()));
+    assert!(result.objects.contains(&"d:d-seq-blocks/seq/block/b:0000".into()));
+    assert!(result.objects.contains(&"d:d-seq-blocks/seq/section/sec:0000:00".into()));
+    assert!(result.objects.contains(&"d:d-seq-blocks/seq/section/sec:0000:01".into()));
+    assert!(result.edges.contains(&"d:d-seq-blocks/seq/message/m:1".into()));
+    assert!(result.edges.contains(&"d:d-seq-blocks/seq/message/m:2".into()));
 }
 
 #[tokio::test]
@@ -3783,9 +3268,7 @@ async fn diagram_render_text_renders_diagram_and_matches_renderer() {
 
     let server = NereidMcp::new(session);
     let Json(result) = server
-        .diagram_render_text(Parameters(DiagramTargetParams {
-            diagram_id: Some("d-seq".into()),
-        }))
+        .diagram_render_text(Parameters(DiagramTargetParams { diagram_id: Some("d-seq".into()) }))
         .await
         .expect("diagram render");
 
@@ -3803,9 +3286,7 @@ async fn diagram_render_text_uses_active_diagram_when_diagram_id_is_omitted() {
 
     let server = NereidMcp::new(session);
     server
-        .diagram_open(Parameters(DiagramOpenParams {
-            diagram_id: "d-flow".into(),
-        }))
+        .diagram_open(Parameters(DiagramOpenParams { diagram_id: "d-flow".into() }))
         .await
         .expect("set active diagram");
 
@@ -3907,30 +3388,21 @@ async fn apply_ops_rejects_unrenderable_result_and_preserves_state() {
     };
     assert_eq!(err.code, rmcp::model::ErrorCode::INVALID_REQUEST);
     assert!(
-        err.message
-            .contains("cannot render diagram after apply_ops"),
+        err.message.contains("cannot render diagram after apply_ops"),
         "unexpected message: {}",
         err.message
     );
-    assert!(
-        err.message.contains("contains a cycle"),
-        "unexpected message: {}",
-        err.message
-    );
+    assert!(err.message.contains("contains a cycle"), "unexpected message: {}", err.message);
 
     let Json(stat) = server
-        .diagram_stat(Parameters(DiagramTargetParams {
-            diagram_id: Some("d-flow".into()),
-        }))
+        .diagram_stat(Parameters(DiagramTargetParams { diagram_id: Some("d-flow".into()) }))
         .await
         .expect("stat");
     assert_eq!(stat.rev, 0);
     assert_eq!(stat.counts.edges, 1);
 
     let Json(ast) = server
-        .diagram_get_ast(Parameters(DiagramTargetParams {
-            diagram_id: Some("d-flow".into()),
-        }))
+        .diagram_get_ast(Parameters(DiagramTargetParams { diagram_id: Some("d-flow".into()) }))
         .await
         .expect("ast");
     let McpDiagramAst::Flowchart { edges, .. } = ast.ast else {
@@ -3958,10 +3430,7 @@ async fn apply_ops_supports_setting_and_clearing_sequence_participant_note() {
     assert_eq!(result.new_rev, 1);
     assert!(result.delta.added.is_empty());
     assert!(result.delta.removed.is_empty());
-    assert_eq!(
-        result.delta.updated,
-        vec!["d:d-seq/seq/participant/p:a".to_owned()]
-    );
+    assert_eq!(result.delta.updated, vec!["d:d-seq/seq/participant/p:a".to_owned()]);
 
     let Json(ast) = server
         .diagram_get_ast(Parameters(DiagramTargetParams { diagram_id: None }))
@@ -3977,19 +3446,13 @@ async fn apply_ops_supports_setting_and_clearing_sequence_participant_note() {
         .diagram_apply_ops(Parameters(ApplyOpsParams {
             diagram_id: None,
             base_rev: 1,
-            ops: vec![McpOp::SeqSetParticipantNote {
-                participant_id: "p:a".into(),
-                note: None,
-            }],
+            ops: vec![McpOp::SeqSetParticipantNote { participant_id: "p:a".into(), note: None }],
         }))
         .await
         .expect("apply clear");
 
     assert_eq!(result.new_rev, 2);
-    assert_eq!(
-        result.delta.updated,
-        vec!["d:d-seq/seq/participant/p:a".to_owned()]
-    );
+    assert_eq!(result.delta.updated, vec!["d:d-seq/seq/participant/p:a".to_owned()]);
 
     let Json(ast) = server
         .diagram_get_ast(Parameters(DiagramTargetParams { diagram_id: None }))
@@ -4021,15 +3484,10 @@ async fn apply_ops_supports_setting_flow_node_note() {
     assert_eq!(result.new_rev, 1);
     assert!(result.delta.added.is_empty());
     assert!(result.delta.removed.is_empty());
-    assert_eq!(
-        result.delta.updated,
-        vec!["d:d-flow/flow/node/n:a".to_owned()]
-    );
+    assert_eq!(result.delta.updated, vec!["d:d-flow/flow/node/n:a".to_owned()]);
 
     let Json(ast) = server
-        .diagram_get_ast(Parameters(DiagramTargetParams {
-            diagram_id: Some("d-flow".into()),
-        }))
+        .diagram_get_ast(Parameters(DiagramTargetParams { diagram_id: Some("d-flow".into()) }))
         .await
         .expect("ast");
     let McpDiagramAst::Flowchart { nodes, .. } = ast.ast else {
@@ -4056,24 +3514,16 @@ async fn apply_ops_supports_setting_flow_node_mermaid_id() {
         .expect("apply");
 
     assert_eq!(result.new_rev, 1);
-    assert_eq!(
-        result.delta.updated,
-        vec!["d:d-flow/flow/node/n:a".to_owned()]
-    );
+    assert_eq!(result.delta.updated, vec!["d:d-flow/flow/node/n:a".to_owned()]);
 
     let Json(ast) = server
-        .diagram_get_ast(Parameters(DiagramTargetParams {
-            diagram_id: Some("d-flow".into()),
-        }))
+        .diagram_get_ast(Parameters(DiagramTargetParams { diagram_id: Some("d-flow".into()) }))
         .await
         .expect("ast");
     let McpDiagramAst::Flowchart { nodes, .. } = ast.ast else {
         panic!("expected flowchart ast");
     };
-    let node = nodes
-        .iter()
-        .find(|node| node.node_id == "n:a")
-        .expect("flow node n:a");
+    let node = nodes.iter().find(|node| node.node_id == "n:a").expect("flow node n:a");
     assert_eq!(node.mermaid_id.as_deref(), Some("authz"));
 }
 
@@ -4115,24 +3565,16 @@ async fn propose_ops_supports_flow_node_mermaid_id_without_mutating_state() {
         .await
         .expect("propose");
     assert_eq!(proposed.new_rev, 1);
-    assert_eq!(
-        proposed.delta.updated,
-        vec!["d:d-flow/flow/node/n:a".to_owned()]
-    );
+    assert_eq!(proposed.delta.updated, vec!["d:d-flow/flow/node/n:a".to_owned()]);
 
     let Json(ast) = server
-        .diagram_get_ast(Parameters(DiagramTargetParams {
-            diagram_id: Some("d-flow".into()),
-        }))
+        .diagram_get_ast(Parameters(DiagramTargetParams { diagram_id: Some("d-flow".into()) }))
         .await
         .expect("ast");
     let McpDiagramAst::Flowchart { nodes, .. } = ast.ast else {
         panic!("expected flowchart ast");
     };
-    let node = nodes
-        .iter()
-        .find(|node| node.node_id == "n:a")
-        .expect("flow node n:a");
+    let node = nodes.iter().find(|node| node.node_id == "n:a").expect("flow node n:a");
     assert!(node.mermaid_id.is_none());
 }
 
@@ -4160,21 +3602,14 @@ async fn propose_ops_rejects_unrenderable_result_without_mutating_state() {
     };
     assert_eq!(err.code, rmcp::model::ErrorCode::INVALID_REQUEST);
     assert!(
-        err.message
-            .contains("cannot render diagram after propose_ops"),
+        err.message.contains("cannot render diagram after propose_ops"),
         "unexpected message: {}",
         err.message
     );
-    assert!(
-        err.message.contains("contains a cycle"),
-        "unexpected message: {}",
-        err.message
-    );
+    assert!(err.message.contains("contains a cycle"), "unexpected message: {}", err.message);
 
     let Json(stat) = server
-        .diagram_stat(Parameters(DiagramTargetParams {
-            diagram_id: Some("d-flow".into()),
-        }))
+        .diagram_stat(Parameters(DiagramTargetParams { diagram_id: Some("d-flow".into()) }))
         .await
         .expect("stat");
     assert_eq!(stat.rev, 0);
@@ -4224,10 +3659,8 @@ async fn propose_ops_delta_matches_apply_ops_for_same_input() {
         }],
     };
 
-    let Json(proposed) = server
-        .diagram_propose_ops(Parameters(params.clone()))
-        .await
-        .expect("propose");
+    let Json(proposed) =
+        server.diagram_propose_ops(Parameters(params.clone())).await.expect("propose");
 
     let Json(applied) = server
         .diagram_apply_ops(Parameters(ApplyOpsParams {
@@ -4271,18 +3704,12 @@ async fn apply_ops_bumps_rev_and_diff_returns_cached_last_delta() {
     assert_eq!(result.delta.added.len(), 1);
 
     let Json(delta) = server
-        .diagram_diff(Parameters(GetDeltaParams {
-            diagram_id: None,
-            since_rev: 0,
-        }))
+        .diagram_diff(Parameters(GetDeltaParams { diagram_id: None, since_rev: 0 }))
         .await
         .expect("delta");
     assert_eq!(delta.from_rev, 0);
     assert_eq!(delta.to_rev, 1);
-    assert!(delta
-        .changes
-        .iter()
-        .any(|c| c.kind == DeltaChangeKind::Added && !c.refs.is_empty()));
+    assert!(delta.changes.iter().any(|c| c.kind == DeltaChangeKind::Added && !c.refs.is_empty()));
 }
 
 #[tokio::test]
@@ -4314,10 +3741,7 @@ async fn diagram_diff_can_span_multiple_revisions_within_history_window() {
         .expect("apply2");
 
     let Json(delta) = server
-        .diagram_diff(Parameters(GetDeltaParams {
-            diagram_id: None,
-            since_rev: 0,
-        }))
+        .diagram_diff(Parameters(GetDeltaParams { diagram_id: None, since_rev: 0 }))
         .await
         .expect("delta");
     assert_eq!(delta.from_rev, 0);
@@ -4367,10 +3791,7 @@ async fn diagram_diff_errors_with_supported_since_rev_and_snapshot_tool_outside_
 async fn diagram_diff_is_empty_when_since_rev_equals_current_rev() {
     let server = NereidMcp::new(demo_session());
     let Json(delta) = server
-        .diagram_diff(Parameters(GetDeltaParams {
-            diagram_id: None,
-            since_rev: 0,
-        }))
+        .diagram_diff(Parameters(GetDeltaParams { diagram_id: None, since_rev: 0 }))
         .await
         .expect("delta");
     assert_eq!(delta.from_rev, 0);
@@ -4401,9 +3822,7 @@ async fn diagram_apply_ops_persists_new_rev_to_session_folder() {
         .expect("apply ops");
     assert_eq!(result.new_rev, 1);
 
-    let loaded = SessionFolder::new(dir_str)
-        .load_session()
-        .expect("load session");
+    let loaded = SessionFolder::new(dir_str).load_session().expect("load session");
     let diagram_id = DiagramId::new("d-seq").expect("diagram id");
     let diagram = loaded.diagrams().get(&diagram_id).expect("diagram");
     assert_eq!(diagram.rev(), 1);
@@ -4432,9 +3851,8 @@ async fn diagram_diff_history_survives_external_selection_only_updates() {
         .expect("apply ops");
     assert_eq!(applied.new_rev, 1);
 
-    let mut external = SessionFolder::new(dir_str.clone())
-        .load_session()
-        .expect("load session externally");
+    let mut external =
+        SessionFolder::new(dir_str.clone()).load_session().expect("load session externally");
     external.set_selected_object_refs(
         [ObjectRef::from_str("d:d-seq/seq/participant/p:a").expect("object ref")]
             .into_iter()
@@ -4445,10 +3863,7 @@ async fn diagram_diff_history_survives_external_selection_only_updates() {
         .expect("persist external selection");
 
     let Json(delta) = server
-        .diagram_diff(Parameters(GetDeltaParams {
-            diagram_id: None,
-            since_rev: 0,
-        }))
+        .diagram_diff(Parameters(GetDeltaParams { diagram_id: None, since_rev: 0 }))
         .await
         .expect("diagram diff");
     assert_eq!(delta.from_rev, 0);
@@ -4469,22 +3884,15 @@ async fn walkthrough_apply_ops_persists_new_rev_and_title_to_session_folder() {
         .walkthrough_apply_ops(Parameters(WalkthroughApplyOpsParams {
             walkthrough_id: "w:1".into(),
             base_rev: 0,
-            ops: vec![McpWalkthroughOp::SetTitle {
-                title: "Updated".into(),
-            }],
+            ops: vec![McpWalkthroughOp::SetTitle { title: "Updated".into() }],
         }))
         .await
         .expect("apply ops");
     assert_eq!(result.new_rev, 1);
 
-    let loaded = SessionFolder::new(dir_str)
-        .load_session()
-        .expect("load session");
+    let loaded = SessionFolder::new(dir_str).load_session().expect("load session");
     let walkthrough_id = WalkthroughId::new("w:1").expect("walkthrough id");
-    let walkthrough = loaded
-        .walkthroughs()
-        .get(&walkthrough_id)
-        .expect("walkthrough");
+    let walkthrough = loaded.walkthroughs().get(&walkthrough_id).expect("walkthrough");
     assert_eq!(walkthrough.rev(), 1);
     assert_eq!(walkthrough.title(), "Updated");
 }
@@ -4496,36 +3904,20 @@ async fn diagram_open_persists_to_session_folder() {
     let folder = SessionFolder::new(dir_str.clone());
 
     let mut session = demo_session();
-    assert_eq!(
-        session
-            .active_diagram_id()
-            .map(|diagram_id| diagram_id.as_str()),
-        Some("d-seq")
-    );
+    assert_eq!(session.active_diagram_id().map(|diagram_id| diagram_id.as_str()), Some("d-seq"));
     let walkthrough_id = WalkthroughId::new("w:1").expect("walkthrough id");
     let walkthrough = Walkthrough::new(walkthrough_id.clone(), "Walkthrough");
-    session
-        .walkthroughs_mut()
-        .insert(walkthrough_id, walkthrough);
+    session.walkthroughs_mut().insert(walkthrough_id, walkthrough);
     folder.save_session(&session).expect("save initial session");
 
     let server = NereidMcp::new_persistent(session, folder);
     server
-        .diagram_open(Parameters(DiagramOpenParams {
-            diagram_id: "d-flow".into(),
-        }))
+        .diagram_open(Parameters(DiagramOpenParams { diagram_id: "d-flow".into() }))
         .await
         .expect("set active diagram");
 
-    let loaded = SessionFolder::new(dir_str)
-        .load_session()
-        .expect("load session");
-    assert_eq!(
-        loaded
-            .active_diagram_id()
-            .map(|diagram_id| diagram_id.as_str()),
-        Some("d-flow")
-    );
+    let loaded = SessionFolder::new(dir_str).load_session().expect("load session");
+    assert_eq!(loaded.active_diagram_id().map(|diagram_id| diagram_id.as_str()), Some("d-flow"));
 }
 
 #[tokio::test]
@@ -4538,9 +3930,8 @@ async fn diagram_current_refreshes_from_session_folder() {
     folder.save_session(&session).expect("save initial session");
     let server = NereidMcp::new_persistent(session, folder);
 
-    let mut external = SessionFolder::new(dir_str.clone())
-        .load_session()
-        .expect("load session externally");
+    let mut external =
+        SessionFolder::new(dir_str.clone()).load_session().expect("load session externally");
     external.set_active_diagram_id(Some(DiagramId::new("d-flow").expect("diagram id")));
     SessionFolder::new(dir_str)
         .save_active_diagram_id(&external)
@@ -4560,30 +3951,19 @@ async fn diagram_list_refreshes_from_session_folder() {
     folder.save_session(&session).expect("save initial session");
     let server = NereidMcp::new_persistent(session, folder);
 
-    let mut external = SessionFolder::new(dir_str.clone())
-        .load_session()
-        .expect("load session externally");
+    let mut external =
+        SessionFolder::new(dir_str.clone()).load_session().expect("load session externally");
     let extra_id = DiagramId::new("d-external").expect("diagram id");
     let mut flow = FlowchartAst::default();
-    flow.nodes_mut()
-        .insert(oid("n:start"), FlowNode::new("Start"));
+    flow.nodes_mut().insert(oid("n:start"), FlowNode::new("Start"));
     external.diagrams_mut().insert(
         extra_id.clone(),
-        Diagram::new(
-            extra_id.clone(),
-            "External".to_owned(),
-            DiagramAst::Flowchart(flow),
-        ),
+        Diagram::new(extra_id.clone(), "External".to_owned(), DiagramAst::Flowchart(flow)),
     );
-    SessionFolder::new(dir_str)
-        .save_session(&external)
-        .expect("persist external diagram");
+    SessionFolder::new(dir_str).save_session(&external).expect("persist external diagram");
 
     let Json(list) = server.diagram_list().await.expect("diagram.list");
-    assert!(list
-        .diagrams
-        .iter()
-        .any(|diagram| diagram.diagram_id == extra_id.as_str()));
+    assert!(list.diagrams.iter().any(|diagram| diagram.diagram_id == extra_id.as_str()));
 }
 
 #[tokio::test]
@@ -4605,32 +3985,18 @@ async fn diagram_delete_persists_to_session_folder() {
 
     let server = NereidMcp::new_persistent(session, folder);
     let Json(result) = server
-        .diagram_delete(Parameters(DiagramDeleteParams {
-            diagram_id: "d-seq".into(),
-        }))
+        .diagram_delete(Parameters(DiagramDeleteParams { diagram_id: "d-seq".into() }))
         .await
         .expect("delete diagram");
     assert_eq!(result.deleted_diagram_id, "d-seq");
     assert_eq!(result.active_diagram_id.as_deref(), Some("d-flow"));
 
-    let loaded = SessionFolder::new(dir_str)
-        .load_session()
-        .expect("load session");
+    let loaded = SessionFolder::new(dir_str).load_session().expect("load session");
     assert_eq!(loaded.diagrams().len(), 1);
-    assert!(loaded
-        .diagrams()
-        .contains_key(&DiagramId::new("d-flow").expect("diagram id")));
-    assert_eq!(
-        loaded
-            .active_diagram_id()
-            .map(|diagram_id| diagram_id.as_str()),
-        Some("d-flow")
-    );
-    let selected = loaded
-        .selected_object_refs()
-        .iter()
-        .map(ToString::to_string)
-        .collect::<Vec<_>>();
+    assert!(loaded.diagrams().contains_key(&DiagramId::new("d-flow").expect("diagram id")));
+    assert_eq!(loaded.active_diagram_id().map(|diagram_id| diagram_id.as_str()), Some("d-flow"));
+    let selected =
+        loaded.selected_object_refs().iter().map(ToString::to_string).collect::<Vec<_>>();
     assert_eq!(selected, vec!["d:d-flow/flow/node/n:a".to_owned()]);
 }
 
@@ -4644,26 +4010,18 @@ async fn walkthrough_open_persists_to_session_folder() {
     assert!(session.active_walkthrough_id().is_none());
     let walkthrough_id = WalkthroughId::new("w:1").expect("walkthrough id");
     let walkthrough = Walkthrough::new(walkthrough_id.clone(), "Walkthrough");
-    session
-        .walkthroughs_mut()
-        .insert(walkthrough_id, walkthrough);
+    session.walkthroughs_mut().insert(walkthrough_id, walkthrough);
     folder.save_session(&session).expect("save initial session");
 
     let server = NereidMcp::new_persistent(session, folder);
     server
-        .walkthrough_open(Parameters(WalkthroughOpenParams {
-            walkthrough_id: "w:1".into(),
-        }))
+        .walkthrough_open(Parameters(WalkthroughOpenParams { walkthrough_id: "w:1".into() }))
         .await
         .expect("set active walkthrough");
 
-    let loaded = SessionFolder::new(dir_str)
-        .load_session()
-        .expect("load session");
+    let loaded = SessionFolder::new(dir_str).load_session().expect("load session");
     assert_eq!(
-        loaded
-            .active_walkthrough_id()
-            .map(|walkthrough_id| walkthrough_id.as_str()),
+        loaded.active_walkthrough_id().map(|walkthrough_id| walkthrough_id.as_str()),
         Some("w:1")
     );
 }
@@ -4686,9 +4044,7 @@ async fn selection_update_persists_to_session_folder() {
         .await
         .expect("set selection");
 
-    let loaded = SessionFolder::new(dir_str)
-        .load_session()
-        .expect("load session");
+    let loaded = SessionFolder::new(dir_str).load_session().expect("load session");
     let expected = ObjectRef::from_str("d:d-seq/seq/participant/p:a").expect("object ref");
     assert_eq!(loaded.selected_object_refs().len(), 1);
     assert!(loaded.selected_object_refs().contains(&expected));
@@ -4723,10 +4079,7 @@ async fn selection_get_refreshes_from_session_folder_meta() {
     let Json(selection) = server.selection_get().await.expect("selection.read");
     assert_eq!(
         selection.object_refs,
-        vec![
-            "d:d-flow/flow/edge/e:ab".to_owned(),
-            "d:d-seq/seq/participant/p:a".to_owned(),
-        ]
+        vec!["d:d-flow/flow/edge/e:ab".to_owned(), "d:d-seq/seq/participant/p:a".to_owned(),]
     );
 }
 
@@ -4760,20 +4113,12 @@ async fn selection_update_add_uses_latest_meta_selection_in_persistent_mode() {
         .await
         .expect("selection.update add");
 
-    let loaded = SessionFolder::new(dir_str)
-        .load_session()
-        .expect("load merged selection");
-    let selected = loaded
-        .selected_object_refs()
-        .iter()
-        .map(ToString::to_string)
-        .collect::<Vec<_>>();
+    let loaded = SessionFolder::new(dir_str).load_session().expect("load merged selection");
+    let selected =
+        loaded.selected_object_refs().iter().map(ToString::to_string).collect::<Vec<_>>();
     assert_eq!(
         selected,
-        vec![
-            "d:d-flow/flow/edge/e:ab".to_owned(),
-            "d:d-seq/seq/participant/p:a".to_owned(),
-        ]
+        vec!["d:d-flow/flow/edge/e:ab".to_owned(), "d:d-seq/seq/participant/p:a".to_owned(),]
     );
 }
 
@@ -4798,9 +4143,7 @@ async fn xref_add_persists_to_session_folder() {
         .await
         .expect("xref add");
 
-    let loaded = SessionFolder::new(dir_str)
-        .load_session()
-        .expect("load session");
+    let loaded = SessionFolder::new(dir_str).load_session().expect("load session");
     let xref_id = XRefId::new("x:new").expect("xref id");
     assert!(loaded.xrefs().contains_key(&xref_id));
 }
@@ -4816,15 +4159,11 @@ async fn xref_remove_persists_to_session_folder() {
 
     let server = NereidMcp::new_persistent(session, folder);
     server
-        .xref_remove(Parameters(XRefRemoveParams {
-            xref_id: "x:1".into(),
-        }))
+        .xref_remove(Parameters(XRefRemoveParams { xref_id: "x:1".into() }))
         .await
         .expect("xref remove");
 
-    let loaded = SessionFolder::new(dir_str)
-        .load_session()
-        .expect("load session");
+    let loaded = SessionFolder::new(dir_str).load_session().expect("load session");
     let removed_id = XRefId::new("x:1").expect("xref id");
     assert!(!loaded.xrefs().contains_key(&removed_id));
 }

@@ -134,16 +134,8 @@ pub struct FlowEdgePatch {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum XRefOp {
-    Add {
-        xref_id: XRefId,
-        from: ObjectRef,
-        to: ObjectRef,
-        kind: String,
-        label: Option<String>,
-    },
-    Remove {
-        xref_id: XRefId,
-    },
+    Add { xref_id: XRefId, from: ObjectRef, to: ObjectRef, kind: String, label: Option<String> },
+    Remove { xref_id: XRefId },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -199,11 +191,7 @@ impl DeltaBuilder {
         sort_object_refs(&mut removed);
         sort_object_refs(&mut updated);
 
-        Delta {
-            added,
-            removed,
-            updated,
-        }
+        Delta { added, removed, updated }
     }
 }
 
@@ -223,18 +211,11 @@ pub fn apply_ops(
 ) -> Result<ApplyResult, ApplyError> {
     let current_rev = diagram.rev();
     if base_rev != current_rev {
-        return Err(ApplyError::Conflict {
-            base_rev,
-            current_rev,
-        });
+        return Err(ApplyError::Conflict { base_rev, current_rev });
     }
 
     if ops.is_empty() {
-        return Ok(ApplyResult {
-            new_rev: current_rev,
-            applied: 0,
-            delta: Delta::default(),
-        });
+        return Ok(ApplyResult { new_rev: current_rev, applied: 0, delta: Delta::default() });
     }
 
     let mut new_ast = diagram.ast().clone();
@@ -262,9 +243,7 @@ pub fn apply_ops(
                 apply_flow_op(&diagram_id, ast, flow_op, &mut delta)?;
             }
             Op::XRef(_) => {
-                return Err(ApplyError::UnsupportedOp {
-                    op_kind: OpKind::XRef,
-                });
+                return Err(ApplyError::UnsupportedOp { op_kind: OpKind::XRef });
             }
         }
     }
@@ -274,19 +253,12 @@ pub fn apply_ops(
             DiagramKind::Sequence => OpKind::Seq,
             DiagramKind::Flowchart => OpKind::Flow,
         };
-        ApplyError::KindMismatch {
-            diagram_kind: mismatch.expected(),
-            op_kind,
-        }
+        ApplyError::KindMismatch { diagram_kind: mismatch.expected(), op_kind }
     })?;
     diagram.bump_rev();
     let new_rev = diagram.rev();
 
-    Ok(ApplyResult {
-        new_rev,
-        applied: ops.len(),
-        delta: delta.finish(),
-    })
+    Ok(ApplyResult { new_rev, applied: ops.len(), delta: delta.finish() })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -306,55 +278,25 @@ pub enum ObjectKind {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ApplyError {
-    Conflict {
-        base_rev: u64,
-        current_rev: u64,
-    },
-    KindMismatch {
-        diagram_kind: DiagramKind,
-        op_kind: OpKind,
-    },
-    UnsupportedOp {
-        op_kind: OpKind,
-    },
-    AlreadyExists {
-        kind: ObjectKind,
-        object_id: ObjectId,
-    },
-    NotFound {
-        kind: ObjectKind,
-        object_id: ObjectId,
-    },
-    MissingFlowNode {
-        node_id: ObjectId,
-    },
-    InvalidFlowNodeMermaidId {
-        mermaid_id: String,
-        reason: MermaidIdentError,
-    },
-    DuplicateFlowNodeMermaidId {
-        mermaid_id: String,
-        node_id: ObjectId,
-    },
+    Conflict { base_rev: u64, current_rev: u64 },
+    KindMismatch { diagram_kind: DiagramKind, op_kind: OpKind },
+    UnsupportedOp { op_kind: OpKind },
+    AlreadyExists { kind: ObjectKind, object_id: ObjectId },
+    NotFound { kind: ObjectKind, object_id: ObjectId },
+    MissingFlowNode { node_id: ObjectId },
+    InvalidFlowNodeMermaidId { mermaid_id: String, reason: MermaidIdentError },
+    DuplicateFlowNodeMermaidId { mermaid_id: String, node_id: ObjectId },
 }
 
 impl fmt::Display for ApplyError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Conflict {
-                base_rev,
-                current_rev,
-            } => write!(
-                f,
-                "stale base_rev (base_rev={base_rev}, current_rev={current_rev})"
-            ),
-            Self::KindMismatch {
-                diagram_kind,
-                op_kind,
-            } => write!(
-                f,
-                "op kind mismatch (diagram_kind={diagram_kind:?}, op_kind={op_kind:?})"
-            ),
+            Self::Conflict { base_rev, current_rev } => {
+                write!(f, "stale base_rev (base_rev={base_rev}, current_rev={current_rev})")
+            }
+            Self::KindMismatch { diagram_kind, op_kind } => {
+                write!(f, "op kind mismatch (diagram_kind={diagram_kind:?}, op_kind={op_kind:?})")
+            }
             Self::UnsupportedOp { op_kind } => write!(f, "unsupported op kind ({op_kind:?})"),
             Self::AlreadyExists { kind, object_id } => {
                 write!(f, "object already exists ({kind:?}, id={object_id})")
@@ -366,13 +308,9 @@ impl fmt::Display for ApplyError {
             Self::InvalidFlowNodeMermaidId { mermaid_id, reason } => {
                 write!(f, "invalid flow node Mermaid id '{mermaid_id}': {reason}")
             }
-            Self::DuplicateFlowNodeMermaidId {
-                mermaid_id,
-                node_id,
-            } => write!(
-                f,
-                "flow node Mermaid id '{mermaid_id}' is already used by node {node_id}"
-            ),
+            Self::DuplicateFlowNodeMermaidId { mermaid_id, node_id } => {
+                write!(f, "flow node Mermaid id '{mermaid_id}' is already used by node {node_id}")
+            }
         }
     }
 }

@@ -106,11 +106,7 @@ pub struct SequenceParticipant {
 
 impl SequenceParticipant {
     pub fn new(mermaid_name: impl Into<String>) -> Self {
-        Self {
-            mermaid_name: mermaid_name.into(),
-            role: None,
-            note: None,
-        }
+        Self { mermaid_name: mermaid_name.into(), role: None, note: None }
     }
 
     pub fn set_mermaid_name(&mut self, mermaid_name: impl Into<String>) {
@@ -167,13 +163,7 @@ impl SequenceBlock {
         sections: Vec<SequenceSection>,
         blocks: Vec<SequenceBlock>,
     ) -> Self {
-        Self {
-            block_id,
-            kind,
-            header,
-            sections,
-            blocks,
-        }
+        Self { block_id, kind, header, sections, blocks }
     }
 
     pub fn block_id(&self) -> &ObjectId {
@@ -231,12 +221,7 @@ impl SequenceSection {
         header: Option<String>,
         message_ids: Vec<ObjectId>,
     ) -> Self {
-        Self {
-            section_id,
-            kind,
-            header,
-            message_ids,
-        }
+        Self { section_id, kind, header, message_ids }
     }
 
     pub fn section_id(&self) -> &ObjectId {
@@ -331,9 +316,7 @@ impl SequenceMessage {
     }
 
     pub fn cmp_in_order(a: &Self, b: &Self) -> Ordering {
-        a.order_key
-            .cmp(&b.order_key)
-            .then_with(|| a.message_id.cmp(&b.message_id))
+        a.order_key.cmp(&b.order_key).then_with(|| a.message_id.cmp(&b.message_id))
     }
 }
 
@@ -345,10 +328,7 @@ pub struct SequenceNote {
 
 impl SequenceNote {
     pub fn new(note_id: ObjectId, text: impl Into<String>) -> Self {
-        Self {
-            note_id,
-            text: text.into(),
-        }
+        Self { note_id, text: text.into() }
     }
 
     pub fn note_id(&self) -> &ObjectId {
@@ -391,9 +371,6 @@ mod tests {
     #[test]
     fn sequence_block_and_section_ids_are_allocated_deterministically() {
         assert_eq!(SequenceBlock::make_block_id(1).as_str(), "b:0001");
-        assert_eq!(
-            SequenceSection::make_section_id(1, 0).as_str(),
-            "sec:0001:00"
-        );
+        assert_eq!(SequenceSection::make_section_id(1, 0).as_str(), "sec:0001:00");
     }
 }

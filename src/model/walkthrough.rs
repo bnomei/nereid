@@ -168,12 +168,7 @@ impl WalkthroughEdge {
         to_node_id: WalkthroughNodeId,
         kind: impl Into<String>,
     ) -> Self {
-        Self {
-            from_node_id,
-            to_node_id,
-            kind: kind.into(),
-            label: None,
-        }
+        Self { from_node_id, to_node_id, kind: kind.into(), label: None }
     }
 
     pub fn from_node_id(&self) -> &WalkthroughNodeId {

@@ -21,56 +21,18 @@ use crate::model::seq_ast::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MermaidSequenceParseError {
     MissingHeader,
-    UnsupportedSyntax {
-        line_no: usize,
-        line: String,
-    },
-    InvalidParticipantDecl {
-        line_no: usize,
-        line: String,
-    },
-    InvalidParticipantName {
-        line_no: usize,
-        name: String,
-        reason: MermaidIdentError,
-    },
-    InvalidMessageLine {
-        line_no: usize,
-        line: String,
-    },
-    InvalidMessageParticipant {
-        line_no: usize,
-        name: String,
-        reason: MermaidIdentError,
-    },
-    MissingMessageText {
-        line_no: usize,
-        line: String,
-    },
-    UnmatchedEnd {
-        line_no: usize,
-    },
-    ElseOutsideAlt {
-        line_no: usize,
-        line: String,
-    },
-    AndOutsidePar {
-        line_no: usize,
-        line: String,
-    },
-    BlockNestingTooDeep {
-        line_no: usize,
-        max_depth: usize,
-    },
-    EmptyBlockSection {
-        line_no: usize,
-        section_id: ObjectId,
-    },
-    UnclosedBlock {
-        opened_on_line_no: usize,
-        block_id: ObjectId,
-        kind: SequenceBlockKind,
-    },
+    UnsupportedSyntax { line_no: usize, line: String },
+    InvalidParticipantDecl { line_no: usize, line: String },
+    InvalidParticipantName { line_no: usize, name: String, reason: MermaidIdentError },
+    InvalidMessageLine { line_no: usize, line: String },
+    InvalidMessageParticipant { line_no: usize, name: String, reason: MermaidIdentError },
+    MissingMessageText { line_no: usize, line: String },
+    UnmatchedEnd { line_no: usize },
+    ElseOutsideAlt { line_no: usize, line: String },
+    AndOutsidePar { line_no: usize, line: String },
+    BlockNestingTooDeep { line_no: usize, max_depth: usize },
+    EmptyBlockSection { line_no: usize, section_id: ObjectId },
+    UnclosedBlock { opened_on_line_no: usize, block_id: ObjectId, kind: SequenceBlockKind },
 }
 
 impl fmt::Display for MermaidSequenceParseError {
@@ -321,39 +283,26 @@ impl OpenBlock {
     }
 
     fn current_section(&self) -> &SequenceSection {
-        self.sections
-            .get(self.current_section_index)
-            .expect("current section in range")
+        self.sections.get(self.current_section_index).expect("current section in range")
     }
 
     fn current_section_mut(&mut self) -> &mut SequenceSection {
-        self.sections
-            .get_mut(self.current_section_index)
-            .expect("current section in range")
+        self.sections.get_mut(self.current_section_index).expect("current section in range")
     }
 
     fn push_message_id(&mut self, message_id: ObjectId) {
-        self.current_section_mut()
-            .message_ids_mut()
-            .push(message_id);
+        self.current_section_mut().message_ids_mut().push(message_id);
     }
 
     fn start_section(&mut self, kind: SequenceSectionKind, header: Option<String>) {
         let section_index = self.sections.len();
         let section_id = SequenceSection::make_section_id(self.block_index, section_index);
-        self.sections
-            .push(SequenceSection::new(section_id, kind, header, Vec::new()));
+        self.sections.push(SequenceSection::new(section_id, kind, header, Vec::new()));
         self.current_section_index = section_index;
     }
 
     fn into_block(self) -> SequenceBlock {
-        SequenceBlock::new(
-            self.block_id,
-            self.kind,
-            self.header,
-            self.sections,
-            self.blocks,
-        )
+        SequenceBlock::new(self.block_id, self.kind, self.header, self.sections, self.blocks)
     }
 }
 
@@ -550,19 +499,14 @@ pub fn parse_sequence_diagram(input: &str) -> Result<SequenceAst, MermaidSequenc
 
         let (from_raw, arrow_token, rest) = split_once_any(
             trimmed,
-            &[
-                "<<-->>", "<<->>", "-->>", "->>", "--)", "-)", "--x", "-x", "-->", "->",
-            ],
+            &["<<-->>", "<<->>", "-->>", "->>", "--)", "-)", "--x", "-x", "-->", "->"],
         )
         .ok_or_else(|| MermaidSequenceParseError::UnsupportedSyntax {
             line_no,
             line: trimmed.to_owned(),
         })?;
         let arrow = Arrow::from_token(arrow_token).ok_or_else(|| {
-            MermaidSequenceParseError::InvalidMessageLine {
-                line_no,
-                line: trimmed.to_owned(),
-            }
+            MermaidSequenceParseError::InvalidMessageLine { line_no, line: trimmed.to_owned() }
         })?;
 
         let rest = rest.trim_start();
@@ -576,12 +520,9 @@ pub fn parse_sequence_diagram(input: &str) -> Result<SequenceAst, MermaidSequenc
             _ => (arrow_token.to_owned(), rest),
         };
 
-        let (to_raw, text_raw) =
-            rest.split_once(':')
-                .ok_or_else(|| MermaidSequenceParseError::InvalidMessageLine {
-                    line_no,
-                    line: trimmed.to_owned(),
-                })?;
+        let (to_raw, text_raw) = rest.split_once(':').ok_or_else(|| {
+            MermaidSequenceParseError::InvalidMessageLine { line_no, line: trimmed.to_owned() }
+        })?;
 
         let from_name = from_raw.trim();
         let to_name = to_raw.trim();
@@ -699,30 +640,18 @@ struct ExportSectionRange<'a> {
 
 #[derive(Debug, Clone, Copy)]
 enum ExportEvent<'a> {
-    BlockOpen {
-        block: &'a SequenceBlock,
-        depth: usize,
-    },
-    SectionSplit {
-        block: &'a SequenceBlock,
-        section: &'a SequenceSection,
-        depth: usize,
-    },
-    BlockClose {
-        block: &'a SequenceBlock,
-        depth: usize,
-    },
+    BlockOpen { block: &'a SequenceBlock, depth: usize },
+    SectionSplit { block: &'a SequenceBlock, section: &'a SequenceSection, depth: usize },
+    BlockClose { block: &'a SequenceBlock, depth: usize },
 }
 
 fn export_event_sort_key_before<'a>(
     event: &ExportEvent<'a>,
 ) -> (u8, usize, &'a ObjectId, Option<&'a ObjectId>) {
     match *event {
-        ExportEvent::SectionSplit {
-            block,
-            section,
-            depth,
-        } => (0, depth, block.block_id(), Some(section.section_id())),
+        ExportEvent::SectionSplit { block, section, depth } => {
+            (0, depth, block.block_id(), Some(section.section_id()))
+        }
         ExportEvent::BlockOpen { block, depth } => (1, depth, block.block_id(), None),
         ExportEvent::BlockClose { block, depth } => (2, depth, block.block_id(), None),
     }
@@ -732,11 +661,9 @@ fn export_event_sort_key_after<'a>(event: &ExportEvent<'a>) -> (usize, &'a Objec
     match *event {
         ExportEvent::BlockClose { block, depth } => (usize::MAX - depth, block.block_id()),
         ExportEvent::BlockOpen { block, depth } => (usize::MAX - depth, block.block_id()),
-        ExportEvent::SectionSplit {
-            block,
-            depth,
-            section: _,
-        } => (usize::MAX - depth, block.block_id()),
+        ExportEvent::SectionSplit { block, depth, section: _ } => {
+            (usize::MAX - depth, block.block_id())
+        }
     }
 }
 
@@ -991,11 +918,7 @@ pub fn export_sequence_diagram(ast: &SequenceAst) -> Result<String, MermaidSeque
                     }
                     out.push('\n');
                 }
-                ExportEvent::SectionSplit {
-                    block: _,
-                    section,
-                    depth: _,
-                } => {
+                ExportEvent::SectionSplit { block: _, section, depth: _ } => {
                     let keyword = section_kind_keyword(section.kind());
                     if keyword.is_empty() {
                         continue;
@@ -1022,13 +945,12 @@ pub fn export_sequence_diagram(ast: &SequenceAst) -> Result<String, MermaidSeque
             .ok_or_else(|| MermaidSequenceExportError::MissingParticipant {
                 participant_id: msg.from_participant_id().clone(),
             })?;
-        let to_name = ast
-            .participants()
-            .get(msg.to_participant_id())
-            .map(|p| p.mermaid_name())
-            .ok_or_else(|| MermaidSequenceExportError::MissingParticipant {
-                participant_id: msg.to_participant_id().clone(),
-            })?;
+        let to_name =
+            ast.participants().get(msg.to_participant_id()).map(|p| p.mermaid_name()).ok_or_else(
+                || MermaidSequenceExportError::MissingParticipant {
+                    participant_id: msg.to_participant_id().clone(),
+                },
+            )?;
 
         out.push_str(from_name);
         let arrow = msg
@@ -1127,10 +1049,7 @@ mod tests {
         let ast = parse_sequence_diagram(input).expect("parse");
         let (participants, messages) = semantic_view(&ast);
 
-        assert_eq!(
-            participants,
-            ["Alice".to_owned(), "Bob".to_owned()].into_iter().collect()
-        );
+        assert_eq!(participants, ["Alice".to_owned(), "Bob".to_owned()].into_iter().collect());
         assert_eq!(messages.len(), 3);
         assert_eq!(messages[0].0, "Alice");
         assert_eq!(messages[0].1, "Bob");
@@ -1184,10 +1103,7 @@ mod tests {
         let input = "sequenceDiagram\nAlice->>Bob: Hi\n";
         let ast = parse_sequence_diagram(input).expect("parse");
         let (participants, messages) = semantic_view(&ast);
-        assert_eq!(
-            participants,
-            ["Alice".to_owned(), "Bob".to_owned()].into_iter().collect()
-        );
+        assert_eq!(participants, ["Alice".to_owned(), "Bob".to_owned()].into_iter().collect());
         assert_eq!(messages.len(), 1);
     }
 
@@ -1222,13 +1138,7 @@ mod tests {
         let arrows1 = ast1
             .messages_in_order()
             .into_iter()
-            .map(|msg| {
-                (
-                    msg.kind(),
-                    msg.raw_arrow().map(ToOwned::to_owned),
-                    msg.text().to_owned(),
-                )
-            })
+            .map(|msg| (msg.kind(), msg.raw_arrow().map(ToOwned::to_owned), msg.text().to_owned()))
             .collect::<Vec<_>>();
 
         assert_eq!(
@@ -1245,11 +1155,7 @@ mod tests {
                     Some("<<-->>".to_owned()),
                     "Two-way return".to_owned()
                 ),
-                (
-                    SequenceMessageKind::Sync,
-                    Some("->>+".to_owned()),
-                    "Activate".to_owned()
-                ),
+                (SequenceMessageKind::Sync, Some("->>+".to_owned()), "Activate".to_owned()),
                 (
                     SequenceMessageKind::Async,
                     Some("--)".to_owned()),
@@ -1263,13 +1169,7 @@ mod tests {
         let arrows2 = ast2
             .messages_in_order()
             .into_iter()
-            .map(|msg| {
-                (
-                    msg.kind(),
-                    msg.raw_arrow().map(ToOwned::to_owned),
-                    msg.text().to_owned(),
-                )
-            })
+            .map(|msg| (msg.kind(), msg.raw_arrow().map(ToOwned::to_owned), msg.text().to_owned()))
             .collect::<Vec<_>>();
 
         assert_eq!(arrows2, arrows1);
@@ -1473,10 +1373,7 @@ Alice->>Bob: Done
             parse_sequence_diagram("sequenceDiagram\nAlice->>Bob: Hi\nelse oops\n").unwrap_err();
         assert_eq!(
             err,
-            MermaidSequenceParseError::ElseOutsideAlt {
-                line_no: 3,
-                line: "else oops".to_owned(),
-            }
+            MermaidSequenceParseError::ElseOutsideAlt { line_no: 3, line: "else oops".to_owned() }
         );
     }
 
@@ -1486,10 +1383,7 @@ Alice->>Bob: Done
             parse_sequence_diagram("sequenceDiagram\nAlice->>Bob: Hi\nand oops\n").unwrap_err();
         assert_eq!(
             err,
-            MermaidSequenceParseError::AndOutsidePar {
-                line_no: 3,
-                line: "and oops".to_owned(),
-            }
+            MermaidSequenceParseError::AndOutsidePar { line_no: 3, line: "and oops".to_owned() }
         );
     }
 

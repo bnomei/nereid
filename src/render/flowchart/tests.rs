@@ -115,16 +115,8 @@ fn assert_flowchart_connectors_do_not_enter_node_interiors(ast: &FlowchartAst) {
     let interior_cells = node_interior_cells(&plan.node_renders);
 
     for (edge_idx, (edge_id, edge)) in ast.edges().iter().enumerate() {
-        let from = plan
-            .node_renders
-            .get(edge.from_node_id())
-            .copied()
-            .expect("from placement");
-        let to = plan
-            .node_renders
-            .get(edge.to_node_id())
-            .copied()
-            .expect("to placement");
+        let from = plan.node_renders.get(edge.from_node_id()).copied().expect("from placement");
+        let to = plan.node_renders.get(edge.to_node_id()).copied().expect("to placement");
         let route = plan.routes.get(edge_idx).expect("route");
 
         for (idx, _p) in route.iter().enumerate() {
@@ -206,11 +198,7 @@ fn snapshot_single_node_notes_toggle() {
     let notes_on = render_flowchart_unicode_with_options(
         &ast,
         &layout,
-        RenderOptions {
-            show_notes: true,
-            prefix_object_labels: false,
-            flowchart_extra_col_gap: 0,
-        },
+        RenderOptions { show_notes: true, prefix_object_labels: false, flowchart_extra_col_gap: 0 },
     )
     .expect("render");
     assert_eq!(notes_on, "┌───────┐\n│ Node  │\n│ note  │\n└───────┘");
@@ -238,17 +226,13 @@ fn annotated_render_indexes_nodes_and_edges() {
     ast.nodes_mut().insert(n_a.clone(), FlowNode::new("A"));
     ast.nodes_mut().insert(n_b.clone(), FlowNode::new("B"));
 
-    ast.edges_mut()
-        .insert(oid("e:ab"), FlowEdge::new(n_a.clone(), n_b.clone()));
+    ast.edges_mut().insert(oid("e:ab"), FlowEdge::new(n_a.clone(), n_b.clone()));
 
     let layout = layout_flowchart(&ast).expect("layout");
     let diagram_id = DiagramId::new("d-flow").expect("diagram id");
     let annotated = render_flowchart_unicode_annotated(&diagram_id, &ast, &layout).expect("render");
 
-    assert_eq!(
-        annotated.text,
-        render_flowchart_unicode(&ast, &layout).expect("plain render")
-    );
+    assert_eq!(annotated.text, render_flowchart_unicode(&ast, &layout).expect("plain render"));
 
     let a_ref: ObjectRef = "d:d-flow/flow/node/n:a".parse().expect("object ref");
     let b_ref: ObjectRef = "d:d-flow/flow/node/n:b".parse().expect("object ref");
@@ -304,16 +288,8 @@ fn connectors_do_not_enter_demo_routing_fixture_node_interiors() {
     let interior_cells = node_interior_cells(&plan.node_renders);
 
     for (idx, (edge_id, edge)) in ast.edges().iter().enumerate() {
-        let from = plan
-            .node_renders
-            .get(edge.from_node_id())
-            .copied()
-            .expect("from placement");
-        let to = plan
-            .node_renders
-            .get(edge.to_node_id())
-            .copied()
-            .expect("to placement");
+        let from = plan.node_renders.get(edge.from_node_id()).copied().expect("from placement");
+        let to = plan.node_renders.get(edge.to_node_id()).copied().expect("to placement");
         let route = plan.routes.get(idx).expect("route");
 
         let spans = if route.len() < 2 {
@@ -351,15 +327,9 @@ fn demo_motifs_selected_edges_do_not_touch() {
     let diagram_id = DiagramId::new("om-20-motifs").expect("diagram id");
     let annotated = render_flowchart_unicode_annotated(&diagram_id, &ast, &layout).expect("render");
 
-    let e_0011: ObjectRef = "d:om-20-motifs/flow/edge/e:0011"
-        .parse()
-        .expect("e:0011 ref");
-    let e_0009: ObjectRef = "d:om-20-motifs/flow/edge/e:0009"
-        .parse()
-        .expect("e:0009 ref");
-    let e_0007: ObjectRef = "d:om-20-motifs/flow/edge/e:0007"
-        .parse()
-        .expect("e:0007 ref");
+    let e_0011: ObjectRef = "d:om-20-motifs/flow/edge/e:0011".parse().expect("e:0011 ref");
+    let e_0009: ObjectRef = "d:om-20-motifs/flow/edge/e:0009".parse().expect("e:0009 ref");
+    let e_0007: ObjectRef = "d:om-20-motifs/flow/edge/e:0007".parse().expect("e:0007 ref");
 
     let cells_0011 = spans_to_cells(annotated.highlight_index.get(&e_0011).expect("e:0011"));
     let cells_0009 = spans_to_cells(annotated.highlight_index.get(&e_0009).expect("e:0009"));
@@ -403,34 +373,18 @@ fn demo_motifs_lions_sleep_keeps_one_cell_clearance_with_tui_gap() {
     )
     .expect("render");
 
-    let e_lions_sleep: ObjectRef = "d:om-20-motifs/flow/edge/e:0011"
-        .parse()
-        .expect("e:0011 ref");
-    let e_endurance_fight: ObjectRef = "d:om-20-motifs/flow/edge/e:0007"
-        .parse()
-        .expect("e:0007 ref");
-    let e_luck_streak: ObjectRef = "d:om-20-motifs/flow/edge/e:0009"
-        .parse()
-        .expect("e:0009 ref");
+    let e_lions_sleep: ObjectRef = "d:om-20-motifs/flow/edge/e:0011".parse().expect("e:0011 ref");
+    let e_endurance_fight: ObjectRef =
+        "d:om-20-motifs/flow/edge/e:0007".parse().expect("e:0007 ref");
+    let e_luck_streak: ObjectRef = "d:om-20-motifs/flow/edge/e:0009".parse().expect("e:0009 ref");
 
-    let lions_sleep = spans_to_cells(
-        annotated
-            .highlight_index
-            .get(&e_lions_sleep)
-            .expect("lions->sleep spans"),
-    );
+    let lions_sleep =
+        spans_to_cells(annotated.highlight_index.get(&e_lions_sleep).expect("lions->sleep spans"));
     let endurance_fight = spans_to_cells(
-        annotated
-            .highlight_index
-            .get(&e_endurance_fight)
-            .expect("endurance->fight spans"),
+        annotated.highlight_index.get(&e_endurance_fight).expect("endurance->fight spans"),
     );
-    let luck_streak = spans_to_cells(
-        annotated
-            .highlight_index
-            .get(&e_luck_streak)
-            .expect("luck->streak spans"),
-    );
+    let luck_streak =
+        spans_to_cells(annotated.highlight_index.get(&e_luck_streak).expect("luck->streak spans"));
 
     assert_no_overlap_or_side_touch(
         &lions_sleep,
@@ -471,16 +425,10 @@ fn demo_luck_salao_resolve_keeps_clearance_from_parents_separation_with_tui_gap(
         "d:om-05-luck/flow/edge/e:0003".parse().expect("e:0003 ref");
 
     let salao_resolve = spans_to_cells(
-        annotated
-            .highlight_index
-            .get(&e_salao_resolve)
-            .expect("salao->resolve spans"),
+        annotated.highlight_index.get(&e_salao_resolve).expect("salao->resolve spans"),
     );
     let parents_separation = spans_to_cells(
-        annotated
-            .highlight_index
-            .get(&e_parents_separation)
-            .expect("parents->separation spans"),
+        annotated.highlight_index.get(&e_parents_separation).expect("parents->separation spans"),
     );
 
     assert_no_overlap_or_side_touch(
@@ -519,18 +467,10 @@ fn demo_gear_mast_skiff_keeps_clearance_from_tools_club_with_tui_gap() {
     let e_mast_skiff: ObjectRef = "d:om-02-gear/flow/edge/e:0007".parse().expect("e:0007 ref");
     let e_tools_club: ObjectRef = "d:om-02-gear/flow/edge/e:0006".parse().expect("e:0006 ref");
 
-    let mast_skiff = spans_to_cells(
-        annotated
-            .highlight_index
-            .get(&e_mast_skiff)
-            .expect("mast->skiff spans"),
-    );
-    let tools_club = spans_to_cells(
-        annotated
-            .highlight_index
-            .get(&e_tools_club)
-            .expect("tools->club spans"),
-    );
+    let mast_skiff =
+        spans_to_cells(annotated.highlight_index.get(&e_mast_skiff).expect("mast->skiff spans"));
+    let tools_club =
+        spans_to_cells(annotated.highlight_index.get(&e_tools_club).expect("tools->club spans"));
 
     assert_no_overlap_or_side_touch(&mast_skiff, &tools_club, "om-02-gear e:0007 vs e:0006");
 }
@@ -570,26 +510,14 @@ fn demo_om01_cast_edges_0007_and_0010_do_not_bridge_cross() {
     let edge_0007 = ast.edges().get(&edge_id_0007).expect("e:0007 edge");
     let edge_0010 = ast.edges().get(&edge_id_0010).expect("e:0010 edge");
 
-    let from_0007 = plan
-        .node_renders
-        .get(edge_0007.from_node_id())
-        .copied()
-        .expect("from 0007 placement");
-    let to_0007 = plan
-        .node_renders
-        .get(edge_0007.to_node_id())
-        .copied()
-        .expect("to 0007 placement");
-    let from_0010 = plan
-        .node_renders
-        .get(edge_0010.from_node_id())
-        .copied()
-        .expect("from 0010 placement");
-    let to_0010 = plan
-        .node_renders
-        .get(edge_0010.to_node_id())
-        .copied()
-        .expect("to 0010 placement");
+    let from_0007 =
+        plan.node_renders.get(edge_0007.from_node_id()).copied().expect("from 0007 placement");
+    let to_0007 =
+        plan.node_renders.get(edge_0007.to_node_id()).copied().expect("to 0007 placement");
+    let from_0010 =
+        plan.node_renders.get(edge_0010.from_node_id()).copied().expect("from 0010 placement");
+    let to_0010 =
+        plan.node_renders.get(edge_0010.to_node_id()).copied().expect("to 0010 placement");
 
     let route_0007 = plan.routes.get(edge_idx_0007).expect("route 0007");
     let route_0010 = plan.routes.get(edge_idx_0010).expect("route 0010");
@@ -610,10 +538,7 @@ fn demo_om01_cast_edges_0007_and_0010_do_not_bridge_cross() {
         plan.layer_metrics.len(),
     )
     .expect("gap 0010");
-    assert_eq!(
-        gap_0007, gap_0010,
-        "expected edges to share the same start gap\n{rendered}"
-    );
+    assert_eq!(gap_0007, gap_0010, "expected edges to share the same start gap\n{rendered}");
 
     let x_0007 = super::lane_x_for_gap(
         gap_0007,

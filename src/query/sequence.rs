@@ -40,9 +40,7 @@ pub fn message_search<'a>(
             }
         }
         MessageSearchMode::Regex => {
-            let regex = RegexBuilder::new(needle)
-                .case_insensitive(case_insensitive)
-                .build()?;
+            let regex = RegexBuilder::new(needle).case_insensitive(case_insensitive).build()?;
             Ok(ast
                 .messages_in_order()
                 .into_iter()
@@ -72,9 +70,7 @@ pub fn trace_before<'a>(
     limit: usize,
 ) -> Option<Vec<&'a SequenceMessage>> {
     let messages = ast.messages_in_order();
-    let target_index = messages
-        .iter()
-        .position(|msg| msg.message_id() == message_id)?;
+    let target_index = messages.iter().position(|msg| msg.message_id() == message_id)?;
     let start_index = target_index.saturating_sub(limit);
     Some(messages[start_index..target_index].to_vec())
 }
@@ -85,9 +81,7 @@ pub fn trace_after<'a>(
     limit: usize,
 ) -> Option<Vec<&'a SequenceMessage>> {
     let messages = ast.messages_in_order();
-    let target_index = messages
-        .iter()
-        .position(|msg| msg.message_id() == message_id)?;
+    let target_index = messages.iter().position(|msg| msg.message_id() == message_id)?;
 
     let start_index = target_index.saturating_add(1);
     let end_index = start_index.saturating_add(limit).min(messages.len());
@@ -103,10 +97,7 @@ mod tests {
     };
 
     fn message_ids(messages: &[&SequenceMessage]) -> Vec<String> {
-        messages
-            .iter()
-            .map(|msg| msg.message_id().as_str().to_owned())
-            .collect()
+        messages.iter().map(|msg| msg.message_id().as_str().to_owned()).collect()
     }
 
     fn fixture_ast() -> SequenceAst {
@@ -116,12 +107,9 @@ mod tests {
         let p_bob = ObjectId::new("p:bob").expect("participant id");
         let p_carol = ObjectId::new("p:carol").expect("participant id");
 
-        ast.participants_mut()
-            .insert(p_alice.clone(), SequenceParticipant::new("Alice"));
-        ast.participants_mut()
-            .insert(p_bob.clone(), SequenceParticipant::new("Bob"));
-        ast.participants_mut()
-            .insert(p_carol.clone(), SequenceParticipant::new("Carol"));
+        ast.participants_mut().insert(p_alice.clone(), SequenceParticipant::new("Alice"));
+        ast.participants_mut().insert(p_bob.clone(), SequenceParticipant::new("Bob"));
+        ast.participants_mut().insert(p_carol.clone(), SequenceParticipant::new("Carol"));
 
         let m_0001 = ObjectId::new("m:0001").expect("message id");
         let m_0002 = ObjectId::new("m:0002").expect("message id");

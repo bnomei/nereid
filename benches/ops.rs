@@ -24,23 +24,14 @@ fn checksum_apply_result(result: &ApplyResult) -> u64 {
     let mut acc = 0u64;
     acc = acc.wrapping_mul(131).wrapping_add(result.new_rev);
     acc = acc.wrapping_mul(131).wrapping_add(result.applied as u64);
-    acc = acc
-        .wrapping_mul(131)
-        .wrapping_add(result.delta.added.len() as u64);
-    acc = acc
-        .wrapping_mul(131)
-        .wrapping_add(result.delta.updated.len() as u64);
-    acc = acc
-        .wrapping_mul(131)
-        .wrapping_add(result.delta.removed.len() as u64);
+    acc = acc.wrapping_mul(131).wrapping_add(result.delta.added.len() as u64);
+    acc = acc.wrapping_mul(131).wrapping_add(result.delta.updated.len() as u64);
+    acc = acc.wrapping_mul(131).wrapping_add(result.delta.removed.len() as u64);
     acc
 }
 
 fn seq_add_message_ops(participants: &[ObjectId], order_key_base: i64, count: usize) -> Vec<Op> {
-    assert!(
-        participants.len() >= 2,
-        "sequence fixture must contain >= 2 participants"
-    );
+    assert!(participants.len() >= 2, "sequence fixture must contain >= 2 participants");
 
     let mut ops = Vec::with_capacity(count);
     for idx in 0..count {
@@ -100,13 +91,8 @@ fn benches_ops(c: &mut Criterion) {
     // Sequence ops (baseline: deterministic medium sequence fixture).
     let seq_ast = fixtures::seq::fixture(fixtures::seq::Case::Medium);
     let seq_participants = seq_ast.participants().keys().cloned().collect::<Vec<_>>();
-    let seq_order_key_base = seq_ast
-        .messages()
-        .iter()
-        .map(|m| m.order_key())
-        .max()
-        .unwrap_or(0)
-        .saturating_add(1000);
+    let seq_order_key_base =
+        seq_ast.messages().iter().map(|m| m.order_key()).max().unwrap_or(0).saturating_add(1000);
     let seq_template = Diagram::new(
         DiagramId::new("bench:ops:seq").expect("diagram id"),
         "bench_seq",

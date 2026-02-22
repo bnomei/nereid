@@ -12,11 +12,7 @@ pub(super) fn collect_spanned_text(text: &str, spans: &[(usize, usize, usize)]) 
 
     for &(y, x0, x1) in spans {
         let line = lines.get(y).expect("y in bounds");
-        let slice = line
-            .chars()
-            .skip(x0)
-            .take((x1 - x0) + 1)
-            .collect::<String>();
+        let slice = line.chars().skip(x0).take((x1 - x0) + 1).collect::<String>();
         out.push_str(&slice);
         out.push('\n');
     }

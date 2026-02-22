@@ -228,19 +228,13 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) {
         }
     }
 
-    let active_diagram_id = app
-        .active_diagram_id()
-        .map(ToString::to_string)
-        .unwrap_or_else(|| "—".to_owned());
+    let active_diagram_id =
+        app.active_diagram_id().map(ToString::to_string).unwrap_or_else(|| "—".to_owned());
     let diagram_ids = app.session.diagrams().keys().collect::<Vec<_>>();
     let diagram_total = diagram_ids.len();
     let diagram_index = app
         .active_diagram_id()
-        .and_then(|active| {
-            diagram_ids
-                .iter()
-                .position(|diagram_id| *diagram_id == active)
-        })
+        .and_then(|active| diagram_ids.iter().position(|diagram_id| *diagram_id == active))
         .map(|idx| idx + 1);
     let diagram_title = diagram_view_title(
         &active_diagram_id,
@@ -276,9 +270,7 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) {
             objects_suffix = Some("— selected only".to_owned());
         }
         let objects_title = view_title("Objects", '2', objects_suffix.as_deref());
-        let marker_style = Style::default()
-            .fg(Color::White)
-            .add_modifier(Modifier::BOLD);
+        let marker_style = Style::default().fg(Color::White).add_modifier(Modifier::BOLD);
         let visible_objects = app.visible_object_indices();
         let selected_object_refs = app.session.selected_object_refs();
         let has_active_selection_in_objects = !selected_object_refs.is_empty();
@@ -348,11 +340,8 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) {
                 let indirectly_selected = xref_involves_selected(selected_ref, &xref.xref);
                 let style = xref_item_style(xref.xref.status(), indirectly_selected);
                 let prefix = xref_direction_prefix(selected_ref, &xref.xref);
-                ListItem::new(Line::from(vec![
-                    Span::raw(prefix),
-                    Span::raw(xref.label.clone()),
-                ]))
-                .style(style)
+                ListItem::new(Line::from(vec![Span::raw(prefix), Span::raw(xref.label.clone())]))
+                    .style(style)
             })
             .collect::<Vec<_>>();
         let xrefs_list = List::new(xref_items)
@@ -395,10 +384,7 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) {
                         ),
                     )
                 }
-                None => (
-                    view_title("Inspector", '4', Some("— XRef")),
-                    "No selection".to_owned(),
-                ),
+                None => (view_title("Inspector", '4', Some("— XRef")), "No selection".to_owned()),
             },
             _ => match app.selected_object() {
                 Some(obj) => {
@@ -415,10 +401,7 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) {
                         ),
                     )
                 }
-                None => (
-                    view_title("Inspector", '4', None),
-                    "No selection".to_owned(),
-                ),
+                None => (view_title("Inspector", '4', None), "No selection".to_owned()),
             },
         };
         let inspector = Paragraph::new(inspector_text)
@@ -433,10 +416,7 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) {
         frame.render_widget(inspector, inspector_area);
     }
 
-    let toast_snapshot = app
-        .toast
-        .as_ref()
-        .map(|toast| (toast.message.clone(), toast.expires_at));
+    let toast_snapshot = app.toast.as_ref().map(|toast| (toast.message.clone(), toast.expires_at));
     let toast_suffix = match toast_snapshot {
         Some((message, expires_at)) if expires_at > Instant::now() => format!(" | {message}"),
         Some(_) => {
@@ -456,11 +436,7 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) {
                 .x
                 .saturating_add(1)
                 .saturating_add(query.chars().count() as u16)
-                .min(
-                    status_area
-                        .x
-                        .saturating_add(status_area.width.saturating_sub(1)),
-                );
+                .min(status_area.x.saturating_add(status_area.width.saturating_sub(1)));
             frame.set_cursor(cursor_x, status_area.y);
         }
         return;
@@ -625,11 +601,7 @@ impl App {
                     render_diagram_annotated_for_tui(&session, diagram, true);
                 (text, highlight_index, objects_from_diagram(diagram))
             }
-            None => (
-                "No diagrams in session".to_owned(),
-                HighlightIndex::new(),
-                Vec::new(),
-            ),
+            None => ("No diagrams in session".to_owned(), HighlightIndex::new(), Vec::new()),
         };
 
         let mut objects_state = ListState::default();
@@ -775,9 +747,7 @@ impl App {
             return false;
         }
 
-        let already_selected = self
-            .selected_ref()
-            .is_some_and(|selected| selected == &object_ref);
+        let already_selected = self.selected_ref().is_some_and(|selected| selected == &object_ref);
         let diagram_matches = self
             .active_diagram_id()
             .is_some_and(|diagram_id| diagram_id == object_ref.diagram_id());
@@ -800,11 +770,7 @@ impl App {
                     render_diagram_annotated_for_tui(&self.session, diagram, self.show_notes);
                 (text, highlight_index, objects_from_diagram(diagram))
             }
-            None => (
-                "No diagrams in session".to_owned(),
-                HighlightIndex::new(),
-                Vec::new(),
-            ),
+            None => ("No diagrams in session".to_owned(), HighlightIndex::new(), Vec::new()),
         };
 
         self.base_diagram = base_diagram;
@@ -851,12 +817,9 @@ impl App {
             return;
         }
 
-        let diagram_width = self
-            .base_diagram
-            .split('\n')
-            .map(|line| line.chars().count())
-            .max()
-            .unwrap_or(0) as i32;
+        let diagram_width =
+            self.base_diagram.split('\n').map(|line| line.chars().count()).max().unwrap_or(0)
+                as i32;
         let raw_line_count = self.base_diagram.split('\n').count() as i32;
         let diagram_height = raw_line_count.max(0);
         let viewport_width = viewport_width as i32;
@@ -1010,11 +973,8 @@ impl App {
             }
         }
 
-        let has_selected_flow_edge = self
-            .session
-            .selected_object_refs()
-            .iter()
-            .any(is_flow_edge_ref);
+        let has_selected_flow_edge =
+            self.session.selected_object_refs().iter().any(is_flow_edge_ref);
         let mut has_selected_objects_in_diagram = false;
         for object_ref in self.session.selected_object_refs() {
             if let Some(spans) = self.base_highlight_index.get(object_ref) {
@@ -1065,10 +1025,8 @@ impl App {
             if chars.is_empty() {
                 line_spans.push(Span::raw(String::new()));
             } else {
-                let mut current_style = style_overrides
-                    .first()
-                    .and_then(|style| *style)
-                    .unwrap_or_else(|| {
+                let mut current_style =
+                    style_overrides.first().and_then(|style| *style).unwrap_or_else(|| {
                         style_for_diagram_cell(
                             flags.first().copied().unwrap_or(0),
                             has_active_selection_in_diagram,
@@ -1096,10 +1054,8 @@ impl App {
                 let mut buf = String::new();
 
                 for (idx, ch) in chars.iter().enumerate() {
-                    let base_style = style_overrides
-                        .get(idx)
-                        .and_then(|style| *style)
-                        .unwrap_or_else(|| {
+                    let base_style =
+                        style_overrides.get(idx).and_then(|style| *style).unwrap_or_else(|| {
                             style_for_diagram_cell(
                                 flags.get(idx).copied().unwrap_or(0),
                                 has_active_selection_in_diagram,
@@ -1151,10 +1107,7 @@ impl App {
         self.visible_object_indices.clear();
         for (idx, obj) in self.objects.iter().enumerate() {
             if self.objects_selected_only
-                && !self
-                    .session
-                    .selected_object_refs()
-                    .contains(&obj.object_ref)
+                && !self.session.selected_object_refs().contains(&obj.object_ref)
             {
                 continue;
             }
@@ -1222,9 +1175,8 @@ impl App {
             return;
         }
 
-        let next_selected = prev_selected
-            .and_then(|prev| visible.iter().position(|&idx| idx == prev))
-            .unwrap_or(0);
+        let next_selected =
+            prev_selected.and_then(|prev| visible.iter().position(|&idx| idx == prev)).unwrap_or(0);
         self.xrefs_state.select(Some(next_selected));
     }
 
@@ -1254,20 +1206,12 @@ impl App {
 
     fn toggle_inspector_visible(&mut self) {
         self.inspector_visible = !self.inspector_visible;
-        self.set_toast(if self.inspector_visible {
-            "Inspector shown"
-        } else {
-            "Inspector hidden"
-        });
+        self.set_toast(if self.inspector_visible { "Inspector shown" } else { "Inspector hidden" });
     }
 
     fn toggle_palette_visible(&mut self) {
         self.palette_visible = !self.palette_visible;
-        self.set_toast(if self.palette_visible {
-            "Palette shown"
-        } else {
-            "Palette hidden"
-        });
+        self.set_toast(if self.palette_visible { "Palette shown" } else { "Palette hidden" });
     }
 
     fn panel_is_visible(&self, focus: Focus) -> bool {
@@ -1338,9 +1282,7 @@ impl App {
     }
 
     fn object_index_for_ref(&self, object_ref: &ObjectRef) -> Option<usize> {
-        self.objects
-            .iter()
-            .position(|obj| &obj.object_ref == object_ref)
+        self.objects.iter().position(|obj| &obj.object_ref == object_ref)
     }
 
     fn object_exists_in_session(&self, object_ref: &ObjectRef) -> bool {
@@ -1370,11 +1312,7 @@ impl App {
         if self.follow_ai {
             self.follow_agent_highlight();
         }
-        self.set_toast(if self.follow_ai {
-            "Follow AI enabled"
-        } else {
-            "Follow AI disabled"
-        });
+        self.set_toast(if self.follow_ai { "Follow AI enabled" } else { "Follow AI disabled" });
     }
 
     fn take_external_action(&mut self) -> Option<ExternalAction> {
@@ -1405,10 +1343,7 @@ impl App {
 
         let launch_result = launch_editor_command(&editor_command, &temp_path);
         let edited_mermaid = fs::read_to_string(&temp_path).map_err(|err| {
-            format!(
-                "failed reading edited Mermaid from {}: {err}",
-                temp_path.display()
-            )
+            format!("failed reading edited Mermaid from {}: {err}", temp_path.display())
         });
         let _ = fs::remove_file(&temp_path);
 
@@ -1476,9 +1411,7 @@ impl App {
                 "Edited {diagram_id} (rev {baseline_rev}->{new_rev}); sync pending"
             ));
         } else {
-            self.set_toast(format!(
-                "Edited {diagram_id} (rev {baseline_rev}->{new_rev})"
-            ));
+            self.set_toast(format!("Edited {diagram_id} (rev {baseline_rev}->{new_rev})"));
         }
 
         Ok(())
@@ -1514,14 +1447,10 @@ impl App {
             ));
         };
 
-        let mut disk_session = session_folder
-            .load_session()
-            .map_err(|err| format!("sync failed (load): {err}"))?;
+        let mut disk_session =
+            session_folder.load_session().map_err(|err| format!("sync failed (load): {err}"))?;
         let Some(disk_diagram) = disk_session.diagrams().get(&pending.diagram_id) else {
-            return Err(format!(
-                "sync conflict: diagram removed on disk: {}",
-                pending.diagram_id
-            ));
+            return Err(format!("sync conflict: diagram removed on disk: {}", pending.diagram_id));
         };
 
         if disk_diagram.rev() != pending.expected_disk_rev {
@@ -1533,9 +1462,7 @@ impl App {
             ));
         }
 
-        disk_session
-            .diagrams_mut()
-            .insert(pending.diagram_id.clone(), local_diagram);
+        disk_session.diagrams_mut().insert(pending.diagram_id.clone(), local_diagram);
         session_folder
             .save_session(&disk_session)
             .map_err(|err| format!("sync failed (save): {err}"))
@@ -1560,10 +1487,7 @@ impl App {
             .map(|(xref_id, xref)| {
                 let from_dangling = self.session.object_ref_is_missing(xref.from());
                 let to_dangling = self.session.object_ref_is_missing(xref.to());
-                (
-                    xref_id.clone(),
-                    XRefStatus::from_flags(from_dangling, to_dangling),
-                )
+                (xref_id.clone(), XRefStatus::from_flags(from_dangling, to_dangling))
             })
             .collect::<Vec<_>>();
 
@@ -1622,10 +1546,8 @@ impl App {
             SearchMode::Inactive => {}
         }
 
-        if !matches!(
-            code,
-            KeyCode::Char('?') | KeyCode::Char('/') | KeyCode::Char('\\')
-        ) && matches!(self.focus, Focus::Diagram | Focus::Objects)
+        if !matches!(code, KeyCode::Char('?') | KeyCode::Char('/') | KeyCode::Char('\\'))
+            && matches!(self.focus, Focus::Diagram | Focus::Objects)
             && self.handle_diagram_hint_key(code)
         {
             return false;
@@ -1826,11 +1748,8 @@ impl App {
                             }
                         }
                     } else {
-                        self.hint_mode = HintMode::AwaitingSecond {
-                            kind,
-                            first,
-                            targets: filtered,
-                        };
+                        self.hint_mode =
+                            HintMode::AwaitingSecond { kind, first, targets: filtered };
                     }
                     true
                 }
@@ -1839,11 +1758,7 @@ impl App {
                     true
                 }
             },
-            HintMode::AwaitingSecond {
-                kind,
-                first,
-                targets,
-            } => match code {
+            HintMode::AwaitingSecond { kind, first, targets } => match code {
                 KeyCode::Esc => {
                     self.cancel_hint_mode();
                     true
@@ -1865,11 +1780,7 @@ impl App {
                             self.reset_diagram_hint_mode(HintKind::SelectChain);
                         }
                         (HintKind::SelectChain, None) => {
-                            self.hint_mode = HintMode::AwaitingSecond {
-                                kind,
-                                first,
-                                targets,
-                            };
+                            self.hint_mode = HintMode::AwaitingSecond { kind, first, targets };
                             self.set_toast("No matching hint".to_owned());
                         }
                     }
@@ -1877,11 +1788,7 @@ impl App {
                     true
                 }
                 _ => {
-                    self.hint_mode = HintMode::AwaitingSecond {
-                        kind,
-                        first,
-                        targets,
-                    };
+                    self.hint_mode = HintMode::AwaitingSecond { kind, first, targets };
                     true
                 }
             },
@@ -2005,9 +1912,7 @@ impl App {
         let k = NODE_HINT_CHARS.chars().count();
         let max_two_char = k.saturating_mul(k);
         if hint_count > max_two_char {
-            self.set_toast(format!(
-                "Too many hint targets ({hint_count}, max {max_two_char})"
-            ));
+            self.set_toast(format!("Too many hint targets ({hint_count}, max {max_two_char})"));
             return None;
         }
 
@@ -2051,10 +1956,7 @@ impl App {
 
         let mut inserted_any = false;
         for object_ref in &refs_to_select {
-            inserted_any |= self
-                .session
-                .selected_object_refs_mut()
-                .insert(object_ref.clone());
+            inserted_any |= self.session.selected_object_refs_mut().insert(object_ref.clone());
         }
 
         if inserted_any {
@@ -2275,19 +2177,13 @@ impl App {
         let now_selected = if self.session.selected_object_refs_mut().remove(&object_ref) {
             false
         } else {
-            self.session
-                .selected_object_refs_mut()
-                .insert(object_ref.clone());
+            self.session.selected_object_refs_mut().insert(object_ref.clone());
             true
         };
 
         self.apply_object_filters();
 
-        let verb = if now_selected {
-            "Selected"
-        } else {
-            "Deselected"
-        };
+        let verb = if now_selected { "Selected" } else { "Deselected" };
         let mut message = format!("{verb} {object_ref}");
         if let Some(session_folder) = self.session_folder.as_ref() {
             if let Err(err) = session_folder.save_selected_object_refs(&self.session) {
@@ -2382,12 +2278,7 @@ impl App {
     }
 
     fn select_object_ref(&mut self, object_ref: &ObjectRef) {
-        if self
-            .session
-            .diagrams()
-            .get(object_ref.diagram_id())
-            .is_none()
-        {
+        if self.session.diagrams().get(object_ref.diagram_id()).is_none() {
             return;
         }
 
@@ -2409,10 +2300,8 @@ impl App {
             self.apply_object_filters();
         }
 
-        let Some(visible_idx) = self
-            .visible_object_indices
-            .iter()
-            .position(|&idx| idx == object_idx)
+        let Some(visible_idx) =
+            self.visible_object_indices.iter().position(|&idx| idx == object_idx)
         else {
             return;
         };
@@ -2462,10 +2351,7 @@ impl App {
 
         if matches.len() > 1 {
             let xref_id = &self.xrefs[first_idx].xref_id;
-            self.set_toast(format!(
-                "{} outgoing xrefs; followed first ({xref_id})",
-                matches.len()
-            ));
+            self.set_toast(format!("{} outgoing xrefs; followed first ({xref_id})", matches.len()));
         }
     }
 
@@ -2492,10 +2378,7 @@ impl App {
 
         if matches.len() > 1 {
             let xref_id = &self.xrefs[first_idx].xref_id;
-            self.set_toast(format!(
-                "{} incoming xrefs; followed first ({xref_id})",
-                matches.len()
-            ));
+            self.set_toast(format!("{} incoming xrefs; followed first ({xref_id})", matches.len()));
         }
     }
 
@@ -2629,11 +2512,7 @@ fn resolve_editor_command() -> String {
     env::var("VISUAL")
         .ok()
         .filter(|value| !value.trim().is_empty())
-        .or_else(|| {
-            env::var("EDITOR")
-                .ok()
-                .filter(|value| !value.trim().is_empty())
-        })
+        .or_else(|| env::var("EDITOR").ok().filter(|value| !value.trim().is_empty()))
         .unwrap_or_else(|| "vi".to_owned())
 }
 
@@ -2649,20 +2528,11 @@ fn write_temp_mermaid_file(
     let safe_id = diagram_id
         .to_string()
         .chars()
-        .map(|ch| {
-            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
-                ch
-            } else {
-                '_'
-            }
-        })
+        .map(|ch| if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' { ch } else { '_' })
         .collect::<String>();
     temp_path.push(format!("nereid-{safe_id}-{ts}.mmd"));
     fs::write(&temp_path, content).map_err(|err| {
-        format!(
-            "failed to create temporary Mermaid file {}: {err}",
-            temp_path.display()
-        )
+        format!("failed to create temporary Mermaid file {}: {err}", temp_path.display())
     })?;
     Ok(temp_path)
 }
@@ -2675,10 +2545,7 @@ fn launch_editor_command(command: &str, path: &Path) -> Result<(), String> {
 
     let status = Command::new("sh")
         .arg("-lc")
-        .arg(format!(
-            "{command} {}",
-            shell_single_quote(path_text.as_ref())
-        ))
+        .arg(format!("{command} {}", shell_single_quote(path_text.as_ref())))
         .status()
         .map_err(|err| format!("failed to run editor command `{command}`: {err}"))?;
     if !status.success() {
@@ -2725,10 +2592,7 @@ fn ensure_active_diagram_id(session: &mut Session) -> Option<DiagramId> {
 fn render_diagram_annotated(diagram: &Diagram, options: RenderOptions) -> (String, HighlightIndex) {
     match crate::render::diagram::render_diagram_unicode_annotated_with_options(diagram, options) {
         Ok(rendered) => (rendered.text, rendered.highlight_index),
-        Err(err) => (
-            format!("Diagram render error:\n{err}"),
-            HighlightIndex::new(),
-        ),
+        Err(err) => (format!("Diagram render error:\n{err}"), HighlightIndex::new()),
     }
 }
 
@@ -2778,11 +2642,7 @@ fn prefix_xref_direction_labels_for_tui(diagram: &mut Diagram, session: &Session
                 );
                 let has_incoming = incoming_refs.contains(&object_ref);
                 let has_outgoing = outgoing_refs.contains(&object_ref);
-                node.set_label(prefixed_direction_label(
-                    node.label(),
-                    has_incoming,
-                    has_outgoing,
-                ));
+                node.set_label(prefixed_direction_label(node.label(), has_incoming, has_outgoing));
             }
         }
         DiagramAst::Sequence(seq_ast) => {
@@ -2827,9 +2687,7 @@ fn prefix_xref_direction_labels_for_tui(diagram: &mut Diagram, session: &Session
         }
     }
 
-    diagram
-        .set_ast(ast)
-        .expect("diagram kind should remain unchanged");
+    diagram.set_ast(ast).expect("diagram kind should remain unchanged");
 }
 
 fn render_diagram_annotated_for_tui(
@@ -2868,17 +2726,11 @@ fn apply_highlight_flags(flags_by_line: &mut [Vec<u8>], spans: &[LineSpan], flag
 }
 
 fn is_box_drawing_verticalish(ch: char) -> bool {
-    matches!(
-        ch,
-        '│' | '┌' | '┐' | '└' | '┘' | '├' | '┤' | '┬' | '┴' | '┼'
-    )
+    matches!(ch, '│' | '┌' | '┐' | '└' | '┘' | '├' | '┤' | '┬' | '┴' | '┼')
 }
 
 fn is_box_drawing_horizontalish(ch: char) -> bool {
-    matches!(
-        ch,
-        '─' | '┌' | '┐' | '└' | '┘' | '├' | '┤' | '┬' | '┴' | '┼'
-    )
+    matches!(ch, '─' | '┌' | '┐' | '└' | '┘' | '├' | '┤' | '┬' | '┴' | '┼')
 }
 
 fn fill_highlight_bridge_gaps(flags_by_line: &mut [Vec<u8>], diagram: &str, flag: u8) {
@@ -2934,10 +2786,7 @@ fn fill_highlight_bridge_gaps_with_limit(
                 continue;
             }
 
-            if chars[gap_start..gap_end]
-                .iter()
-                .all(|ch| is_box_drawing_verticalish(*ch))
-            {
+            if chars[gap_start..gap_end].iter().all(|ch| is_box_drawing_verticalish(*ch)) {
                 for cell in flags.iter_mut().take(gap_end).skip(gap_start) {
                     *cell |= flag;
                 }
@@ -3027,10 +2876,8 @@ fn bounding_box_from_spans(spans: &[LineSpan]) -> Option<(usize, usize, usize, u
 }
 
 fn fill_highlight_corner_branch_extensions(flags_by_line: &mut [Vec<u8>], diagram: &str, flag: u8) {
-    let chars_by_line = diagram
-        .split('\n')
-        .map(|line| line.chars().collect::<Vec<_>>())
-        .collect::<Vec<_>>();
+    let chars_by_line =
+        diagram.split('\n').map(|line| line.chars().collect::<Vec<_>>()).collect::<Vec<_>>();
 
     let mut extensions = Vec::<(usize, usize)>::new();
 
@@ -3179,14 +3026,9 @@ fn apply_hint_target_to_line(
         _ => return,
     };
 
-    let base_style = Style::default()
-        .fg(Color::White)
-        .bg(Color::Cyan)
-        .add_modifier(Modifier::BOLD);
-    let typed_style = Style::default()
-        .fg(Color::DarkGray)
-        .bg(Color::Cyan)
-        .add_modifier(Modifier::BOLD);
+    let base_style = Style::default().fg(Color::White).bg(Color::Cyan).add_modifier(Modifier::BOLD);
+    let typed_style =
+        Style::default().fg(Color::DarkGray).bg(Color::Cyan).add_modifier(Modifier::BOLD);
 
     if target.fill_char == crate::render::UNICODE_BOX_HORIZONTAL {
         let mut label_start = label_start;
@@ -3259,14 +3101,8 @@ fn apply_hint_target_to_line(
         if tag_slot_start.is_none() {
             for x in scan_start..=max_start {
                 let ch0 = line_chars.get(x).copied().unwrap_or(target.fill_char);
-                let ch1 = line_chars
-                    .get(x.saturating_add(1))
-                    .copied()
-                    .unwrap_or(target.fill_char);
-                let ch2 = line_chars
-                    .get(x.saturating_add(2))
-                    .copied()
-                    .unwrap_or(target.fill_char);
+                let ch1 = line_chars.get(x.saturating_add(1)).copied().unwrap_or(target.fill_char);
+                let ch2 = line_chars.get(x.saturating_add(2)).copied().unwrap_or(target.fill_char);
                 if !is_hint_label_char(ch0, target.fill_char)
                     && !is_hint_label_char(ch1, target.fill_char)
                     && !is_hint_label_char(ch2, target.fill_char)
@@ -3308,10 +3144,7 @@ fn apply_hint_target_to_line(
         return;
     }
 
-    let available = target
-        .inner_x1
-        .saturating_sub(target.inner_x0)
-        .saturating_add(1);
+    let available = target.inner_x1.saturating_sub(target.inner_x0).saturating_add(1);
     if available < 3 {
         return;
     }
@@ -3328,9 +3161,7 @@ fn apply_hint_target_to_line(
     let max_label_len = if new_label_start > max_label_end {
         0
     } else {
-        max_label_end
-            .saturating_sub(new_label_start)
-            .saturating_add(1)
+        max_label_end.saturating_sub(new_label_start).saturating_add(1)
     };
     label_chars.truncate(max_label_len);
 
@@ -3383,15 +3214,9 @@ fn style_for_highlight_flag(
 
     if selected {
         style = if in_focus {
-            Style::default()
-                .fg(Color::White)
-                .bg(Color::LightGreen)
-                .add_modifier(Modifier::BOLD)
+            Style::default().fg(Color::White).bg(Color::LightGreen).add_modifier(Modifier::BOLD)
         } else {
-            Style::default()
-                .fg(Color::White)
-                .bg(Color::DarkGray)
-                .add_modifier(Modifier::BOLD)
+            Style::default().fg(Color::White).bg(Color::DarkGray).add_modifier(Modifier::BOLD)
         };
     } else if background_flags == 0 && has_active_selection_in_diagram {
         style = Style::default().fg(Color::DarkGray);
@@ -3400,6 +3225,7 @@ fn style_for_highlight_flag(
     style
 }
 
+#[allow(clippy::too_many_arguments)]
 fn style_for_diagram_cell(
     flag: u8,
     has_active_selection_in_diagram: bool,
@@ -3452,21 +3278,14 @@ fn objects_from_sequence_ast(diagram_id: &DiagramId, ast: &SequenceAst) -> Vec<S
             participant_id.clone(),
         );
         out.push(SelectableObject {
-            label: format!(
-                "participant {} ({})",
-                participant_id,
-                participant.mermaid_name()
-            ),
+            label: format!("participant {} ({})", participant_id, participant.mermaid_name()),
             object_ref,
         });
     }
 
     for msg in ast.messages() {
-        let object_ref = ObjectRef::new(
-            diagram_id.clone(),
-            message_category.clone(),
-            msg.message_id().clone(),
-        );
+        let object_ref =
+            ObjectRef::new(diagram_id.clone(), message_category.clone(), msg.message_id().clone());
         out.push(SelectableObject {
             label: format!(
                 "message {} {}→{}: {}",
@@ -3499,12 +3318,7 @@ fn objects_from_flowchart_ast(diagram_id: &DiagramId, ast: &FlowchartAst) -> Vec
     for (edge_id, edge) in ast.edges() {
         let object_ref = ObjectRef::new(diagram_id.clone(), edge_category.clone(), edge_id.clone());
         out.push(SelectableObject {
-            label: format!(
-                "edge {} {}→{}",
-                edge_id,
-                edge.from_node_id(),
-                edge.to_node_id()
-            ),
+            label: format!("edge {} {}→{}", edge_id, edge.from_node_id(), edge.to_node_id()),
             object_ref,
         });
     }
@@ -3531,10 +3345,7 @@ fn search_candidates_from_session(session: &Session) -> Vec<SearchCandidate> {
         for obj in objects_from_diagram(diagram) {
             let object_ref_text = obj.object_ref.to_string();
             let haystack = format!("{object_ref_text} {}", obj.label).to_lowercase();
-            candidates.push(SearchCandidate {
-                haystack,
-                object_ref: obj.object_ref,
-            });
+            candidates.push(SearchCandidate { haystack, object_ref: obj.object_ref });
         }
     }
 
@@ -3563,10 +3374,7 @@ fn ranked_search_results(
         let Some(score) = score else {
             continue;
         };
-        groups
-            .entry(candidate.object_ref.diagram_id().to_string())
-            .or_default()
-            .push((score, idx));
+        groups.entry(candidate.object_ref.diagram_id().to_string()).or_default().push((score, idx));
     }
 
     if groups.is_empty() {
@@ -3575,11 +3383,9 @@ fn ranked_search_results(
 
     for matches in groups.values_mut() {
         matches.sort_by(|(score_a, idx_a), (score_b, idx_b)| {
-            score_b.cmp(score_a).then_with(|| {
-                candidates[*idx_a]
-                    .haystack
-                    .cmp(&candidates[*idx_b].haystack)
-            })
+            score_b
+                .cmp(score_a)
+                .then_with(|| candidates[*idx_a].haystack.cmp(&candidates[*idx_b].haystack))
         });
     }
 
@@ -3618,14 +3424,8 @@ fn regular_score(needle: &str, haystack: &str) -> Option<i64> {
 
     let first = haystack.find(needle)?;
     let starts = first == 0;
-    let start_boundary = if starts {
-        true
-    } else {
-        haystack[..first]
-            .chars()
-            .last()
-            .is_some_and(is_boundary_char)
-    };
+    let start_boundary =
+        if starts { true } else { haystack[..first].chars().last().is_some_and(is_boundary_char) };
     let occurrences = haystack.match_indices(needle).count() as i64;
 
     let mut score = 200_000i64.saturating_sub((first as i64) * 1000);
@@ -3746,11 +3546,7 @@ fn xrefs_from_session(session: &Session) -> Vec<SelectableXRef> {
                 ),
             };
 
-            SelectableXRef {
-                xref_id: xref_id.clone(),
-                label,
-                xref: xref.clone(),
-            }
+            SelectableXRef { xref_id: xref_id.clone(), label, xref: xref.clone() }
         })
         .collect()
 }
@@ -3776,19 +3572,15 @@ fn xref_direction_prefix_for_flags(has_outgoing: bool, has_incoming: bool) -> &'
 }
 
 pub fn demo_session() -> Session {
-    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("data")
-        .join("demo-session");
+    let root =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data").join("demo-session");
     let folder = SessionFolder::new(root.clone());
 
     match folder.load_session() {
         Ok(session) => session,
         Err(err) => {
             if cfg!(test) {
-                panic!(
-                    "failed to load demo session fixture from {}: {err}",
-                    root.display()
-                );
+                panic!("failed to load demo session fixture from {}: {err}", root.display());
             }
             eprintln!(
                 "warning: failed to load demo session fixture from {}: {err}; falling back to built-in demo session",
@@ -3809,12 +3601,8 @@ fn demo_session_fallback() -> Session {
     let mut seq_ast = SequenceAst::default();
     let p_alice = oid("p:alice");
     let p_bob = oid("p:bob");
-    seq_ast
-        .participants_mut()
-        .insert(p_alice.clone(), SequenceParticipant::new("Alice"));
-    seq_ast
-        .participants_mut()
-        .insert(p_bob.clone(), SequenceParticipant::new("Bob"));
+    seq_ast.participants_mut().insert(p_alice.clone(), SequenceParticipant::new("Alice"));
+    seq_ast.participants_mut().insert(p_bob.clone(), SequenceParticipant::new("Bob"));
     seq_ast.messages_mut().push(SequenceMessage::new(
         oid("m:0001"),
         p_alice.clone(),
@@ -3825,58 +3613,35 @@ fn demo_session_fallback() -> Session {
     ));
 
     let seq_id = DiagramId::new("demo-seq").expect("diagram id");
-    let seq_diagram = Diagram::new(
-        seq_id.clone(),
-        "Sequence demo",
-        DiagramAst::Sequence(seq_ast),
-    );
+    let seq_diagram = Diagram::new(seq_id.clone(), "Sequence demo", DiagramAst::Sequence(seq_ast));
 
     let flow_ast = crate::model::fixtures::flowchart_small_dag();
     let n_a = oid("n:a");
     let n_b = oid("n:b");
 
     let flow_id = DiagramId::new("demo-flow").expect("diagram id");
-    let flow_diagram = Diagram::new(
-        flow_id.clone(),
-        "Flowchart demo",
-        DiagramAst::Flowchart(flow_ast),
-    );
+    let flow_diagram =
+        Diagram::new(flow_id.clone(), "Flowchart demo", DiagramAst::Flowchart(flow_ast));
 
     session.diagrams_mut().insert(seq_id, seq_diagram);
     session.diagrams_mut().insert(flow_id.clone(), flow_diagram);
 
     let x1 = XRef::new(
-        ObjectRef::new(
-            flow_id.clone(),
-            category_path(&["flow", "node"]),
-            n_a.clone(),
-        ),
-        ObjectRef::new(
-            flow_id.clone(),
-            category_path(&["flow", "edge"]),
-            oid("e:ab"),
-        ),
+        ObjectRef::new(flow_id.clone(), category_path(&["flow", "node"]), n_a.clone()),
+        ObjectRef::new(flow_id.clone(), category_path(&["flow", "edge"]), oid("e:ab")),
         "uses",
         XRefStatus::Ok,
     );
 
     let x2 = XRef::new(
-        ObjectRef::new(
-            flow_id.clone(),
-            category_path(&["flow", "node"]),
-            n_b.clone(),
-        ),
+        ObjectRef::new(flow_id.clone(), category_path(&["flow", "node"]), n_b.clone()),
         ObjectRef::new(flow_id, category_path(&["flow", "edge"]), oid("e:missing")),
         "uses",
         XRefStatus::DanglingTo,
     );
 
-    session
-        .xrefs_mut()
-        .insert(XRefId::new("x:1").expect("xref id"), x1);
-    session
-        .xrefs_mut()
-        .insert(XRefId::new("x:2").expect("xref id"), x2);
+    session.xrefs_mut().insert(XRefId::new("x:1").expect("xref id"), x1);
+    session.xrefs_mut().insert(XRefId::new("x:2").expect("xref id"), x2);
 
     session
 }

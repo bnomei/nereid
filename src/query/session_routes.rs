@@ -18,9 +18,7 @@ pub struct SessionRouteAdjacency {
 
 impl SessionRouteAdjacency {
     pub fn derive(session: &Session) -> Self {
-        Self {
-            adjacency: derive_adjacency(session),
-        }
+        Self { adjacency: derive_adjacency(session) }
     }
 }
 
@@ -57,19 +55,11 @@ fn flow_edge_ref(diagram_id: &DiagramId, edge_id: &ObjectId) -> ObjectRef {
 }
 
 fn seq_message_ref(diagram_id: &DiagramId, message_id: &ObjectId) -> ObjectRef {
-    ObjectRef::new(
-        diagram_id.clone(),
-        seq_message_category(),
-        message_id.clone(),
-    )
+    ObjectRef::new(diagram_id.clone(), seq_message_category(), message_id.clone())
 }
 
 fn seq_participant_ref(diagram_id: &DiagramId, participant_id: &ObjectId) -> ObjectRef {
-    ObjectRef::new(
-        diagram_id.clone(),
-        seq_participant_category(),
-        participant_id.clone(),
-    )
+    ObjectRef::new(diagram_id.clone(), seq_participant_category(), participant_id.clone())
 }
 
 fn seq_block_ref(diagram_id: &DiagramId, block_id: &ObjectId) -> ObjectRef {
@@ -77,11 +67,7 @@ fn seq_block_ref(diagram_id: &DiagramId, block_id: &ObjectId) -> ObjectRef {
 }
 
 fn seq_section_ref(diagram_id: &DiagramId, section_id: &ObjectId) -> ObjectRef {
-    ObjectRef::new(
-        diagram_id.clone(),
-        seq_section_category(),
-        section_id.clone(),
-    )
+    ObjectRef::new(diagram_id.clone(), seq_section_category(), section_id.clone())
 }
 
 fn insert_node(adjacency: &mut BTreeMap<ObjectRef, BTreeSet<ObjectRef>>, node: ObjectRef) {
@@ -126,10 +112,7 @@ fn derive_adjacency(session: &Session) -> BTreeMap<ObjectRef, BTreeSet<ObjectRef
             }
             DiagramAst::Sequence(ast) => {
                 for participant_id in ast.participants().keys() {
-                    insert_node(
-                        &mut adjacency,
-                        seq_participant_ref(diagram_id, participant_id),
-                    );
+                    insert_node(&mut adjacency, seq_participant_ref(diagram_id, participant_id));
                 }
 
                 let messages = ast.messages_in_order();
@@ -159,11 +142,7 @@ fn derive_adjacency(session: &Session) -> BTreeMap<ObjectRef, BTreeSet<ObjectRef
                     insert_node(&mut adjacency, from_participant.clone());
                     insert_node(&mut adjacency, to_participant.clone());
 
-                    insert_edge(
-                        &mut adjacency,
-                        from_participant.clone(),
-                        message_ref.clone(),
-                    );
+                    insert_edge(&mut adjacency, from_participant.clone(), message_ref.clone());
                     insert_edge(&mut adjacency, message_ref.clone(), from_participant);
                     insert_edge(&mut adjacency, to_participant.clone(), message_ref.clone());
                     insert_edge(&mut adjacency, message_ref, to_participant);
@@ -278,10 +257,7 @@ pub fn find_routes_with_adjacency(
 
     let max_hops = max_hops.unwrap_or(u64::MAX);
     let mut candidates: BinaryHeap<Reverse<CandidateRoute>> = BinaryHeap::new();
-    candidates.push(Reverse(CandidateRoute {
-        hops: 0,
-        path: vec![from.clone()],
-    }));
+    candidates.push(Reverse(CandidateRoute { hops: 0, path: vec![from.clone()] }));
 
     let mut routes = Vec::new();
     while let Some(Reverse(candidate)) = candidates.pop() {
@@ -309,10 +285,7 @@ pub fn find_routes_with_adjacency(
 
             let mut next_path = candidate.path.clone();
             next_path.push(next.clone());
-            candidates.push(Reverse(CandidateRoute {
-                hops: next_hops,
-                path: next_path,
-            }));
+            candidates.push(Reverse(CandidateRoute { hops: next_hops, path: next_path }));
         }
     }
 
@@ -408,16 +381,12 @@ mod tests {
         let mut flow_ast = FlowchartAst::default();
         for node in ["n:a", "n:b"] {
             let node_id = ObjectId::new(node).expect("node id");
-            flow_ast
-                .nodes_mut()
-                .insert(node_id, FlowNode::new(node.to_uppercase()));
+            flow_ast.nodes_mut().insert(node_id, FlowNode::new(node.to_uppercase()));
         }
         let edge_id = ObjectId::new("e:ab").expect("edge id");
         let from = ObjectId::new("n:a").expect("from node id");
         let to = ObjectId::new("n:b").expect("to node id");
-        flow_ast
-            .edges_mut()
-            .insert(edge_id, FlowEdge::new(from.clone(), to.clone()));
+        flow_ast.edges_mut().insert(edge_id, FlowEdge::new(from.clone(), to.clone()));
 
         session.diagrams_mut().insert(
             flow_id.clone(),
@@ -428,12 +397,8 @@ mod tests {
         let mut seq_ast = SequenceAst::default();
         let p1 = ObjectId::new("p:one").expect("participant id");
         let p2 = ObjectId::new("p:two").expect("participant id");
-        seq_ast
-            .participants_mut()
-            .insert(p1.clone(), SequenceParticipant::new("One"));
-        seq_ast
-            .participants_mut()
-            .insert(p2.clone(), SequenceParticipant::new("Two"));
+        seq_ast.participants_mut().insert(p1.clone(), SequenceParticipant::new("One"));
+        seq_ast.participants_mut().insert(p2.clone(), SequenceParticipant::new("Two"));
 
         let m1 = ObjectId::new("m:1").expect("message id");
         let m2 = ObjectId::new("m:2").expect("message id");
@@ -463,10 +428,9 @@ mod tests {
         let xref_id = XRefId::new("x:1").expect("xref id");
         let xref_from: ObjectRef = "d:flow/flow/node/n:b".parse().expect("from ref");
         let xref_to: ObjectRef = "d:seq/seq/message/m:1".parse().expect("to ref");
-        session.xrefs_mut().insert(
-            xref_id,
-            XRef::new(xref_from, xref_to, "relates", XRefStatus::Ok),
-        );
+        session
+            .xrefs_mut()
+            .insert(xref_id, XRef::new(xref_from, xref_to, "relates", XRefStatus::Ok));
 
         let start: ObjectRef = "d:flow/flow/node/n:a".parse().expect("start ref");
         let goal: ObjectRef = "d:seq/seq/message/m:2".parse().expect("goal ref");
@@ -496,14 +460,10 @@ mod tests {
         let mut flow_ast = FlowchartAst::default();
         for node in ["n:a", "n:b"] {
             let node_id = ObjectId::new(node).expect("node id");
-            flow_ast
-                .nodes_mut()
-                .insert(node_id, FlowNode::new(node.to_uppercase()));
+            flow_ast.nodes_mut().insert(node_id, FlowNode::new(node.to_uppercase()));
         }
 
-        flow_ast
-            .edges_mut()
-            .insert(oid("e:ab"), FlowEdge::new(oid("n:a"), oid("n:b")));
+        flow_ast.edges_mut().insert(oid("e:ab"), FlowEdge::new(oid("n:a"), oid("n:b")));
 
         session.diagrams_mut().insert(
             flow_id.clone(),
@@ -540,12 +500,8 @@ mod tests {
         let mut seq_ast = SequenceAst::default();
         let p1 = ObjectId::new("p:one").expect("participant id");
         let p2 = ObjectId::new("p:two").expect("participant id");
-        seq_ast
-            .participants_mut()
-            .insert(p1.clone(), SequenceParticipant::new("One"));
-        seq_ast
-            .participants_mut()
-            .insert(p2.clone(), SequenceParticipant::new("Two"));
+        seq_ast.participants_mut().insert(p1.clone(), SequenceParticipant::new("One"));
+        seq_ast.participants_mut().insert(p2.clone(), SequenceParticipant::new("Two"));
 
         let m1 = ObjectId::new("m:1").expect("message id");
         let m2 = ObjectId::new("m:2").expect("message id");
@@ -571,9 +527,8 @@ mod tests {
             Diagram::new(seq_id.clone(), "Seq", DiagramAst::Sequence(seq_ast)),
         );
 
-        let participant: ObjectRef = "d:seq/seq/participant/p:one"
-            .parse()
-            .expect("participant ref");
+        let participant: ObjectRef =
+            "d:seq/seq/participant/p:one".parse().expect("participant ref");
         let message: ObjectRef = "d:seq/seq/message/m:2".parse().expect("message ref");
         assert_eq!(
             ref_strings(
@@ -582,9 +537,8 @@ mod tests {
             vec!["d:seq/seq/participant/p:one", "d:seq/seq/message/m:2"]
         );
 
-        let participant_to: ObjectRef = "d:seq/seq/participant/p:two"
-            .parse()
-            .expect("participant ref");
+        let participant_to: ObjectRef =
+            "d:seq/seq/participant/p:two".parse().expect("participant ref");
         let message_from: ObjectRef = "d:seq/seq/message/m:1".parse().expect("message ref");
         assert_eq!(
             ref_strings(
@@ -603,12 +557,8 @@ mod tests {
         let mut seq_ast = SequenceAst::default();
         let p1 = ObjectId::new("p:one").expect("participant id");
         let p2 = ObjectId::new("p:two").expect("participant id");
-        seq_ast
-            .participants_mut()
-            .insert(p1.clone(), SequenceParticipant::new("One"));
-        seq_ast
-            .participants_mut()
-            .insert(p2.clone(), SequenceParticipant::new("Two"));
+        seq_ast.participants_mut().insert(p1.clone(), SequenceParticipant::new("One"));
+        seq_ast.participants_mut().insert(p2.clone(), SequenceParticipant::new("Two"));
 
         let m1 = ObjectId::new("m:1").expect("message id");
         seq_ast.messages_mut().push(SequenceMessage::new(
@@ -658,13 +608,9 @@ mod tests {
         let mut flow_ast = FlowchartAst::default();
         for node in ["n:a", "n:b"] {
             let node_id = ObjectId::new(node).expect("node id");
-            flow_ast
-                .nodes_mut()
-                .insert(node_id, FlowNode::new(node.to_uppercase()));
+            flow_ast.nodes_mut().insert(node_id, FlowNode::new(node.to_uppercase()));
         }
-        flow_ast
-            .edges_mut()
-            .insert(oid("e:ab"), FlowEdge::new(oid("n:a"), oid("n:b")));
+        flow_ast.edges_mut().insert(oid("e:ab"), FlowEdge::new(oid("n:a"), oid("n:b")));
         session.diagrams_mut().insert(
             flow_id.clone(),
             Diagram::new(flow_id.clone(), "Flow", DiagramAst::Flowchart(flow_ast)),
@@ -674,12 +620,8 @@ mod tests {
         let mut seq_ast = SequenceAst::default();
         let p1 = ObjectId::new("p:one").expect("participant id");
         let p2 = ObjectId::new("p:two").expect("participant id");
-        seq_ast
-            .participants_mut()
-            .insert(p1.clone(), SequenceParticipant::new("One"));
-        seq_ast
-            .participants_mut()
-            .insert(p2.clone(), SequenceParticipant::new("Two"));
+        seq_ast.participants_mut().insert(p1.clone(), SequenceParticipant::new("One"));
+        seq_ast.participants_mut().insert(p2.clone(), SequenceParticipant::new("Two"));
 
         let m1 = ObjectId::new("m:1").expect("message id");
         let m2 = ObjectId::new("m:2").expect("message id");
@@ -708,10 +650,9 @@ mod tests {
         let xref_id = XRefId::new("x:1").expect("xref id");
         let xref_from: ObjectRef = "d:flow/flow/edge/e:ab".parse().expect("from ref");
         let xref_to: ObjectRef = "d:seq/seq/participant/p:one".parse().expect("to ref");
-        session.xrefs_mut().insert(
-            xref_id,
-            XRef::new(xref_from, xref_to, "relates", XRefStatus::Ok),
-        );
+        session
+            .xrefs_mut()
+            .insert(xref_id, XRef::new(xref_from, xref_to, "relates", XRefStatus::Ok));
 
         let start: ObjectRef = "d:flow/flow/node/n:a".parse().expect("start ref");
         let goal: ObjectRef = "d:seq/seq/message/m:2".parse().expect("goal ref");
@@ -735,26 +676,14 @@ mod tests {
         let mut flow_ast = FlowchartAst::default();
         for node in ["n:a", "n:b", "n:c", "n:d"] {
             let node_id = ObjectId::new(node).expect("node id");
-            flow_ast
-                .nodes_mut()
-                .insert(node_id, FlowNode::new(node.to_uppercase()));
+            flow_ast.nodes_mut().insert(node_id, FlowNode::new(node.to_uppercase()));
         }
 
-        flow_ast
-            .edges_mut()
-            .insert(oid("e:ab"), FlowEdge::new(oid("n:a"), oid("n:b")));
-        flow_ast
-            .edges_mut()
-            .insert(oid("e:ac"), FlowEdge::new(oid("n:a"), oid("n:c")));
-        flow_ast
-            .edges_mut()
-            .insert(oid("e:bd"), FlowEdge::new(oid("n:b"), oid("n:d")));
-        flow_ast
-            .edges_mut()
-            .insert(oid("e:cd"), FlowEdge::new(oid("n:c"), oid("n:d")));
-        flow_ast
-            .edges_mut()
-            .insert(oid("e:bc"), FlowEdge::new(oid("n:b"), oid("n:c")));
+        flow_ast.edges_mut().insert(oid("e:ab"), FlowEdge::new(oid("n:a"), oid("n:b")));
+        flow_ast.edges_mut().insert(oid("e:ac"), FlowEdge::new(oid("n:a"), oid("n:c")));
+        flow_ast.edges_mut().insert(oid("e:bd"), FlowEdge::new(oid("n:b"), oid("n:d")));
+        flow_ast.edges_mut().insert(oid("e:cd"), FlowEdge::new(oid("n:c"), oid("n:d")));
+        flow_ast.edges_mut().insert(oid("e:bc"), FlowEdge::new(oid("n:b"), oid("n:c")));
 
         session.diagrams_mut().insert(
             flow_id.clone(),
@@ -773,32 +702,17 @@ mod tests {
             Some(3),
             RoutesOrdering::FewestHops,
         );
-        let repeat = find_routes(
-            &session,
-            &start,
-            &goal,
-            10,
-            Some(3),
-            RoutesOrdering::FewestHops,
-        );
+        let repeat = find_routes(&session, &start, &goal, 10, Some(3), RoutesOrdering::FewestHops);
         assert_eq!(routes, repeat);
 
         assert_eq!(routes.len(), 7);
         assert_eq!(
             ref_strings(&routes[0]),
-            vec![
-                "d:flow/flow/node/n:a",
-                "d:flow/flow/node/n:b",
-                "d:flow/flow/node/n:d",
-            ]
+            vec!["d:flow/flow/node/n:a", "d:flow/flow/node/n:b", "d:flow/flow/node/n:d",]
         );
         assert_eq!(
             ref_strings(&routes[1]),
-            vec![
-                "d:flow/flow/node/n:a",
-                "d:flow/flow/node/n:c",
-                "d:flow/flow/node/n:d",
-            ]
+            vec!["d:flow/flow/node/n:a", "d:flow/flow/node/n:c", "d:flow/flow/node/n:d",]
         );
         assert_eq!(
             ref_strings(&routes[2]),
@@ -846,14 +760,8 @@ mod tests {
             ]
         );
 
-        let lex_routes = find_routes(
-            &session,
-            &start,
-            &goal,
-            10,
-            Some(3),
-            RoutesOrdering::Lexicographic,
-        );
+        let lex_routes =
+            find_routes(&session, &start, &goal, 10, Some(3), RoutesOrdering::Lexicographic);
         assert_eq!(
             ref_strings(&lex_routes[0]),
             vec![

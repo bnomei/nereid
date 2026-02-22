@@ -28,13 +28,7 @@ impl XRef {
         kind: impl Into<String>,
         status: XRefStatus,
     ) -> Self {
-        Self {
-            from,
-            to,
-            kind: kind.into(),
-            label: None,
-            status,
-        }
+        Self { from, to, kind: kind.into(), label: None, status }
     }
 
     pub fn from(&self) -> &ObjectRef {

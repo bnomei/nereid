@@ -26,10 +26,7 @@ impl<T> Id<T> {
     pub fn new(value: impl Into<String>) -> Result<Self, IdError> {
         let value = value.into();
         validate_id_segment(&value)?;
-        Ok(Self {
-            value,
-            _marker: PhantomData,
-        })
+        Ok(Self { value, _marker: PhantomData })
     }
 
     pub fn as_str(&self) -> &str {

@@ -42,6 +42,7 @@ fn connector_spans(from: NodeRender, to: NodeRender) -> Vec<LineSpan> {
 }
 
 #[cfg(test)]
+#[allow(clippy::too_many_arguments)]
 fn routed_connector_spans(
     from: NodeRender,
     to: NodeRender,
@@ -130,6 +131,7 @@ fn routed_connector_spans(
     spans
 }
 
+#[allow(clippy::too_many_arguments)]
 fn projected_route_points(
     route: &[GridPoint],
     from: NodeRender,
@@ -166,6 +168,7 @@ fn projected_route_points(
     (!points.is_empty()).then_some(points)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn connector_vertical_occupancy_mask(
     ast: &FlowchartAst,
     layer_metrics: &[LayerMetrics],
@@ -346,6 +349,7 @@ fn connector_spans_bridged(
     spans
 }
 
+#[allow(clippy::too_many_arguments)]
 fn routed_connector_spans_bridged(
     from: NodeRender,
     to: NodeRender,
@@ -1381,6 +1385,7 @@ fn draw_hline_bridge_vertical(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_routed_connector(
     canvas: &mut Canvas,
     from: NodeRender,
@@ -1483,6 +1488,7 @@ fn draw_routed_connector(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn route_grid_x_to_lane_x(
     route: &[GridPoint],
     idx: usize,

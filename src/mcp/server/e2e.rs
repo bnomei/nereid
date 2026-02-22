@@ -23,10 +23,7 @@ use tokio::sync::Mutex;
 static TEMP_DIR_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 fn new_runtime() -> tokio::runtime::Runtime {
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .expect("tokio runtime")
+    tokio::runtime::Builder::new_current_thread().enable_all().build().expect("tokio runtime")
 }
 
 struct TempDir {
@@ -35,16 +32,10 @@ struct TempDir {
 
 impl TempDir {
     fn new(prefix: &str) -> Self {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
         let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
         let mut path = std::env::temp_dir();
-        path.push(format!(
-            "nereid-e2e-{prefix}-{}-{nanos}-{counter}",
-            std::process::id()
-        ));
+        path.push(format!("nereid-e2e-{prefix}-{}-{nanos}-{counter}", std::process::id()));
         std::fs::create_dir_all(&path).expect("create temp dir");
         Self { path }
     }
@@ -145,10 +136,7 @@ fn e2e_human_and_agent_collaborate_on_persisted_session() {
     assert_eq!(created.active_diagram_id.as_deref(), Some(diagram_id));
 
     let reloaded = harness.load_session();
-    assert_eq!(
-        reloaded.active_diagram_id().map(|id| id.as_str()),
-        Some(diagram_id)
-    );
+    assert_eq!(reloaded.active_diagram_id().map(|id| id.as_str()), Some(diagram_id));
     assert!(
         reloaded
             .diagrams()
@@ -163,17 +151,10 @@ fn e2e_human_and_agent_collaborate_on_persisted_session() {
     let participant_b_ref = tui.selected_ref().expect("tui selection").to_string();
     assert_eq!(participant_b_ref, expected_participant_b_ref);
 
-    let Json(human_attention) = runtime.block_on(async {
-        server
-            .attention_human_read()
-            .await
-            .expect("attention.human.read")
-    });
+    let Json(human_attention) = runtime
+        .block_on(async { server.attention_human_read().await.expect("attention.human.read") });
     assert_eq!(human_attention.diagram_id.as_deref(), Some(diagram_id));
-    assert_eq!(
-        human_attention.object_ref.as_deref(),
-        Some(participant_b_ref.as_str())
-    );
+    assert_eq!(human_attention.object_ref.as_deref(), Some(participant_b_ref.as_str()));
 
     // Step 3 (agent/MCP): set agent attention to participant b and confirm it renders.
     tui.press(KeyCode::Up); // back to p:a so highlights don't overlap focus
@@ -189,26 +170,19 @@ fn e2e_human_and_agent_collaborate_on_persisted_session() {
     assert_eq!(update.diagram_id, diagram_id);
 
     let text = tui.diagram_text();
-    let has_agent_highlight = text.lines.iter().any(|line| {
-        line.spans
-            .iter()
-            .any(|span| span.style.bg == Some(Color::LightBlue))
-    });
-    assert!(
-        has_agent_highlight,
-        "expected agent highlight to render with bright blue background"
-    );
+    let has_agent_highlight = text
+        .lines
+        .iter()
+        .any(|line| line.spans.iter().any(|span| span.style.bg == Some(Color::LightBlue)));
+    assert!(has_agent_highlight, "expected agent highlight to render with bright blue background");
 
     // Step 4 (human/TUI): toggle multi-selection and ensure it persists to disk.
     tui.press(KeyCode::Down); // p:a -> p:b
     tui.press(KeyCode::Char(' '));
 
     let reloaded = harness.load_session();
-    let selected = reloaded
-        .selected_object_refs()
-        .iter()
-        .map(ToString::to_string)
-        .collect::<Vec<_>>();
+    let selected =
+        reloaded.selected_object_refs().iter().map(ToString::to_string).collect::<Vec<_>>();
     assert_eq!(selected, vec![participant_b_ref.clone()]);
 
     // Step 5 (agent/MCP): confirm selection is available via MCP after reload.
@@ -262,55 +236,25 @@ fn e2e_selection_and_active_diagram_do_not_drift_between_tui_and_mcp() {
     let Json(current) =
         runtime.block_on(async { server.diagram_current().await.expect("diagram.current") });
     assert_eq!(current.active_diagram_id.as_deref(), Some("d-b"));
-    assert_eq!(
-        current.context.human_active_diagram_id.as_deref(),
-        Some("d-b")
-    );
+    assert_eq!(current.context.human_active_diagram_id.as_deref(), Some("d-b"));
 
     let Json(selection) =
         runtime.block_on(async { server.selection_get().await.expect("selection.read") });
     assert_eq!(selection.object_refs, vec![selected_ref.clone()]);
-    assert!(selection
-        .object_refs
-        .iter()
-        .all(|object_ref| object_ref.starts_with("d:d-b/")));
-    assert_eq!(
-        selection.context.human_active_diagram_id.as_deref(),
-        Some("d-b")
-    );
-    assert_eq!(
-        selection.context.human_active_object_ref.as_deref(),
-        Some(selected_ref.as_str())
-    );
+    assert!(selection.object_refs.iter().all(|object_ref| object_ref.starts_with("d:d-b/")));
+    assert_eq!(selection.context.human_active_diagram_id.as_deref(), Some("d-b"));
+    assert_eq!(selection.context.human_active_object_ref.as_deref(), Some(selected_ref.as_str()));
 
-    let Json(human_attention) = runtime.block_on(async {
-        server
-            .attention_human_read()
-            .await
-            .expect("attention.human.read")
-    });
+    let Json(human_attention) = runtime
+        .block_on(async { server.attention_human_read().await.expect("attention.human.read") });
     assert_eq!(human_attention.diagram_id.as_deref(), Some("d-b"));
-    assert_eq!(
-        human_attention.object_ref.as_deref(),
-        Some(selected_ref.as_str())
-    );
-    assert_eq!(
-        human_attention.context.human_active_diagram_id.as_deref(),
-        Some("d-b")
-    );
+    assert_eq!(human_attention.object_ref.as_deref(), Some(selected_ref.as_str()));
+    assert_eq!(human_attention.context.human_active_diagram_id.as_deref(), Some("d-b"));
 
     let reloaded = harness.load_session();
-    assert_eq!(
-        reloaded
-            .active_diagram_id()
-            .map(|diagram_id| diagram_id.as_str()),
-        Some("d-b")
-    );
-    let persisted = reloaded
-        .selected_object_refs()
-        .iter()
-        .map(ToString::to_string)
-        .collect::<Vec<_>>();
+    assert_eq!(reloaded.active_diagram_id().map(|diagram_id| diagram_id.as_str()), Some("d-b"));
+    let persisted =
+        reloaded.selected_object_refs().iter().map(ToString::to_string).collect::<Vec<_>>();
     assert_eq!(persisted, vec![selected_ref]);
 }
 
@@ -345,10 +289,7 @@ fn e2e_tui_reloads_when_mcp_creates_diagram_and_sets_attention() {
     });
 
     tui.sync_from_ui_state();
-    assert_eq!(
-        tui.selected_ref().expect("tui selection").to_string(),
-        node_ref
-    );
+    assert_eq!(tui.selected_ref().expect("tui selection").to_string(), node_ref);
 }
 
 #[test]
@@ -427,11 +368,7 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
             .expect("diagram.get_ast")
     });
     match ast.ast {
-        McpDiagramAst::Sequence {
-            participants,
-            messages,
-            blocks: _,
-        } => {
+        McpDiagramAst::Sequence { participants, messages, blocks: _ } => {
             assert_eq!(participants.len(), 2);
             assert_eq!(messages.len(), 2);
         }
@@ -451,16 +388,8 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
     assert_eq!(message_list.messages.len(), 2);
     let message_1_ref = message_list.messages[0].clone();
     let message_2_ref = message_list.messages[1].clone();
-    let message_1_id = message_1_ref
-        .rsplit('/')
-        .next()
-        .expect("message id segment")
-        .to_owned();
-    let message_2_id = message_2_ref
-        .rsplit('/')
-        .next()
-        .expect("message id segment")
-        .to_owned();
+    let message_1_id = message_1_ref.rsplit('/').next().expect("message id segment").to_owned();
+    let message_2_id = message_2_ref.rsplit('/').next().expect("message id segment").to_owned();
 
     let Json(slice) = runtime.block_on(async {
         server
@@ -474,10 +403,7 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
             .await
             .expect("diagram.get_slice")
     });
-    assert!(
-        slice.objects.contains(&participant_a_ref),
-        "expected slice to include center ref"
-    );
+    assert!(slice.objects.contains(&participant_a_ref), "expected slice to include center ref");
     assert!(!slice.edges.is_empty());
 
     let Json(obj_a) = runtime.block_on(async {
@@ -549,30 +475,16 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
     assert_eq!(highlighted.object_ref, participant_b_ref.clone());
     assert_eq!(highlighted.diagram_id, diagram_id);
 
-    let Json(attention) = runtime.block_on(async {
-        server
-            .attention_agent_read()
-            .await
-            .expect("attention.agent.read")
-    });
-    assert_eq!(
-        attention.object_ref.as_deref(),
-        Some(participant_b_ref.as_str())
-    );
+    let Json(attention) = runtime
+        .block_on(async { server.attention_agent_read().await.expect("attention.agent.read") });
+    assert_eq!(attention.object_ref.as_deref(), Some(participant_b_ref.as_str()));
     assert_eq!(attention.diagram_id.as_deref(), Some(diagram_id));
 
-    let Json(cleared) = runtime.block_on(async {
-        server
-            .attention_agent_clear()
-            .await
-            .expect("attention.agent.clear")
-    });
+    let Json(cleared) = runtime
+        .block_on(async { server.attention_agent_clear().await.expect("attention.agent.clear") });
     assert_eq!(cleared.cleared, 1);
     let Json(attention) = runtime.block_on(async {
-        server
-            .attention_agent_read()
-            .await
-            .expect("attention.agent.read (cleared)")
+        server.attention_agent_read().await.expect("attention.agent.read (cleared)")
     });
     assert_eq!(attention.object_ref, None);
     assert_eq!(attention.diagram_id, None);
@@ -650,10 +562,7 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
             .await
             .expect("seq.search extra")
     });
-    assert_eq!(
-        search.messages,
-        vec![format!("d:{diagram_id}/seq/message/m:0003")]
-    );
+    assert_eq!(search.messages, vec![format!("d:{diagram_id}/seq/message/m:0003")]);
 
     let Json(trace) = runtime.block_on(async {
         server
@@ -684,11 +593,8 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
     assert_eq!(selection.object_refs, vec![new_message_ref.clone()]);
 
     let reloaded = harness.load_session();
-    let selected = reloaded
-        .selected_object_refs()
-        .iter()
-        .map(ToString::to_string)
-        .collect::<Vec<_>>();
+    let selected =
+        reloaded.selected_object_refs().iter().map(ToString::to_string).collect::<Vec<_>>();
     assert_eq!(selected, vec![new_message_ref.clone()]);
 
     runtime.block_on(async {
@@ -699,16 +605,9 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
             .await
             .expect("attention.agent.set");
     });
-    let Json(attention) = runtime.block_on(async {
-        server
-            .attention_agent_read()
-            .await
-            .expect("attention.agent.read")
-    });
-    assert_eq!(
-        attention.object_ref.as_deref(),
-        Some(new_message_ref.as_str())
-    );
+    let Json(attention) = runtime
+        .block_on(async { server.attention_agent_read().await.expect("attention.agent.read") });
+    assert_eq!(attention.object_ref.as_deref(), Some(new_message_ref.as_str()));
     assert_eq!(attention.diagram_id.as_deref(), Some(diagram_id));
 }
 
@@ -748,9 +647,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
 
     let Json(opened) = runtime.block_on(async {
         server
-            .diagram_open(Parameters(DiagramOpenParams {
-                diagram_id: flow_id.to_owned(),
-            }))
+            .diagram_open(Parameters(DiagramOpenParams { diagram_id: flow_id.to_owned() }))
             .await
             .expect("diagram.open")
     });
@@ -773,10 +670,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
             assert!(!edges.is_empty());
             let node_id = &nodes[0].node_id;
             let edge_id = &edges[0].edge_id;
-            (
-                format!("d:{flow_id}/flow/edge/{edge_id}"),
-                format!("d:{flow_id}/flow/node/{node_id}"),
-            )
+            (format!("d:{flow_id}/flow/edge/{edge_id}"), format!("d:{flow_id}/flow/node/{node_id}"))
         }
         other => panic!("expected flow AST, got {other:?}"),
     };
@@ -846,10 +740,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
             .await
             .expect("flow.reachable")
     });
-    assert!(reachable
-        .nodes
-        .iter()
-        .any(|n| n == &format!("d:{flow_id}/flow/node/n:c")));
+    assert!(reachable.nodes.iter().any(|n| n == &format!("d:{flow_id}/flow/node/n:c")));
 
     let Json(paths) = runtime.block_on(async {
         server
@@ -863,11 +754,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
             .await
             .expect("flow.paths")
     });
-    assert_eq!(
-        paths.paths.first().map(|p| p.len()),
-        Some(3),
-        "expected a->b->c path"
-    );
+    assert_eq!(paths.paths.first().map(|p| p.len()), Some(3), "expected a->b->c path");
 
     let Json(unreachable) = runtime.block_on(async {
         server
@@ -878,16 +765,11 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
             .await
             .expect("flow.unreachable")
     });
-    assert!(unreachable
-        .nodes
-        .iter()
-        .any(|n| n == &format!("d:{flow_id}/flow/node/n:d")));
+    assert!(unreachable.nodes.iter().any(|n| n == &format!("d:{flow_id}/flow/node/n:d")));
 
     let Json(cycles) = runtime.block_on(async {
         server
-            .flow_cycles(Parameters(DiagramTargetParams {
-                diagram_id: Some(flow_id.to_owned()),
-            }))
+            .flow_cycles(Parameters(DiagramTargetParams { diagram_id: Some(flow_id.to_owned()) }))
             .await
             .expect("flow.cycles")
     });
@@ -901,10 +783,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
             .await
             .expect("flow.dead_ends")
     });
-    assert!(dead_ends
-        .nodes
-        .iter()
-        .any(|n| n == &format!("d:{flow_id}/flow/node/n:c")));
+    assert!(dead_ends.nodes.iter().any(|n| n == &format!("d:{flow_id}/flow/node/n:c")));
 
     let Json(degrees) = runtime.block_on(async {
         server
@@ -1000,35 +879,20 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
             .expect("attention.agent.set");
     });
     tui.sync_from_ui_state();
-    assert_eq!(
-        tui.selected_ref().expect("tui selection").to_string(),
-        flow_node_d_ref
-    );
+    assert_eq!(tui.selected_ref().expect("tui selection").to_string(), flow_node_d_ref);
 
     tui.press(KeyCode::Tab); // Objects -> XRefs
     tui.press(KeyCode::Char('t')); // jump to xref.to (seq participant a)
-    assert_eq!(
-        tui.selected_ref().expect("tui selection").to_string(),
-        seq_participant_a_ref
-    );
+    assert_eq!(tui.selected_ref().expect("tui selection").to_string(), seq_participant_a_ref);
 
-    let Json(human_attention) = runtime.block_on(async {
-        server
-            .attention_human_read()
-            .await
-            .expect("attention.human.read")
-    });
-    assert_eq!(
-        human_attention.object_ref.as_deref(),
-        Some(seq_participant_a_ref.as_str())
-    );
+    let Json(human_attention) = runtime
+        .block_on(async { server.attention_human_read().await.expect("attention.human.read") });
+    assert_eq!(human_attention.object_ref.as_deref(), Some(seq_participant_a_ref.as_str()));
     assert_eq!(human_attention.diagram_id.as_deref(), Some(seq_id));
 
     let Json(removed) = runtime.block_on(async {
         server
-            .xref_remove(Parameters(XRefRemoveParams {
-                xref_id: xref_2.to_owned(),
-            }))
+            .xref_remove(Parameters(XRefRemoveParams { xref_id: xref_2.to_owned() }))
             .await
             .expect("xref.remove")
     });
@@ -1059,10 +923,9 @@ fn e2e_walkthrough_tools_cover_full_surface() {
 
     let mut session = harness.load_session();
     let walkthrough_id = WalkthroughId::new("w:1".to_owned()).expect("walkthrough id");
-    session.walkthroughs_mut().insert(
-        walkthrough_id.clone(),
-        Walkthrough::new(walkthrough_id.clone(), "Walkthrough"),
-    );
+    session
+        .walkthroughs_mut()
+        .insert(walkthrough_id.clone(), Walkthrough::new(walkthrough_id.clone(), "Walkthrough"));
     harness.save_session(&session);
 
     let server = harness.server();
@@ -1082,16 +945,9 @@ fn e2e_walkthrough_tools_cover_full_surface() {
     });
     assert_eq!(opened.active_walkthrough_id, walkthrough_id.as_str());
 
-    let Json(current) = runtime.block_on(async {
-        server
-            .walkthrough_current()
-            .await
-            .expect("walkthrough.current")
-    });
-    assert_eq!(
-        current.active_walkthrough_id.as_deref(),
-        Some(walkthrough_id.as_str())
-    );
+    let Json(current) = runtime
+        .block_on(async { server.walkthrough_current().await.expect("walkthrough.current") });
+    assert_eq!(current.active_walkthrough_id.as_deref(), Some(walkthrough_id.as_str()));
 
     let Json(read) = runtime.block_on(async {
         server
@@ -1120,9 +976,7 @@ fn e2e_walkthrough_tools_cover_full_surface() {
                 walkthrough_id: walkthrough_id.as_str().to_owned(),
                 base_rev: 0,
                 ops: vec![
-                    McpWalkthroughOp::SetTitle {
-                        title: "Updated".to_owned(),
-                    },
+                    McpWalkthroughOp::SetTitle { title: "Updated".to_owned() },
                     McpWalkthroughOp::AddNode {
                         node_id: "n:1".to_owned(),
                         title: "Step 1".to_owned(),
@@ -1199,10 +1053,7 @@ fn e2e_walkthrough_tools_cover_full_surface() {
     assert_eq!(digest.digest.rev, 1);
 
     let reloaded = harness.load_session();
-    let wt = reloaded
-        .walkthroughs()
-        .get(&walkthrough_id)
-        .expect("walkthrough after reload");
+    let wt = reloaded.walkthroughs().get(&walkthrough_id).expect("walkthrough after reload");
     assert_eq!(wt.title(), "Updated");
     assert_eq!(wt.rev(), 1);
     assert_eq!(wt.nodes().len(), 2);

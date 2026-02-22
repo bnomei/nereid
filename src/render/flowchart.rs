@@ -142,14 +142,8 @@ impl FlowchartRenderPlan {
                 });
             }
 
-            fallback = Some((
-                layer_metrics,
-                gap_widths,
-                node_renders,
-                edge_gap_lanes,
-                width,
-                height,
-            ));
+            fallback =
+                Some((layer_metrics, gap_widths, node_renders, edge_gap_lanes, width, height));
             attempt_min_col_gap = attempt_min_col_gap.saturating_add(1);
         }
 
@@ -173,19 +167,15 @@ impl FlowchartRenderPlan {
         let mut canvas = Canvas::new(self.width, self.height)?;
 
         for (node_id, render) in &self.node_renders {
-            let node =
-                ast.nodes()
-                    .get(node_id)
-                    .ok_or_else(|| FlowchartRenderError::MissingNode {
-                        node_id: node_id.clone(),
-                    })?;
+            let node = ast
+                .nodes()
+                .get(node_id)
+                .ok_or_else(|| FlowchartRenderError::MissingNode { node_id: node_id.clone() })?;
 
-            let layer =
-                self.layer_metrics
-                    .get(render.layer)
-                    .ok_or(FlowchartRenderError::InvalidLayer {
-                        layer: render.layer,
-                    })?;
+            let layer = self
+                .layer_metrics
+                .get(render.layer)
+                .ok_or(FlowchartRenderError::InvalidLayer { layer: render.layer })?;
 
             canvas.draw_box(render.box_x0, render.box_y0, render.box_x1, render.box_y1)?;
 
@@ -211,20 +201,15 @@ impl FlowchartRenderPlan {
         // segments "bridge" across unrelated vertical segments by leaving gaps at crossings.
         for pass in [ConnectorDrawPass::Vertical, ConnectorDrawPass::Horizontal] {
             for (idx, (_edge_id, edge)) in ast.edges().iter().enumerate() {
-                let from = self
-                    .node_renders
-                    .get(edge.from_node_id())
-                    .copied()
-                    .ok_or_else(|| FlowchartRenderError::MissingPlacement {
-                        node_id: edge.from_node_id().clone(),
+                let from =
+                    self.node_renders.get(edge.from_node_id()).copied().ok_or_else(|| {
+                        FlowchartRenderError::MissingPlacement {
+                            node_id: edge.from_node_id().clone(),
+                        }
                     })?;
-                let to = self
-                    .node_renders
-                    .get(edge.to_node_id())
-                    .copied()
-                    .ok_or_else(|| FlowchartRenderError::MissingPlacement {
-                        node_id: edge.to_node_id().clone(),
-                    })?;
+                let to = self.node_renders.get(edge.to_node_id()).copied().ok_or_else(|| {
+                    FlowchartRenderError::MissingPlacement { node_id: edge.to_node_id().clone() }
+                })?;
 
                 if let Some(route) = self.routes.get(idx) {
                     draw_routed_connector(
@@ -263,24 +248,17 @@ impl FlowchartRenderPlan {
         let mut highlight_index = HighlightIndex::new();
 
         for (node_id, render) in &self.node_renders {
-            let node =
-                ast.nodes()
-                    .get(node_id)
-                    .ok_or_else(|| FlowchartRenderError::MissingNode {
-                        node_id: node_id.clone(),
-                    })?;
-            let layer =
-                self.layer_metrics
-                    .get(render.layer)
-                    .ok_or(FlowchartRenderError::InvalidLayer {
-                        layer: render.layer,
-                    })?;
+            let node = ast
+                .nodes()
+                .get(node_id)
+                .ok_or_else(|| FlowchartRenderError::MissingNode { node_id: node_id.clone() })?;
+            let layer = self
+                .layer_metrics
+                .get(render.layer)
+                .ok_or(FlowchartRenderError::InvalidLayer { layer: render.layer })?;
 
-            let object_ref = ObjectRef::new(
-                diagram_id.clone(),
-                flow_node_category.clone(),
-                node_id.clone(),
-            );
+            let object_ref =
+                ObjectRef::new(diagram_id.clone(), flow_node_category.clone(), node_id.clone());
 
             let mut spans = Vec::<LineSpan>::new();
             for y in render.box_y0..=render.box_y1 {
@@ -325,20 +303,12 @@ impl FlowchartRenderPlan {
         );
 
         for (idx, (edge_id, edge)) in ast.edges().iter().enumerate() {
-            let from = self
-                .node_renders
-                .get(edge.from_node_id())
-                .copied()
-                .ok_or_else(|| FlowchartRenderError::MissingPlacement {
-                    node_id: edge.from_node_id().clone(),
-                })?;
-            let to = self
-                .node_renders
-                .get(edge.to_node_id())
-                .copied()
-                .ok_or_else(|| FlowchartRenderError::MissingPlacement {
-                    node_id: edge.to_node_id().clone(),
-                })?;
+            let from = self.node_renders.get(edge.from_node_id()).copied().ok_or_else(|| {
+                FlowchartRenderError::MissingPlacement { node_id: edge.from_node_id().clone() }
+            })?;
+            let to = self.node_renders.get(edge.to_node_id()).copied().ok_or_else(|| {
+                FlowchartRenderError::MissingPlacement { node_id: edge.to_node_id().clone() }
+            })?;
 
             let mut spans = match self.routes.get(idx) {
                 Some(route) => routed_connector_spans_bridged(
@@ -359,11 +329,8 @@ impl FlowchartRenderPlan {
             spans.sort();
             spans.dedup();
 
-            let object_ref = ObjectRef::new(
-                diagram_id.clone(),
-                flow_edge_category.clone(),
-                edge_id.clone(),
-            );
+            let object_ref =
+                ObjectRef::new(diagram_id.clone(), flow_edge_category.clone(), edge_id.clone());
             highlight_index.insert(object_ref, spans);
         }
 
@@ -448,10 +415,7 @@ pub fn render_flowchart_unicode_annotated_with_options(
     let mut highlight_index = plan.render_highlight_index(diagram_id, ast)?;
 
     clamp_highlight_index_to_text(&mut highlight_index, &text);
-    Ok(AnnotatedRender {
-        text,
-        highlight_index,
-    })
+    Ok(AnnotatedRender { text, highlight_index })
 }
 
 // Extracted flowchart rendering internals and routing helpers.

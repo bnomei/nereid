@@ -59,16 +59,13 @@ fn apply_seq_update_participant_preserves_role() {
     let mut ast = SequenceAst::default();
     let mut participant = SequenceParticipant::new("Alice");
     participant.set_role(Some("actor"));
-    ast.participants_mut()
-        .insert(participant_id.clone(), participant);
+    ast.participants_mut().insert(participant_id.clone(), participant);
 
     let mut diagram = crate::model::Diagram::new(diagram_id, "seq", DiagramAst::Sequence(ast));
 
     let ops = [Op::Seq(SeqOp::UpdateParticipant {
         participant_id: participant_id.clone(),
-        patch: SeqParticipantPatch {
-            mermaid_name: Some("Alice2".to_owned()),
-        },
+        patch: SeqParticipantPatch { mermaid_name: Some("Alice2".to_owned()) },
     })];
 
     apply_ops(&mut diagram, 0, &ops).expect("apply");
@@ -76,10 +73,7 @@ fn apply_seq_update_participant_preserves_role() {
     let DiagramAst::Sequence(ast) = diagram.ast() else {
         panic!("expected sequence ast");
     };
-    let participant = ast
-        .participants()
-        .get(&participant_id)
-        .expect("participant");
+    let participant = ast.participants().get(&participant_id).expect("participant");
     assert_eq!(participant.mermaid_name(), "Alice2");
     assert_eq!(participant.role(), Some("actor"));
 }
@@ -125,10 +119,7 @@ fn apply_seq_set_participant_note_sets_note_and_records_delta_updated() {
     let DiagramAst::Sequence(ast) = diagram.ast() else {
         panic!("expected sequence ast");
     };
-    let participant = ast
-        .participants()
-        .get(&participant_id)
-        .expect("participant exists");
+    let participant = ast.participants().get(&participant_id).expect("participant exists");
     assert_eq!(participant.note(), Some("invariant"));
 }
 
@@ -346,16 +337,8 @@ fn apply_flow_op_adds_node_edge_and_bumps_rev() {
     let e1 = ObjectId::new("e:1").expect("edge id");
 
     let ops = [
-        Op::Flow(FlowOp::AddNode {
-            node_id: n1.clone(),
-            label: "Start".to_owned(),
-            shape: None,
-        }),
-        Op::Flow(FlowOp::AddNode {
-            node_id: n2.clone(),
-            label: "End".to_owned(),
-            shape: None,
-        }),
+        Op::Flow(FlowOp::AddNode { node_id: n1.clone(), label: "Start".to_owned(), shape: None }),
+        Op::Flow(FlowOp::AddNode { node_id: n2.clone(), label: "End".to_owned(), shape: None }),
         Op::Flow(FlowOp::AddEdge {
             edge_id: e1.clone(),
             from_node_id: n1.clone(),
@@ -392,16 +375,8 @@ fn apply_flow_remove_node_records_cascading_edge_removal_in_delta() {
     let e1 = ObjectId::new("e:1").expect("edge id");
 
     let setup_ops = [
-        Op::Flow(FlowOp::AddNode {
-            node_id: n1.clone(),
-            label: "Start".to_owned(),
-            shape: None,
-        }),
-        Op::Flow(FlowOp::AddNode {
-            node_id: n2.clone(),
-            label: "End".to_owned(),
-            shape: None,
-        }),
+        Op::Flow(FlowOp::AddNode { node_id: n1.clone(), label: "Start".to_owned(), shape: None }),
+        Op::Flow(FlowOp::AddNode { node_id: n2.clone(), label: "End".to_owned(), shape: None }),
         Op::Flow(FlowOp::AddEdge {
             edge_id: e1.clone(),
             from_node_id: n1.clone(),
@@ -413,14 +388,9 @@ fn apply_flow_remove_node_records_cascading_edge_removal_in_delta() {
     ];
     apply_ops(&mut diagram, 0, &setup_ops).expect("setup apply");
 
-    let result = apply_ops(
-        &mut diagram,
-        1,
-        &[Op::Flow(FlowOp::RemoveNode {
-            node_id: n1.clone(),
-        })],
-    )
-    .expect("apply");
+    let result =
+        apply_ops(&mut diagram, 1, &[Op::Flow(FlowOp::RemoveNode { node_id: n1.clone() })])
+            .expect("apply");
 
     assert_eq!(result.new_rev, 2);
     assert_eq!(result.delta.removed.len(), 2);
@@ -468,17 +438,11 @@ fn apply_flow_update_node_patch_preserves_unrelated_fields() {
         }),
         Op::Flow(FlowOp::UpdateNode {
             node_id: node_id.clone(),
-            patch: FlowNodePatch {
-                label: Some("Begin".to_owned()),
-                ..Default::default()
-            },
+            patch: FlowNodePatch { label: Some("Begin".to_owned()), ..Default::default() },
         }),
         Op::Flow(FlowOp::UpdateNode {
             node_id: node_id.clone(),
-            patch: FlowNodePatch {
-                shape: Some("circle".to_owned()),
-                ..Default::default()
-            },
+            patch: FlowNodePatch { shape: Some("circle".to_owned()), ..Default::default() },
         }),
     ];
 
@@ -563,17 +527,11 @@ fn apply_flow_set_node_mermaid_id_rejects_invalid_identifiers() {
     let err = apply_ops(
         &mut diagram,
         1,
-        &[Op::Flow(FlowOp::SetNodeMermaidId {
-            node_id,
-            mermaid_id: Some("bad-id".to_owned()),
-        })],
+        &[Op::Flow(FlowOp::SetNodeMermaidId { node_id, mermaid_id: Some("bad-id".to_owned()) })],
     )
     .unwrap_err();
 
-    assert!(matches!(
-        err,
-        super::ApplyError::InvalidFlowNodeMermaidId { .. }
-    ));
+    assert!(matches!(err, super::ApplyError::InvalidFlowNodeMermaidId { .. }));
 }
 
 #[test]
@@ -608,17 +566,11 @@ fn apply_flow_set_node_mermaid_id_rejects_duplicates() {
     let err = apply_ops(
         &mut diagram,
         1,
-        &[Op::Flow(FlowOp::SetNodeMermaidId {
-            node_id: node_a,
-            mermaid_id: Some("b".to_owned()),
-        })],
+        &[Op::Flow(FlowOp::SetNodeMermaidId { node_id: node_a, mermaid_id: Some("b".to_owned()) })],
     )
     .unwrap_err();
 
-    assert!(matches!(
-        err,
-        super::ApplyError::DuplicateFlowNodeMermaidId { .. }
-    ));
+    assert!(matches!(err, super::ApplyError::DuplicateFlowNodeMermaidId { .. }));
 }
 
 #[test]
@@ -655,10 +607,7 @@ fn apply_flow_set_node_note_clears_note_and_records_delta_updated() {
     let result = apply_ops(
         &mut diagram,
         2,
-        &[Op::Flow(FlowOp::SetNodeNote {
-            node_id: node_id.clone(),
-            note: None,
-        })],
+        &[Op::Flow(FlowOp::SetNodeNote { node_id: node_id.clone(), note: None })],
     )
     .expect("apply clear");
 
@@ -692,21 +641,9 @@ fn apply_flow_edge_label_style_updates_and_are_preserved_on_endpoint_changes() {
     let e1 = ObjectId::new("e:1").expect("edge id");
 
     let ops = [
-        Op::Flow(FlowOp::AddNode {
-            node_id: n1.clone(),
-            label: "One".to_owned(),
-            shape: None,
-        }),
-        Op::Flow(FlowOp::AddNode {
-            node_id: n2.clone(),
-            label: "Two".to_owned(),
-            shape: None,
-        }),
-        Op::Flow(FlowOp::AddNode {
-            node_id: n3.clone(),
-            label: "Three".to_owned(),
-            shape: None,
-        }),
+        Op::Flow(FlowOp::AddNode { node_id: n1.clone(), label: "One".to_owned(), shape: None }),
+        Op::Flow(FlowOp::AddNode { node_id: n2.clone(), label: "Two".to_owned(), shape: None }),
+        Op::Flow(FlowOp::AddNode { node_id: n3.clone(), label: "Three".to_owned(), shape: None }),
         Op::Flow(FlowOp::AddEdge {
             edge_id: e1.clone(),
             from_node_id: n1.clone(),
@@ -783,9 +720,7 @@ fn apply_seq_remove_participant_records_cascading_message_removal_in_delta() {
     let result = apply_ops(
         &mut diagram,
         1,
-        &[Op::Seq(SeqOp::RemoveParticipant {
-            participant_id: alice.clone(),
-        })],
+        &[Op::Seq(SeqOp::RemoveParticipant { participant_id: alice.clone() })],
     )
     .expect("apply");
 

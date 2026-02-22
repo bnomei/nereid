@@ -322,13 +322,9 @@ fn parse_link_style_statement(
                 line: trimmed.to_owned(),
             });
         }
-        let index: usize =
-            value
-                .parse()
-                .map_err(|_| MermaidFlowchartParseError::UnsupportedSyntax {
-                    line_no,
-                    line: trimmed.to_owned(),
-                })?;
+        let index: usize = value.parse().map_err(|_| {
+            MermaidFlowchartParseError::UnsupportedSyntax { line_no, line: trimmed.to_owned() }
+        })?;
         indices.push(index);
     }
 
@@ -409,17 +405,9 @@ fn parse_node_spec(token: &str, line_no: usize) -> Result<NodeSpec, MermaidFlowc
 
     let Some((open_idx, open_ch)) = open_delim else {
         validate_mermaid_ident(trimmed).map_err(|reason| {
-            MermaidFlowchartParseError::InvalidNodeId {
-                line_no,
-                name: trimmed.to_owned(),
-                reason,
-            }
+            MermaidFlowchartParseError::InvalidNodeId { line_no, name: trimmed.to_owned(), reason }
         })?;
-        return Ok(NodeSpec {
-            mermaid_id: trimmed.to_owned(),
-            label: None,
-            shape: None,
-        });
+        return Ok(NodeSpec { mermaid_id: trimmed.to_owned(), label: None, shape: None });
     };
 
     let (close_ch, shape) = match open_ch {
@@ -470,25 +458,15 @@ fn ensure_node(
     spec: NodeSpec,
     line_no: usize,
 ) -> Result<ObjectId, MermaidFlowchartParseError> {
-    let NodeSpec {
-        mermaid_id,
-        label,
-        shape,
-    } = spec;
+    let NodeSpec { mermaid_id, label, shape } = spec;
 
     let node_id = node_id_from_mermaid_id(&mermaid_id).map_err(|reason| {
-        MermaidFlowchartParseError::InvalidNodeId {
-            line_no,
-            name: mermaid_id.clone(),
-            reason,
-        }
+        MermaidFlowchartParseError::InvalidNodeId { line_no, name: mermaid_id.clone(), reason }
     })?;
 
     let desired_label = label.as_deref().unwrap_or(&mermaid_id).to_owned();
-    let desired_shape = shape
-        .as_ref()
-        .map(|shape| shape.model_shape())
-        .unwrap_or(NodeShape::Rect.model_shape());
+    let desired_shape =
+        shape.as_ref().map(|shape| shape.model_shape()).unwrap_or(NodeShape::Rect.model_shape());
 
     let Some(existing) = ast.nodes().get(&node_id) else {
         ast.nodes_mut().insert(
@@ -542,10 +520,8 @@ fn ensure_node(
         || new_shape != existing_shape
         || existing_mermaid_id != new_mermaid_id
     {
-        ast.nodes_mut().insert(
-            node_id.clone(),
-            FlowNode::new_with(new_label, new_shape, new_mermaid_id),
-        );
+        ast.nodes_mut()
+            .insert(node_id.clone(), FlowNode::new_with(new_label, new_shape, new_mermaid_id));
     }
 
     Ok(node_id)
@@ -757,8 +733,7 @@ pub fn parse_flowchart(input: &str) -> Result<FlowchartAst, MermaidFlowchartPars
 }
 
 fn mermaid_id_for_node<'a>(node_id: &'a ObjectId, node: &'a FlowNode) -> Option<&'a str> {
-    node.mermaid_id()
-        .or_else(|| node_id.as_str().strip_prefix("n:"))
+    node.mermaid_id().or_else(|| node_id.as_str().strip_prefix("n:"))
 }
 
 fn validate_export_node_label(label: &str, closing: char) -> bool {
@@ -796,15 +771,10 @@ pub fn export_flowchart(ast: &FlowchartAst) -> Result<String, MermaidFlowchartEx
 
     for (node_id, node) in ast.nodes() {
         let Some(mermaid_id) = mermaid_id_for_node(node_id, node) else {
-            return Err(MermaidFlowchartExportError::InvalidNodeId {
-                node_id: node_id.clone(),
-            });
+            return Err(MermaidFlowchartExportError::InvalidNodeId { node_id: node_id.clone() });
         };
-        validate_mermaid_ident(mermaid_id).map_err(|_| {
-            MermaidFlowchartExportError::InvalidNodeId {
-                node_id: node_id.clone(),
-            }
-        })?;
+        validate_mermaid_ident(mermaid_id)
+            .map_err(|_| MermaidFlowchartExportError::InvalidNodeId { node_id: node_id.clone() })?;
 
         let shape = NodeShape::from_model_shape(node.shape()).ok_or_else(|| {
             MermaidFlowchartExportError::InvalidNodeShape {
@@ -855,12 +825,7 @@ pub fn export_flowchart(ast: &FlowchartAst) -> Result<String, MermaidFlowchartEx
             .from_node_id()
             .as_str()
             .cmp(edge_b.from_node_id().as_str())
-            .then_with(|| {
-                edge_a
-                    .to_node_id()
-                    .as_str()
-                    .cmp(edge_b.to_node_id().as_str())
-            })
+            .then_with(|| edge_a.to_node_id().as_str().cmp(edge_b.to_node_id().as_str()))
             .then_with(|| edge_id_a.as_str().cmp(edge_id_b.as_str()))
     });
 
@@ -870,44 +835,29 @@ pub fn export_flowchart(ast: &FlowchartAst) -> Result<String, MermaidFlowchartEx
         let to_node_id = edge.to_node_id();
 
         if !ast.nodes().contains_key(from_node_id) {
-            return Err(MermaidFlowchartExportError::MissingNode {
-                node_id: from_node_id.clone(),
-            });
+            return Err(MermaidFlowchartExportError::MissingNode { node_id: from_node_id.clone() });
         }
         if !ast.nodes().contains_key(to_node_id) {
-            return Err(MermaidFlowchartExportError::MissingNode {
-                node_id: to_node_id.clone(),
-            });
+            return Err(MermaidFlowchartExportError::MissingNode { node_id: to_node_id.clone() });
         }
 
         let from_node = ast.nodes().get(from_node_id).ok_or_else(|| {
-            MermaidFlowchartExportError::MissingNode {
-                node_id: from_node_id.clone(),
-            }
+            MermaidFlowchartExportError::MissingNode { node_id: from_node_id.clone() }
         })?;
         let to_node = ast.nodes().get(to_node_id).ok_or_else(|| {
-            MermaidFlowchartExportError::MissingNode {
-                node_id: to_node_id.clone(),
-            }
+            MermaidFlowchartExportError::MissingNode { node_id: to_node_id.clone() }
         })?;
 
         let from = mermaid_id_for_node(from_node_id, from_node).ok_or_else(|| {
-            MermaidFlowchartExportError::InvalidNodeId {
-                node_id: from_node_id.clone(),
-            }
+            MermaidFlowchartExportError::InvalidNodeId { node_id: from_node_id.clone() }
         })?;
         let to = mermaid_id_for_node(to_node_id, to_node).ok_or_else(|| {
-            MermaidFlowchartExportError::InvalidNodeId {
-                node_id: to_node_id.clone(),
-            }
+            MermaidFlowchartExportError::InvalidNodeId { node_id: to_node_id.clone() }
         })?;
 
         out.push_str(from);
         out.push(' ');
-        let op = edge
-            .connector()
-            .filter(|op| validate_export_edge_operator(op))
-            .unwrap_or("-->");
+        let op = edge.connector().filter(|op| validate_export_edge_operator(op)).unwrap_or("-->");
         out.push_str(op);
         if let Some(label) = edge.label() {
             if !validate_export_edge_label(label) {
@@ -961,27 +911,15 @@ mod tests {
             .iter()
             .map(|(node_id, node)| {
                 let mermaid_id = node_id.as_str().strip_prefix("n:").expect("node id prefix");
-                (
-                    mermaid_id.to_owned(),
-                    (node.label().to_owned(), node.shape().to_owned()),
-                )
+                (mermaid_id.to_owned(), (node.label().to_owned(), node.shape().to_owned()))
             })
             .collect::<BTreeMap<_, _>>();
 
         let mut edges = BTreeMap::<(String, String, Option<String>), usize>::new();
         for edge in ast.edges().values() {
-            let from = edge
-                .from_node_id()
-                .as_str()
-                .strip_prefix("n:")
-                .expect("from prefix")
-                .to_owned();
-            let to = edge
-                .to_node_id()
-                .as_str()
-                .strip_prefix("n:")
-                .expect("to prefix")
-                .to_owned();
+            let from =
+                edge.from_node_id().as_str().strip_prefix("n:").expect("from prefix").to_owned();
+            let to = edge.to_node_id().as_str().strip_prefix("n:").expect("to prefix").to_owned();
             let label = edge.label().map(str::to_owned);
             *edges.entry((from, to, label)).or_insert(0) += 1;
         }
@@ -992,18 +930,9 @@ mod tests {
     fn connector_view(ast: &FlowchartAst) -> BTreeMap<(String, String), Option<String>> {
         let mut connectors = BTreeMap::<(String, String), Option<String>>::new();
         for edge in ast.edges().values() {
-            let from = edge
-                .from_node_id()
-                .as_str()
-                .strip_prefix("n:")
-                .expect("from prefix")
-                .to_owned();
-            let to = edge
-                .to_node_id()
-                .as_str()
-                .strip_prefix("n:")
-                .expect("to prefix")
-                .to_owned();
+            let from =
+                edge.from_node_id().as_str().strip_prefix("n:").expect("from prefix").to_owned();
+            let to = edge.to_node_id().as_str().strip_prefix("n:").expect("to prefix").to_owned();
             connectors.insert((from, to), edge.connector().map(ToOwned::to_owned));
         }
         connectors
@@ -1033,9 +962,7 @@ mod tests {
         );
         assert_eq!(
             edges,
-            [((String::from("A"), String::from("B"), None), 1)]
-                .into_iter()
-                .collect()
+            [((String::from("A"), String::from("B"), None), 1)].into_iter().collect()
         );
     }
 
@@ -1060,9 +987,7 @@ mod tests {
         );
         assert_eq!(
             edges,
-            [((String::from("A"), String::from("B"), None), 1)]
-                .into_iter()
-                .collect()
+            [((String::from("A"), String::from("B"), None), 1)].into_iter().collect()
         );
     }
 
@@ -1070,23 +995,14 @@ mod tests {
     fn rejects_conflicting_node_labels() {
         let input = "flowchart\nA[Start]\nA[Begin]\n";
         let err = parse_flowchart(input).unwrap_err();
-        assert!(matches!(
-            err,
-            MermaidFlowchartParseError::ConflictingNodeLabel { .. }
-        ));
+        assert!(matches!(err, MermaidFlowchartParseError::ConflictingNodeLabel { .. }));
     }
 
     #[test]
     fn parse_populates_node_mermaid_ids() {
         let ast = parse_flowchart("flowchart\nA[Start]\nA --> B\n").expect("parse");
-        let node_a = ast
-            .nodes()
-            .get(&ObjectId::new("n:A").expect("node id"))
-            .expect("node A");
-        let node_b = ast
-            .nodes()
-            .get(&ObjectId::new("n:B").expect("node id"))
-            .expect("node B");
+        let node_a = ast.nodes().get(&ObjectId::new("n:A").expect("node id")).expect("node A");
+        let node_b = ast.nodes().get(&ObjectId::new("n:B").expect("node id")).expect("node B");
         assert_eq!(node_a.mermaid_id(), Some("A"));
         assert_eq!(node_b.mermaid_id(), Some("B"));
     }
@@ -1130,16 +1046,9 @@ mod tests {
         );
         assert_eq!(
             edges,
-            [(
-                (
-                    String::from("A"),
-                    String::from("B"),
-                    Some(String::from("maybe"))
-                ),
-                1
-            )]
-            .into_iter()
-            .collect()
+            [((String::from("A"), String::from("B"), Some(String::from("maybe"))), 1)]
+                .into_iter()
+                .collect()
         );
     }
 
@@ -1198,10 +1107,7 @@ mod tests {
             .values()
             .filter_map(|edge| edge.style().map(ToOwned::to_owned))
             .collect::<Vec<_>>();
-        assert_eq!(
-            styles,
-            vec!["stroke:#ff3,stroke-width:4px,color:red;".to_owned()]
-        );
+        assert_eq!(styles, vec!["stroke:#ff3,stroke-width:4px,color:red;".to_owned()]);
 
         let out = export_flowchart(&ast1).expect("export");
         let ast2 = parse_flowchart(&out).expect("parse 2");
@@ -1231,26 +1137,11 @@ mod tests {
             connector_view(&ast1),
             [
                 ((String::from("A"), String::from("B")), None),
-                (
-                    (String::from("B"), String::from("C")),
-                    Some(String::from("-.->"))
-                ),
-                (
-                    (String::from("C"), String::from("D")),
-                    Some(String::from("==>"))
-                ),
-                (
-                    (String::from("D"), String::from("E")),
-                    Some(String::from("---"))
-                ),
-                (
-                    (String::from("E"), String::from("F")),
-                    Some(String::from("---o"))
-                ),
-                (
-                    (String::from("F"), String::from("G")),
-                    Some(String::from("---x"))
-                ),
+                ((String::from("B"), String::from("C")), Some(String::from("-.->"))),
+                ((String::from("C"), String::from("D")), Some(String::from("==>"))),
+                ((String::from("D"), String::from("E")), Some(String::from("---"))),
+                ((String::from("E"), String::from("F")), Some(String::from("---o"))),
+                ((String::from("F"), String::from("G")), Some(String::from("---x"))),
             ]
             .into_iter()
             .collect()
@@ -1273,11 +1164,9 @@ mod tests {
         let mut end = FlowNode::new("Finish");
         end.set_mermaid_id(Some("done"));
 
-        ast.nodes_mut()
-            .insert(stable_authorize_id.clone(), authorize);
+        ast.nodes_mut().insert(stable_authorize_id.clone(), authorize);
         ast.nodes_mut().insert(stable_end_id.clone(), end);
-        ast.edges_mut()
-            .insert(edge_id, FlowEdge::new(stable_authorize_id, stable_end_id));
+        ast.edges_mut().insert(edge_id, FlowEdge::new(stable_authorize_id, stable_end_id));
 
         let out = export_flowchart(&ast).expect("export");
         assert!(out.contains("authz[Authorize]"));

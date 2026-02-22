@@ -30,10 +30,7 @@ pub struct TempDir {
 impl TempDir {
     pub fn new(prefix: &str) -> Self {
         let pid = std::process::id();
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
         let counter = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
 
         let mut path = std::env::temp_dir();
@@ -74,26 +71,14 @@ fn category_path_2(a: &'static str, b: &'static str) -> CategoryPath {
 pub fn checksum_flowchart(ast: &FlowchartAst) -> u64 {
     let mut acc = 0u64;
     for (node_id, node) in ast.nodes() {
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(node_id.as_str().len() as u64);
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(node.label().len() as u64);
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(node.shape().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(node_id.as_str().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(node.label().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(node.shape().len() as u64);
     }
     for (edge_id, edge) in ast.edges() {
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(edge_id.as_str().len() as u64);
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(edge.from_node_id().as_str().len() as u64);
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(edge.to_node_id().as_str().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(edge_id.as_str().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(edge.from_node_id().as_str().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(edge.to_node_id().as_str().len() as u64);
         if let Some(label) = edge.label() {
             acc = acc.wrapping_mul(131).wrapping_add(label.len() as u64);
         }
@@ -107,38 +92,22 @@ pub fn checksum_flowchart(ast: &FlowchartAst) -> u64 {
 pub fn checksum_sequence(ast: &SequenceAst) -> u64 {
     let mut acc = 0u64;
     for (participant_id, participant) in ast.participants() {
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(participant_id.as_str().len() as u64);
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(participant.mermaid_name().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(participant_id.as_str().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(participant.mermaid_name().len() as u64);
         if let Some(role) = participant.role() {
             acc = acc.wrapping_mul(131).wrapping_add(role.len() as u64);
         }
     }
     for msg in ast.messages() {
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(msg.message_id().as_str().len() as u64);
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(msg.from_participant_id().as_str().len() as u64);
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(msg.to_participant_id().as_str().len() as u64);
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add((msg.kind() as u8) as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(msg.message_id().as_str().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(msg.from_participant_id().as_str().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(msg.to_participant_id().as_str().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add((msg.kind() as u8) as u64);
         acc = acc.wrapping_mul(131).wrapping_add(msg.text().len() as u64);
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(msg.order_key().unsigned_abs());
+        acc = acc.wrapping_mul(131).wrapping_add(msg.order_key().unsigned_abs());
     }
     for note in ast.notes() {
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(note.note_id().as_str().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(note.note_id().as_str().len() as u64);
         acc = acc.wrapping_mul(131).wrapping_add(note.text().len() as u64);
     }
     acc
@@ -146,17 +115,11 @@ pub fn checksum_sequence(ast: &SequenceAst) -> u64 {
 
 pub fn checksum_session(session: &Session) -> u64 {
     let mut acc = 0u64;
-    acc = acc
-        .wrapping_mul(131)
-        .wrapping_add(session.session_id().as_str().len() as u64);
+    acc = acc.wrapping_mul(131).wrapping_add(session.session_id().as_str().len() as u64);
 
     for (diagram_id, diagram) in session.diagrams() {
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(diagram_id.as_str().len() as u64);
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(diagram.name().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(diagram_id.as_str().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(diagram.name().len() as u64);
         acc = acc.wrapping_mul(131).wrapping_add(diagram.rev());
         acc = match diagram.ast() {
             DiagramAst::Flowchart(ast) => {
@@ -167,35 +130,19 @@ pub fn checksum_session(session: &Session) -> u64 {
     }
 
     for (walkthrough_id, walkthrough) in session.walkthroughs() {
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(walkthrough_id.as_str().len() as u64);
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(walkthrough.title().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(walkthrough_id.as_str().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(walkthrough.title().len() as u64);
         acc = acc.wrapping_mul(131).wrapping_add(walkthrough.rev());
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(walkthrough.nodes().len() as u64);
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(walkthrough.edges().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(walkthrough.nodes().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(walkthrough.edges().len() as u64);
     }
 
     for (xref_id, xref) in session.xrefs() {
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(xref_id.as_str().len() as u64);
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(xref.from().to_string().len() as u64);
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(xref.to().to_string().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(xref_id.as_str().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(xref.from().to_string().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(xref.to().to_string().len() as u64);
         acc = acc.wrapping_mul(131).wrapping_add(xref.kind().len() as u64);
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add((xref.status() as u8) as u64);
+        acc = acc.wrapping_mul(131).wrapping_add((xref.status() as u8) as u64);
         if let Some(label) = xref.label() {
             acc = acc.wrapping_mul(131).wrapping_add(label.len() as u64);
         }
@@ -224,13 +171,7 @@ pub mod flow {
             cross_edges_per_node: usize,
             label_len: usize,
         ) -> Self {
-            Self {
-                layers,
-                nodes_per_layer,
-                fanout,
-                cross_edges_per_node,
-                label_len,
-            }
+            Self { layers, nodes_per_layer, fanout, cross_edges_per_node, label_len }
         }
     }
 
@@ -306,8 +247,7 @@ pub mod flow {
                 for k in 0..fanout {
                     let to_idx = (idx + k) % params.nodes_per_layer;
                     let to = node_ids[layer + 1][to_idx].clone();
-                    ast.edges_mut()
-                        .insert(edge_id(next_edge), FlowEdge::new(from.clone(), to));
+                    ast.edges_mut().insert(edge_id(next_edge), FlowEdge::new(from.clone(), to));
                     next_edge += 1;
                 }
 
@@ -319,8 +259,7 @@ pub mod flow {
                     let target_layer = layer + 2 + (k % max_target_layers);
                     let to_idx = (idx + 1 + k.saturating_mul(3)) % params.nodes_per_layer;
                     let to = node_ids[target_layer][to_idx].clone();
-                    ast.edges_mut()
-                        .insert(edge_id(next_edge), FlowEdge::new(from.clone(), to));
+                    ast.edges_mut().insert(edge_id(next_edge), FlowEdge::new(from.clone(), to));
                     next_edge += 1;
                 }
             }
@@ -346,11 +285,7 @@ pub mod seq {
 
     impl Params {
         pub const fn new(participants: usize, messages: usize, long_text: bool) -> Self {
-            Self {
-                participants,
-                messages,
-                long_text,
-            }
+            Self { participants, messages, long_text }
         }
     }
 
@@ -412,8 +347,7 @@ pub mod seq {
         for idx in 0..params.participants {
             let name = participant_name(idx);
             let id = participant_id(&name);
-            ast.participants_mut()
-                .insert(id.clone(), SequenceParticipant::new(name));
+            ast.participants_mut().insert(id.clone(), SequenceParticipant::new(name));
             participant_ids.push(id);
         }
 
@@ -467,14 +401,7 @@ pub mod session {
             include_walkthroughs: bool,
             include_xrefs: bool,
         ) -> Self {
-            Self {
-                flow_diagrams,
-                seq_diagrams,
-                flow,
-                seq,
-                include_walkthroughs,
-                include_xrefs,
-            }
+            Self { flow_diagrams, seq_diagrams, flow, seq, include_walkthroughs, include_xrefs }
         }
     }
 
@@ -552,11 +479,7 @@ pub mod session {
 
     fn first_flow_node_ref(diagram_id: &DiagramId, ast: &FlowchartAst) -> Option<ObjectRef> {
         let node_id = ast.nodes().keys().next()?.clone();
-        Some(ObjectRef::new(
-            diagram_id.clone(),
-            category_path_2("flow", "node"),
-            node_id,
-        ))
+        Some(ObjectRef::new(diagram_id.clone(), category_path_2("flow", "node"), node_id))
     }
 
     fn first_seq_participant_ref(diagram_id: &DiagramId, ast: &SequenceAst) -> Option<ObjectRef> {
@@ -576,11 +499,8 @@ pub mod session {
         for idx in 0..params.flow_diagrams {
             let id = diagram_id("flow", idx);
             let ast = flow::dag(params.flow);
-            let diagram = Diagram::new(
-                id.clone(),
-                format!("Flow {idx:03}"),
-                DiagramAst::Flowchart(ast),
-            );
+            let diagram =
+                Diagram::new(id.clone(), format!("Flow {idx:03}"), DiagramAst::Flowchart(ast));
             session.diagrams_mut().insert(id.clone(), diagram);
             flow_diagram_ids.push(id);
         }
@@ -589,11 +509,8 @@ pub mod session {
         for idx in 0..params.seq_diagrams {
             let id = diagram_id("seq", idx);
             let ast = seq::diagram(params.seq);
-            let diagram = Diagram::new(
-                id.clone(),
-                format!("Seq {idx:03}"),
-                DiagramAst::Sequence(ast),
-            );
+            let diagram =
+                Diagram::new(id.clone(), format!("Seq {idx:03}"), DiagramAst::Sequence(ast));
             session.diagrams_mut().insert(id.clone(), diagram);
             seq_diagram_ids.push(id);
         }
@@ -610,16 +527,12 @@ pub mod session {
             let n1 = walkthrough_node_id(1);
             let n2 = walkthrough_node_id(2);
 
-            wt.nodes_mut()
-                .push(WalkthroughNode::new(n0.clone(), "Start"));
-            wt.nodes_mut()
-                .push(WalkthroughNode::new(n1.clone(), "Middle"));
+            wt.nodes_mut().push(WalkthroughNode::new(n0.clone(), "Start"));
+            wt.nodes_mut().push(WalkthroughNode::new(n1.clone(), "Middle"));
             wt.nodes_mut().push(WalkthroughNode::new(n2.clone(), "End"));
 
-            wt.edges_mut()
-                .push(WalkthroughEdge::new(n0.clone(), n1.clone(), "next"));
-            wt.edges_mut()
-                .push(WalkthroughEdge::new(n1.clone(), n2.clone(), "next"));
+            wt.edges_mut().push(WalkthroughEdge::new(n0.clone(), n1.clone(), "next"));
+            wt.edges_mut().push(WalkthroughEdge::new(n1.clone(), n2.clone(), "next"));
 
             session.walkthroughs_mut().insert(wt_id.clone(), wt);
             session.set_active_walkthrough_id(Some(wt_id));
@@ -631,10 +544,9 @@ pub mod session {
             if let (Some(flow_id), Some(seq_id)) =
                 (flow_diagram_ids.first(), seq_diagram_ids.first())
             {
-                if let (Some(flow_diagram), Some(seq_diagram)) = (
-                    session.diagrams().get(flow_id),
-                    session.diagrams().get(seq_id),
-                ) {
+                if let (Some(flow_diagram), Some(seq_diagram)) =
+                    (session.diagrams().get(flow_id), session.diagrams().get(seq_id))
+                {
                     let from = match flow_diagram.ast() {
                         DiagramAst::Flowchart(ast) => first_flow_node_ref(flow_id, ast),
                         _ => None,

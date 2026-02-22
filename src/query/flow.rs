@@ -48,10 +48,7 @@ fn outgoing_adjacency(ast: &FlowchartAst) -> BTreeMap<ObjectId, Vec<ObjectId>> {
     }
 
     for edge in ast.edges().values() {
-        outgoing
-            .entry(edge.from_node_id().clone())
-            .or_default()
-            .insert(edge.to_node_id().clone());
+        outgoing.entry(edge.from_node_id().clone()).or_default().insert(edge.to_node_id().clone());
         outgoing.entry(edge.to_node_id().clone()).or_default();
     }
 
@@ -96,11 +93,8 @@ fn bfs_distances(
     queue.push_back(start.clone());
 
     while let Some(node_id) = queue.pop_front() {
-        let next_distance = dist
-            .get(&node_id)
-            .copied()
-            .expect("node already inserted")
-            .saturating_add(1);
+        let next_distance =
+            dist.get(&node_id).copied().expect("node already inserted").saturating_add(1);
 
         for next_id in adjacency.get(&node_id).into_iter().flatten() {
             if dist.contains_key(next_id) {
@@ -155,14 +149,12 @@ pub(crate) fn reachable_with_direction(
 
     let outgoing = outgoing_adjacency(ast);
     match direction {
-        ReachDirection::Out => bfs_reachable(&outgoing, from_node_id, &known_nodes)
-            .into_iter()
-            .collect(),
+        ReachDirection::Out => {
+            bfs_reachable(&outgoing, from_node_id, &known_nodes).into_iter().collect()
+        }
         ReachDirection::In => {
             let incoming = incoming_adjacency(&outgoing);
-            bfs_reachable(&incoming, from_node_id, &known_nodes)
-                .into_iter()
-                .collect()
+            bfs_reachable(&incoming, from_node_id, &known_nodes).into_iter().collect()
         }
         ReachDirection::Both => {
             let incoming = incoming_adjacency(&outgoing);
@@ -278,16 +270,7 @@ pub fn cycles(ast: &FlowchartAst) -> Vec<Vec<ObjectId>> {
 
         for w in outgoing.get(&v).into_iter().flatten() {
             if !indices.contains_key(w) {
-                strongconnect(
-                    w.clone(),
-                    index,
-                    outgoing,
-                    indices,
-                    lowlink,
-                    stack,
-                    on_stack,
-                    sccs,
-                );
+                strongconnect(w.clone(), index, outgoing, indices, lowlink, stack, on_stack, sccs);
                 let v_low = lowlink.get(&v).copied().unwrap_or(usize::MAX);
                 let w_low = lowlink.get(w).copied().unwrap_or(usize::MAX);
                 lowlink.insert(v.clone(), v_low.min(w_low));
@@ -376,12 +359,9 @@ mod tests {
     fn fixture_ast() -> FlowchartAst {
         let mut ast = FlowchartAst::default();
 
-        for node in [
-            "n:a", "n:b", "n:c", "n:d", "n:e", "n:f", "n:x", "n:y", "n:z",
-        ] {
+        for node in ["n:a", "n:b", "n:c", "n:d", "n:e", "n:f", "n:x", "n:y", "n:z"] {
             let node_id = ObjectId::new(node).expect("node id");
-            ast.nodes_mut()
-                .insert(node_id, FlowNode::new(node.to_uppercase()));
+            ast.nodes_mut().insert(node_id, FlowNode::new(node.to_uppercase()));
         }
 
         let mut add_edge = |edge_id: &str, from: &str, to: &str| {
@@ -434,21 +414,15 @@ mod tests {
         let ast = fixture_ast();
         let degrees = degrees(&ast);
 
-        let a = degrees
-            .get(&ObjectId::new("n:a").expect("a"))
-            .expect("degree");
+        let a = degrees.get(&ObjectId::new("n:a").expect("a")).expect("degree");
         assert_eq!(a.in_degree, 0);
         assert_eq!(a.out_degree, 2);
 
-        let c = degrees
-            .get(&ObjectId::new("n:c").expect("c"))
-            .expect("degree");
+        let c = degrees.get(&ObjectId::new("n:c").expect("c")).expect("degree");
         assert_eq!(c.in_degree, 2);
         assert_eq!(c.out_degree, 1);
 
-        let f = degrees
-            .get(&ObjectId::new("n:f").expect("f"))
-            .expect("degree");
+        let f = degrees.get(&ObjectId::new("n:f").expect("f")).expect("degree");
         assert_eq!(f.in_degree, 0);
         assert_eq!(f.out_degree, 0);
     }

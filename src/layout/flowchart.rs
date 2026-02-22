@@ -83,23 +83,14 @@ impl GridPoint {
     }
 
     fn offset(self, dx: i32, dy: i32) -> Self {
-        Self {
-            x: self.x + dx,
-            y: self.y + dy,
-        }
+        Self { x: self.x + dx, y: self.y + dy }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlowchartLayoutError {
-    UnknownNode {
-        edge_id: ObjectId,
-        endpoint: FlowEdgeEndpoint,
-        node_id: ObjectId,
-    },
-    CycleDetected {
-        nodes: Vec<ObjectId>,
-    },
+    UnknownNode { edge_id: ObjectId, endpoint: FlowEdgeEndpoint, node_id: ObjectId },
+    CycleDetected { nodes: Vec<ObjectId> },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -111,19 +102,12 @@ pub enum FlowEdgeEndpoint {
 impl std::fmt::Display for FlowchartLayoutError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::UnknownNode {
-                edge_id,
-                endpoint,
-                node_id,
-            } => {
+            Self::UnknownNode { edge_id, endpoint, node_id } => {
                 let endpoint = match endpoint {
                     FlowEdgeEndpoint::From => "from",
                     FlowEdgeEndpoint::To => "to",
                 };
-                write!(
-                    f,
-                    "edge {edge_id} references unknown {endpoint} node {node_id}"
-                )
+                write!(f, "edge {edge_id} references unknown {endpoint} node {node_id}")
             }
             Self::CycleDetected { nodes } => {
                 if nodes.is_empty() {
@@ -195,10 +179,7 @@ fn topo_sort_nodes(ast: &FlowchartAst) -> Result<Vec<ObjectId>, FlowchartLayoutE
             });
         }
 
-        outgoing
-            .get_mut(from)
-            .expect("node exists (validated)")
-            .push(to.clone());
+        outgoing.get_mut(from).expect("node exists (validated)").push(to.clone());
         *indegree.get_mut(to).expect("node exists (validated)") += 1;
     }
 
@@ -360,20 +341,11 @@ pub fn layout_flowchart(ast: &FlowchartAst) -> Result<FlowchartLayout, Flowchart
     let mut node_placements = BTreeMap::<ObjectId, FlowNodePlacement>::new();
     for (layer, nodes) in layers.iter().enumerate() {
         for (index_in_layer, node_id) in nodes.iter().enumerate() {
-            node_placements.insert(
-                node_id.clone(),
-                FlowNodePlacement {
-                    layer,
-                    index_in_layer,
-                },
-            );
+            node_placements.insert(node_id.clone(), FlowNodePlacement { layer, index_in_layer });
         }
     }
 
-    Ok(FlowchartLayout {
-        layers,
-        node_placements,
-    })
+    Ok(FlowchartLayout { layers, node_placements })
 }
 
 fn routing_bounds_and_obstacles(layout: &FlowchartLayout) -> (GridBounds, BTreeSet<GridPoint>) {
@@ -381,10 +353,7 @@ fn routing_bounds_and_obstacles(layout: &FlowchartLayout) -> (GridBounds, BTreeS
         .node_placements()
         .values()
         .map(|placement| {
-            GridPoint::new(
-                (placement.layer() * 2) as i32,
-                (placement.index_in_layer() * 2) as i32,
-            )
+            GridPoint::new((placement.layer() * 2) as i32, (placement.index_in_layer() * 2) as i32)
         })
         .collect::<BTreeSet<_>>();
 
@@ -406,13 +375,7 @@ fn routing_bounds_and_obstacles(layout: &FlowchartLayout) -> (GridBounds, BTreeS
         max_y = max_y.max(p.y);
     }
 
-    let bounds = GridBounds {
-        min_x,
-        max_x,
-        min_y,
-        max_y,
-    }
-    .expand(4);
+    let bounds = GridBounds { min_x, max_x, min_y, max_y }.expand(4);
 
     (bounds, obstacles)
 }
@@ -476,18 +439,11 @@ impl RoutingGrid {
     fn new(bounds: GridBounds) -> Self {
         let width = (bounds.max_x - bounds.min_x + 1) as usize;
         let height = (bounds.max_y - bounds.min_y + 1) as usize;
-        Self {
-            min_x: bounds.min_x,
-            min_y: bounds.min_y,
-            width,
-            height,
-        }
+        Self { min_x: bounds.min_x, min_y: bounds.min_y, width, height }
     }
 
     fn len(&self) -> usize {
-        self.width
-            .checked_mul(self.height)
-            .expect("routing grid area overflow")
+        self.width.checked_mul(self.height).expect("routing grid area overflow")
     }
 
     fn idx_of(&self, point: GridPoint) -> Option<usize> {
@@ -557,12 +513,9 @@ impl ShortestPathScratch {
         }
 
         let reserve_hint = len.min(4096);
-        self.queue
-            .reserve(reserve_hint.saturating_sub(self.queue.len()));
-        self.path
-            .reserve(reserve_hint.saturating_sub(self.path.len()));
-        self.heap
-            .reserve(reserve_hint.saturating_sub(self.heap.len()));
+        self.queue.reserve(reserve_hint.saturating_sub(self.queue.len()));
+        self.path.reserve(reserve_hint.saturating_sub(self.path.len()));
+        self.heap.reserve(reserve_hint.saturating_sub(self.heap.len()));
 
         let grid = self.grid.expect("configured");
         for point in obstacles.iter().copied() {
@@ -736,6 +689,7 @@ fn shortest_path_4dir_soft_occupancy<'a>(
         Some(cost)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn reconstruct_path<'a>(
         start: GridPoint,
         goal: GridPoint,
@@ -848,9 +802,7 @@ fn shortest_path_4dir_soft_occupancy<'a>(
     let gen = scratch.begin();
     scratch.set_dist(start_idx, gen, 0, -1);
     let h0 = start.x.abs_diff(goal.x) + start.y.abs_diff(goal.y);
-    scratch
-        .heap
-        .push(Reverse((h0, 0u32, 0u32, start_idx as u32)));
+    scratch.heap.push(Reverse((h0, 0u32, 0u32, start_idx as u32)));
 
     let mut tie_seq = 1u32;
     let mut best_goal_cost = u32::MAX;
@@ -923,9 +875,7 @@ fn shortest_path_4dir_soft_occupancy<'a>(
                         continue;
                     }
                     scratch.set_dist(next_idx, gen, next_cost, idx as i32);
-                    scratch
-                        .heap
-                        .push(Reverse((f_cost, next_cost, tie_seq, next_idx as u32)));
+                    scratch.heap.push(Reverse((f_cost, next_cost, tie_seq, next_idx as u32)));
                     tie_seq = tie_seq.wrapping_add(1);
                 }
             }
@@ -943,9 +893,7 @@ fn shortest_path_4dir_soft_occupancy<'a>(
                 if next_cost < scratch.dist(goal_idx, gen) {
                     best_goal_cost = next_cost;
                     scratch.set_dist(goal_idx, gen, next_cost, idx as i32);
-                    scratch
-                        .heap
-                        .push(Reverse((next_cost, next_cost, tie_seq, goal_idx as u32)));
+                    scratch.heap.push(Reverse((next_cost, next_cost, tie_seq, goal_idx as u32)));
                     tie_seq = tie_seq.wrapping_add(1);
                 }
             }
@@ -989,9 +937,7 @@ fn shortest_path_4dir_soft_occupancy<'a>(
                     continue;
                 }
                 scratch.set_dist(next_idx, gen, next_cost, idx as i32);
-                scratch
-                    .heap
-                    .push(Reverse((f_cost, next_cost, tie_seq, next_idx as u32)));
+                scratch.heap.push(Reverse((f_cost, next_cost, tie_seq, next_idx as u32)));
                 tie_seq = tie_seq.wrapping_add(1);
             }
         }
@@ -1001,9 +947,7 @@ fn shortest_path_4dir_soft_occupancy<'a>(
         return None;
     }
 
-    reconstruct_path(
-        start, goal, start_idx, goal_idx, bounds, grid, scratch, occupancy,
-    )
+    reconstruct_path(start, goal, start_idx, goal_idx, bounds, grid, scratch, occupancy)
 }
 
 fn compress_to_polyline(path: &[GridPoint]) -> Vec<GridPoint> {
@@ -1047,11 +991,8 @@ fn edge_routing_bounds(start: GridPoint, goal: GridPoint) -> GridBounds {
     const MARGIN_CROSS: i32 = 8;
     let dx = (goal.x - start.x).abs();
     let dy = (goal.y - start.y).abs();
-    let (margin_x, margin_y) = if dx >= dy {
-        (MARGIN_MAIN, MARGIN_CROSS)
-    } else {
-        (MARGIN_CROSS, MARGIN_MAIN)
-    };
+    let (margin_x, margin_y) =
+        if dx >= dy { (MARGIN_MAIN, MARGIN_CROSS) } else { (MARGIN_CROSS, MARGIN_MAIN) };
     GridBounds {
         min_x: start.x.min(goal.x) - margin_x,
         max_x: start.x.max(goal.x) + margin_x,
@@ -1321,12 +1262,7 @@ mod tests {
         let layers = layout
             .layers()
             .iter()
-            .map(|layer| {
-                layer
-                    .iter()
-                    .map(|id| id.as_str().to_owned())
-                    .collect::<Vec<_>>()
-            })
+            .map(|layer| layer.iter().map(|id| id.as_str().to_owned()).collect::<Vec<_>>())
             .collect::<Vec<_>>();
 
         assert_eq!(
@@ -1358,22 +1294,15 @@ mod tests {
         ast.nodes_mut().insert(n_d.clone(), FlowNode::new("D"));
         ast.nodes_mut().insert(n_e.clone(), FlowNode::new("E"));
 
-        ast.edges_mut()
-            .insert(oid("e:ab"), FlowEdge::new(n_a.clone(), n_b.clone()));
-        ast.edges_mut()
-            .insert(oid("e:ac"), FlowEdge::new(n_a.clone(), n_c.clone()));
+        ast.edges_mut().insert(oid("e:ab"), FlowEdge::new(n_a.clone(), n_b.clone()));
+        ast.edges_mut().insert(oid("e:ac"), FlowEdge::new(n_a.clone(), n_c.clone()));
         // These two edges would cross if layer 2 stayed in lexical order [n:d, n:e].
-        ast.edges_mut()
-            .insert(oid("e:be"), FlowEdge::new(n_b.clone(), n_e.clone()));
-        ast.edges_mut()
-            .insert(oid("e:cd"), FlowEdge::new(n_c.clone(), n_d.clone()));
+        ast.edges_mut().insert(oid("e:be"), FlowEdge::new(n_b.clone(), n_e.clone()));
+        ast.edges_mut().insert(oid("e:cd"), FlowEdge::new(n_c.clone(), n_d.clone()));
 
         let layout = layout_flowchart(&ast).expect("layout");
 
-        let layer2 = layout.layers()[2]
-            .iter()
-            .map(|id| id.as_str().to_owned())
-            .collect::<Vec<_>>();
+        let layer2 = layout.layers()[2].iter().map(|id| id.as_str().to_owned()).collect::<Vec<_>>();
         assert_eq!(layer2, vec!["n:e".to_owned(), "n:d".to_owned()]);
     }
 
@@ -1384,8 +1313,7 @@ mod tests {
         let n_missing = oid("n:missing");
 
         ast.nodes_mut().insert(n_a.clone(), FlowNode::new("A"));
-        ast.edges_mut()
-            .insert(oid("e:ab"), FlowEdge::new(n_a.clone(), n_missing.clone()));
+        ast.edges_mut().insert(oid("e:ab"), FlowEdge::new(n_a.clone(), n_missing.clone()));
 
         assert_eq!(
             layout_flowchart(&ast),
@@ -1406,16 +1334,12 @@ mod tests {
         ast.nodes_mut().insert(n_a.clone(), FlowNode::new("A"));
         ast.nodes_mut().insert(n_b.clone(), FlowNode::new("B"));
 
-        ast.edges_mut()
-            .insert(oid("e:ab"), FlowEdge::new(n_a.clone(), n_b.clone()));
-        ast.edges_mut()
-            .insert(oid("e:ba"), FlowEdge::new(n_b.clone(), n_a.clone()));
+        ast.edges_mut().insert(oid("e:ab"), FlowEdge::new(n_a.clone(), n_b.clone()));
+        ast.edges_mut().insert(oid("e:ba"), FlowEdge::new(n_b.clone(), n_a.clone()));
 
         assert_eq!(
             layout_flowchart(&ast),
-            Err(FlowchartLayoutError::CycleDetected {
-                nodes: vec![oid("n:a"), oid("n:b")]
-            })
+            Err(FlowchartLayoutError::CycleDetected { nodes: vec![oid("n:a"), oid("n:b")] })
         );
     }
 
@@ -1427,8 +1351,7 @@ mod tests {
 
         ast.nodes_mut().insert(n_a.clone(), FlowNode::new("A"));
         ast.nodes_mut().insert(n_b.clone(), FlowNode::new("B"));
-        ast.edges_mut()
-            .insert(oid("e:ab"), FlowEdge::new(n_a.clone(), n_b.clone()));
+        ast.edges_mut().insert(oid("e:ab"), FlowEdge::new(n_a.clone(), n_b.clone()));
 
         let layout = layout_flowchart(&ast).expect("layout");
         let routes = route_flowchart_edges_orthogonal(&ast, &layout);
@@ -1436,10 +1359,7 @@ mod tests {
 
         assert_eq!(
             route,
-            &vec![
-                layout.node_grid_point(&n_a).unwrap(),
-                layout.node_grid_point(&n_b).unwrap()
-            ]
+            &vec![layout.node_grid_point(&n_a).unwrap(), layout.node_grid_point(&n_b).unwrap()]
         );
     }
 
@@ -1447,12 +1367,7 @@ mod tests {
     fn orthogonal_router_constrains_intermediate_traversal_to_streets() {
         let start = gp(0, 0);
         let goal = gp(4, 0);
-        let bounds = GridBounds {
-            min_x: 0,
-            max_x: 4,
-            min_y: 0,
-            max_y: 1,
-        };
+        let bounds = GridBounds { min_x: 0, max_x: 4, min_y: 0, max_y: 1 };
 
         let obstacles = BTreeSet::new();
         let mut scratch = ShortestPathScratch::default();
@@ -1515,42 +1430,20 @@ mod tests {
 
         // Two parallel edges (same endpoints) should be routed in stable order, and the second
         // should prefer an unoccupied detour once the first marks its route segments.
-        ast.edges_mut()
-            .insert(oid("e:ac1"), FlowEdge::new(n_a.clone(), n_c.clone()));
-        ast.edges_mut()
-            .insert(oid("e:ac2"), FlowEdge::new(n_a.clone(), n_c.clone()));
+        ast.edges_mut().insert(oid("e:ac1"), FlowEdge::new(n_a.clone(), n_c.clone()));
+        ast.edges_mut().insert(oid("e:ac2"), FlowEdge::new(n_a.clone(), n_c.clone()));
 
         // Add additional edges so `enable_soft_occupancy` is triggered (dense enough).
-        ast.edges_mut()
-            .insert(oid("e:ba"), FlowEdge::new(n_b.clone(), n_a.clone()));
-        ast.edges_mut()
-            .insert(oid("e:bc"), FlowEdge::new(n_b.clone(), n_c.clone()));
+        ast.edges_mut().insert(oid("e:ba"), FlowEdge::new(n_b.clone(), n_a.clone()));
+        ast.edges_mut().insert(oid("e:bc"), FlowEdge::new(n_b.clone(), n_c.clone()));
 
         // Manual layout: A (layer 0) -> B (layer 1) -> C (layer 2), single row.
         let layout = FlowchartLayout {
             layers: vec![vec![n_a.clone()], vec![n_b.clone()], vec![n_c.clone()]],
             node_placements: BTreeMap::from([
-                (
-                    n_a.clone(),
-                    super::FlowNodePlacement {
-                        layer: 0,
-                        index_in_layer: 0,
-                    },
-                ),
-                (
-                    n_b.clone(),
-                    super::FlowNodePlacement {
-                        layer: 1,
-                        index_in_layer: 0,
-                    },
-                ),
-                (
-                    n_c.clone(),
-                    super::FlowNodePlacement {
-                        layer: 2,
-                        index_in_layer: 0,
-                    },
-                ),
+                (n_a.clone(), super::FlowNodePlacement { layer: 0, index_in_layer: 0 }),
+                (n_b.clone(), super::FlowNodePlacement { layer: 1, index_in_layer: 0 }),
+                (n_c.clone(), super::FlowNodePlacement { layer: 2, index_in_layer: 0 }),
             ]),
         };
 
@@ -1575,16 +1468,10 @@ mod tests {
         let goal = gp(2, 2);
 
         // Block all start-adjacent points so the graph is disconnected.
-        let obstacles = [gp(1, 0), gp(-1, 0), gp(0, 1), gp(0, -1)]
-            .into_iter()
-            .collect::<BTreeSet<_>>();
+        let obstacles =
+            [gp(1, 0), gp(-1, 0), gp(0, 1), gp(0, -1)].into_iter().collect::<BTreeSet<_>>();
 
-        let bounds = GridBounds {
-            min_x: -2,
-            max_x: 4,
-            min_y: -2,
-            max_y: 4,
-        };
+        let bounds = GridBounds { min_x: -2, max_x: 4, min_y: -2, max_y: 4 };
 
         let route = route_orthogonal(start, goal, bounds, &obstacles);
 
@@ -1593,12 +1480,7 @@ mod tests {
 
     #[test]
     fn orthogonal_routing_is_deterministic_for_moderate_fixture() {
-        let bounds = GridBounds {
-            min_x: 0,
-            max_x: 63,
-            min_y: 0,
-            max_y: 47,
-        };
+        let bounds = GridBounds { min_x: 0, max_x: 63, min_y: 0, max_y: 47 };
 
         let mut obstacles = BTreeSet::<GridPoint>::new();
         for x in 2..=63 {
@@ -1663,10 +1545,7 @@ mod tests {
         ast.nodes_mut().insert(n_b.clone(), FlowNode::new("B"));
         ast.edges_mut().insert(oid("e:ab"), FlowEdge::new(n_a, n_b));
 
-        let layout = FlowchartLayout {
-            layers: Vec::new(),
-            node_placements: BTreeMap::new(),
-        };
+        let layout = FlowchartLayout { layers: Vec::new(), node_placements: BTreeMap::new() };
 
         let routes = route_flowchart_edges_orthogonal(&ast, &layout);
         let route = routes.get(&oid("e:ab")).expect("route");

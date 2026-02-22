@@ -129,9 +129,7 @@ fn main() {
                 nereid::mcp::NereidMcp::new_persistent(session, folder)
             };
 
-            let runtime = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()?;
+            let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
 
             runtime.block_on(mcp.serve_stdio())?;
             return Ok(());
@@ -148,10 +146,8 @@ fn main() {
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_millis())
                 .unwrap_or(0);
-            let demo_dir = std::env::temp_dir().join(format!(
-                "nereid-demo-session-{}-{now_millis}",
-                std::process::id()
-            ));
+            let demo_dir = std::env::temp_dir()
+                .join(format!("nereid-demo-session-{}-{now_millis}", std::process::id()));
             let folder = if options.durable_writes {
                 nereid::store::SessionFolder::new(demo_dir)
                     .with_durability(nereid::store::WriteDurability::Durable)
@@ -189,9 +185,7 @@ fn main() {
             (tui_session, Some(tui_session_folder), mcp)
         };
 
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()?;
+        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
 
         runtime.block_on(async move {
             let listener = tokio::net::TcpListener::bind(("127.0.0.1", mcp_http_port)).await?;
@@ -300,12 +294,7 @@ mod tests {
     #[test]
     fn rejects_mcp_http_port_with_stdio_mcp_mode() {
         parse_options(
-            [
-                "--mcp".to_owned(),
-                "--mcp-http-port".to_owned(),
-                "0".to_owned(),
-            ]
-            .into_iter(),
+            ["--mcp".to_owned(), "--mcp-http-port".to_owned(), "0".to_owned()].into_iter(),
         )
         .unwrap_err();
     }
@@ -358,13 +347,8 @@ mod tests {
         parse_options(["--mcp".to_owned(), "--mcp".to_owned()].into_iter()).unwrap_err();
 
         parse_options(
-            [
-                "--session".to_owned(),
-                ".".to_owned(),
-                "--session".to_owned(),
-                "other".to_owned(),
-            ]
-            .into_iter(),
+            ["--session".to_owned(), ".".to_owned(), "--session".to_owned(), "other".to_owned()]
+                .into_iter(),
         )
         .unwrap_err();
     }

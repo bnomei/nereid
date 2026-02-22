@@ -30,12 +30,8 @@ fn checksum_compute_only_save(session: &Session) -> u64 {
                     .expect("render_sequence_unicode");
 
                 acc = acc.wrapping_mul(131).wrapping_add(mmd.len() as u64);
-                acc = acc
-                    .wrapping_mul(131)
-                    .wrapping_add(layout.participant_cols().len() as u64);
-                acc = acc
-                    .wrapping_mul(131)
-                    .wrapping_add(layout.messages().len() as u64);
+                acc = acc.wrapping_mul(131).wrapping_add(layout.participant_cols().len() as u64);
+                acc = acc.wrapping_mul(131).wrapping_add(layout.messages().len() as u64);
                 acc = acc.wrapping_mul(131).wrapping_add(rendered.len() as u64);
             }
             DiagramAst::Flowchart(ast) => {
@@ -45,12 +41,8 @@ fn checksum_compute_only_save(session: &Session) -> u64 {
                     .expect("render_flowchart_unicode");
 
                 acc = acc.wrapping_mul(131).wrapping_add(mmd.len() as u64);
-                acc = acc
-                    .wrapping_mul(131)
-                    .wrapping_add(layout.layers().len() as u64);
-                acc = acc
-                    .wrapping_mul(131)
-                    .wrapping_add(layout.node_placements().len() as u64);
+                acc = acc.wrapping_mul(131).wrapping_add(layout.layers().len() as u64);
+                acc = acc.wrapping_mul(131).wrapping_add(layout.node_placements().len() as u64);
                 acc = acc.wrapping_mul(131).wrapping_add(rendered.len() as u64);
             }
         }
@@ -71,25 +63,15 @@ fn benches_store(c: &mut Criterion) {
     let session_small = fixtures::session::fixture(fixtures::session::Case::SessionSmall);
     let session_small_compute = session_small.clone();
     group.bench_function("compute_only_small", move |b| {
-        b.iter(|| {
-            black_box(checksum_compute_only_save(black_box(
-                &session_small_compute,
-            )))
-        })
+        b.iter(|| black_box(checksum_compute_only_save(black_box(&session_small_compute))))
     });
     group.bench_function("io_small", move |b| {
         b.iter_batched_ref(
             || TempDir::new("store_save_session_io_small"),
             |tmp| {
                 let folder = SessionFolder::new(tmp.path());
-                folder
-                    .save_session(black_box(&session_small))
-                    .expect("save_session");
-                black_box(
-                    std::fs::metadata(folder.meta_path())
-                        .expect("meta_path metadata")
-                        .len(),
-                )
+                folder.save_session(black_box(&session_small)).expect("save_session");
+                black_box(std::fs::metadata(folder.meta_path()).expect("meta_path metadata").len())
             },
             BatchSize::SmallInput,
         )
@@ -98,25 +80,15 @@ fn benches_store(c: &mut Criterion) {
     let session_medium = fixtures::session::fixture(fixtures::session::Case::SessionMedium);
     let session_medium_compute = session_medium.clone();
     group.bench_function("compute_only_medium", move |b| {
-        b.iter(|| {
-            black_box(checksum_compute_only_save(black_box(
-                &session_medium_compute,
-            )))
-        })
+        b.iter(|| black_box(checksum_compute_only_save(black_box(&session_medium_compute))))
     });
     group.bench_function("io_medium", move |b| {
         b.iter_batched_ref(
             || TempDir::new("store_save_session_io_medium"),
             |tmp| {
                 let folder = SessionFolder::new(tmp.path());
-                folder
-                    .save_session(black_box(&session_medium))
-                    .expect("save_session");
-                black_box(
-                    std::fs::metadata(folder.meta_path())
-                        .expect("meta_path metadata")
-                        .len(),
-                )
+                folder.save_session(black_box(&session_medium)).expect("save_session");
+                black_box(std::fs::metadata(folder.meta_path()).expect("meta_path metadata").len())
             },
             BatchSize::SmallInput,
         )

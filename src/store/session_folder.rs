@@ -132,14 +132,8 @@ impl AsciiExportManager {
 
     fn flush_session_dir(&self, session_dir: &Path) {
         let mut state = self.inner.state.lock().expect("ascii export lock poisoned");
-        while state
-            .in_flight_session_dir
-            .as_deref()
-            .is_some_and(|active| active == session_dir)
-            || state
-                .pending
-                .values()
-                .any(|task| task.session_dir() == session_dir)
+        while state.in_flight_session_dir.as_deref().is_some_and(|active| active == session_dir)
+            || state.pending.values().any(|task| task.session_dir() == session_dir)
         {
             state = self.inner.cv.wait(state).expect("ascii export cv poisoned");
         }
@@ -163,13 +157,7 @@ impl AsciiExportManager {
             };
 
             match task {
-                AsciiExportTask::Diagram {
-                    session_dir,
-                    mmd_path,
-                    text_path,
-                    durability,
-                    ast,
-                } => {
+                AsciiExportTask::Diagram { session_dir, mmd_path, text_path, durability, ast } => {
                     if !mmd_path.is_file() {
                         // Likely removed or cleaned up; avoid resurrecting temp session dirs.
                     } else if let Some(mut text) = match ast {
@@ -599,10 +587,7 @@ fn is_windows_device_name(base: &str) -> bool {
 
 impl SessionFolder {
     pub fn new(root: impl Into<PathBuf>) -> Self {
-        Self {
-            root: root.into(),
-            durability: WriteDurability::default(),
-        }
+        Self { root: root.into(), durability: WriteDurability::default() }
     }
 
     pub fn with_durability(mut self, durability: WriteDurability) -> Self {
@@ -651,15 +636,11 @@ impl SessionFolder {
 
     pub fn walkthrough_json_path(&self, walkthrough_id: &WalkthroughId) -> PathBuf {
         let file_stem = encode_persisted_id_segment(walkthrough_id.as_str());
-        self.root
-            .join("walkthroughs")
-            .join(format!("{file_stem}.wt.json"))
+        self.root.join("walkthroughs").join(format!("{file_stem}.wt.json"))
     }
 
     fn legacy_walkthrough_json_path(&self, walkthrough_id: &WalkthroughId) -> PathBuf {
-        self.root
-            .join("walkthroughs")
-            .join(format!("{}.wt.json", walkthrough_id.as_str()))
+        self.root.join("walkthroughs").join(format!("{}.wt.json", walkthrough_id.as_str()))
     }
 
     /// Returns the path for the deterministic text render export.
@@ -670,9 +651,7 @@ impl SessionFolder {
     /// updates during rapid edits.
     pub fn walkthrough_ascii_path(&self, walkthrough_id: &WalkthroughId) -> PathBuf {
         let file_stem = encode_persisted_id_segment(walkthrough_id.as_str());
-        self.root
-            .join("walkthroughs")
-            .join(format!("{file_stem}.ascii.txt"))
+        self.root.join("walkthroughs").join(format!("{file_stem}.ascii.txt"))
     }
 
     pub fn flush_ascii_exports(&self) {
@@ -823,9 +802,7 @@ impl SessionFolder {
                         .participants()
                         .iter()
                         .filter_map(|(participant_id, participant)| {
-                            participant
-                                .note()
-                                .map(|note| (participant_id.clone(), note.to_owned()))
+                            participant.note().map(|note| (participant_id.clone(), note.to_owned()))
                         })
                         .collect(),
                     DiagramAst::Flowchart(_) => BTreeMap::new(),
@@ -917,10 +894,7 @@ impl SessionFolder {
             Ok(entries) => entries,
             Err(source) if source.kind() == io::ErrorKind::NotFound => return Ok(()),
             Err(source) => {
-                return Err(StoreError::Io {
-                    path: walkthroughs_dir,
-                    source,
-                });
+                return Err(StoreError::Io { path: walkthroughs_dir, source });
             }
         };
 
@@ -933,9 +907,8 @@ impl SessionFolder {
                 continue;
             };
 
-            let Some(walkthrough_id) = file_name
-                .strip_suffix(".wt.json")
-                .or_else(|| file_name.strip_suffix(".ascii.txt"))
+            let Some(walkthrough_id) =
+                file_name.strip_suffix(".wt.json").or_else(|| file_name.strip_suffix(".ascii.txt"))
             else {
                 continue;
             };
@@ -970,10 +943,8 @@ impl SessionFolder {
         for diagram_meta in meta.diagrams {
             let diagram_id = diagram_meta.diagram_id;
             let mmd_path = diagram_meta.mmd_path;
-            let mmd = fs::read_to_string(&mmd_path).map_err(|source| StoreError::Io {
-                path: mmd_path.clone(),
-                source,
-            })?;
+            let mmd = fs::read_to_string(&mmd_path)
+                .map_err(|source| StoreError::Io { path: mmd_path.clone(), source })?;
 
             let sidecar = match self.load_diagram_meta(&mmd_path) {
                 Ok(sidecar) => Some(sidecar),
@@ -1025,12 +996,8 @@ impl SessionFolder {
         }
 
         for xref_meta in meta.xrefs {
-            let mut xref = XRef::new(
-                xref_meta.from,
-                xref_meta.to,
-                xref_meta.kind,
-                xref_meta.status,
-            );
+            let mut xref =
+                XRef::new(xref_meta.from, xref_meta.to, xref_meta.kind, xref_meta.status);
             xref.set_label(xref_meta.label);
             session.xrefs_mut().insert(xref_meta.xref_id, xref);
         }
@@ -1040,9 +1007,7 @@ impl SessionFolder {
             Some(walkthrough_ids) => {
                 for walkthrough_id in walkthrough_ids {
                     let walkthrough = self.load_walkthrough(&walkthrough_id)?;
-                    session
-                        .walkthroughs_mut()
-                        .insert(walkthrough_id, walkthrough);
+                    session.walkthroughs_mut().insert(walkthrough_id, walkthrough);
                 }
             }
             None => {
@@ -1058,18 +1023,13 @@ impl SessionFolder {
                         wt_paths.sort();
 
                         for wt_path in wt_paths {
-                            let wt_str =
-                                fs::read_to_string(&wt_path).map_err(|source| StoreError::Io {
-                                    path: wt_path.clone(),
-                                    source,
-                                })?;
+                            let wt_str = fs::read_to_string(&wt_path).map_err(|source| {
+                                StoreError::Io { path: wt_path.clone(), source }
+                            })?;
 
                             let wt_json: WalkthroughJson =
                                 serde_json::from_str(&wt_str).map_err(|source| {
-                                    StoreError::Json {
-                                        path: wt_path.clone(),
-                                        source,
-                                    }
+                                    StoreError::Json { path: wt_path.clone(), source }
                                 })?;
 
                             let walkthrough = walkthrough_from_json(wt_json)?;
@@ -1080,10 +1040,7 @@ impl SessionFolder {
                     }
                     Err(source) if source.kind() == io::ErrorKind::NotFound => {}
                     Err(source) => {
-                        return Err(StoreError::Io {
-                            path: walkthroughs_dir,
-                            source,
-                        });
+                        return Err(StoreError::Io { path: walkthroughs_dir, source });
                     }
                 }
             }
@@ -1101,49 +1058,32 @@ impl SessionFolder {
                 match fs::read_to_string(&legacy_path) {
                     Ok(meta_str) => (legacy_path, meta_str),
                     Err(legacy_source) if legacy_source.kind() == io::ErrorKind::NotFound => {
-                        return Err(StoreError::Io {
-                            path: meta_path,
-                            source,
-                        });
+                        return Err(StoreError::Io { path: meta_path, source });
                     }
                     Err(legacy_source) => {
-                        return Err(StoreError::Io {
-                            path: legacy_path,
-                            source: legacy_source,
-                        });
+                        return Err(StoreError::Io { path: legacy_path, source: legacy_source });
                     }
                 }
             }
             Err(source) => {
-                return Err(StoreError::Io {
-                    path: meta_path.clone(),
-                    source,
-                });
+                return Err(StoreError::Io { path: meta_path.clone(), source });
             }
         };
 
-        let meta_json: SessionMetaJson =
-            serde_json::from_str(&meta_str).map_err(|source| StoreError::Json {
-                path: meta_path.clone(),
-                source,
-            })?;
+        let meta_json: SessionMetaJson = serde_json::from_str(&meta_str)
+            .map_err(|source| StoreError::Json { path: meta_path.clone(), source })?;
 
         session_meta_from_json(self.root(), meta_json)
     }
 
     pub fn save_meta(&self, meta: &SessionMeta) -> Result<(), StoreError> {
-        fs::create_dir_all(self.root()).map_err(|source| StoreError::Io {
-            path: self.root.clone(),
-            source,
-        })?;
+        fs::create_dir_all(self.root())
+            .map_err(|source| StoreError::Io { path: self.root.clone(), source })?;
 
         let meta_path = self.meta_path();
         let meta_json = session_meta_to_json(self.root(), meta)?;
-        let meta_str =
-            serde_json::to_string_pretty(&meta_json).map_err(|source| StoreError::Json {
-                path: meta_path.clone(),
-                source,
-            })?;
+        let meta_str = serde_json::to_string_pretty(&meta_json)
+            .map_err(|source| StoreError::Json { path: meta_path.clone(), source })?;
 
         write_atomic_in_session(
             self.root(),
@@ -1202,25 +1142,17 @@ impl SessionFolder {
             Ok(wt_str) => (wt_path, wt_str),
             Err(source) if source.kind() == io::ErrorKind::NotFound => {
                 let legacy_path = self.legacy_walkthrough_json_path(walkthrough_id);
-                let wt_str = fs::read_to_string(&legacy_path).map_err(|source| StoreError::Io {
-                    path: legacy_path.clone(),
-                    source,
-                })?;
+                let wt_str = fs::read_to_string(&legacy_path)
+                    .map_err(|source| StoreError::Io { path: legacy_path.clone(), source })?;
                 (legacy_path, wt_str)
             }
             Err(source) => {
-                return Err(StoreError::Io {
-                    path: wt_path.clone(),
-                    source,
-                });
+                return Err(StoreError::Io { path: wt_path.clone(), source });
             }
         };
 
-        let wt_json: WalkthroughJson =
-            serde_json::from_str(&wt_str).map_err(|source| StoreError::Json {
-                path: wt_path.clone(),
-                source,
-            })?;
+        let wt_json: WalkthroughJson = serde_json::from_str(&wt_str)
+            .map_err(|source| StoreError::Json { path: wt_path.clone(), source })?;
 
         walkthrough_from_json(wt_json)
     }
@@ -1229,10 +1161,8 @@ impl SessionFolder {
         let wt_path = self.walkthrough_json_path(walkthrough.walkthrough_id());
 
         let wt_json = walkthrough_to_json(walkthrough);
-        let wt_str = serde_json::to_string_pretty(&wt_json).map_err(|source| StoreError::Json {
-            path: wt_path.clone(),
-            source,
-        })?;
+        let wt_str = serde_json::to_string_pretty(&wt_json)
+            .map_err(|source| StoreError::Json { path: wt_path.clone(), source })?;
 
         write_atomic_in_session(
             self.root(),
@@ -1284,16 +1214,11 @@ impl SessionFolder {
 
     pub fn load_diagram_meta(&self, mmd_path: &Path) -> Result<DiagramMeta, StoreError> {
         let meta_path = self.diagram_meta_path(mmd_path)?;
-        let meta_str = fs::read_to_string(&meta_path).map_err(|source| StoreError::Io {
-            path: meta_path.clone(),
-            source,
-        })?;
+        let meta_str = fs::read_to_string(&meta_path)
+            .map_err(|source| StoreError::Io { path: meta_path.clone(), source })?;
 
-        let meta_json: DiagramMetaJson =
-            serde_json::from_str(&meta_str).map_err(|source| StoreError::Json {
-                path: meta_path.clone(),
-                source,
-            })?;
+        let meta_json: DiagramMetaJson = serde_json::from_str(&meta_str)
+            .map_err(|source| StoreError::Json { path: meta_path.clone(), source })?;
 
         diagram_meta_from_json(self.root(), meta_json)
     }
@@ -1302,11 +1227,8 @@ impl SessionFolder {
         let meta_path = self.diagram_meta_path(&meta.mmd_path)?;
 
         let meta_json = diagram_meta_to_json(self.root(), meta)?;
-        let meta_str =
-            serde_json::to_string_pretty(&meta_json).map_err(|source| StoreError::Json {
-                path: meta_path.clone(),
-                source,
-            })?;
+        let meta_str = serde_json::to_string_pretty(&meta_json)
+            .map_err(|source| StoreError::Json { path: meta_path.clone(), source })?;
 
         write_atomic_in_session(
             self.root(),

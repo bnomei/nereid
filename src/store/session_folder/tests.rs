@@ -37,16 +37,10 @@ struct TempDir {
 
 impl TempDir {
     fn new(prefix: &str) -> Self {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
         let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
         let mut path = env::temp_dir();
-        path.push(format!(
-            "nereid-{prefix}-{}-{nanos}-{counter}",
-            std::process::id()
-        ));
+        path.push(format!("nereid-{prefix}-{}-{nanos}-{counter}", std::process::id()));
         std::fs::create_dir_all(&path).unwrap();
         Self { path }
     }
@@ -74,11 +68,7 @@ impl SessionFolderTestCtx {
         let session_dir = tmp.path().join("my-session");
         std::fs::create_dir_all(&session_dir).unwrap();
         let folder = SessionFolder::new(&session_dir);
-        Self {
-            tmp,
-            session_dir,
-            folder,
-        }
+        Self { tmp, session_dir, folder }
     }
 }
 
@@ -158,10 +148,7 @@ fn load_or_init_session_creates_seed_diagram_when_meta_is_missing(ctx: SessionFo
     assert!(!meta_path.exists());
 
     let session = folder.load_or_init_session().unwrap();
-    assert_eq!(
-        session.session_id(),
-        &SessionId::new("s:my-session").unwrap()
-    );
+    assert_eq!(session.session_id(), &SessionId::new("s:my-session").unwrap());
     assert!(meta_path.is_file());
 
     let diagram_id = DiagramId::new("flow").unwrap();
@@ -226,23 +213,17 @@ fn save_active_diagram_id_updates_meta_and_loads_back(ctx: SessionFolderTestCtx)
 
     let d1 = DiagramId::new("d1").unwrap();
     let mut d1_ast = FlowchartAst::default();
-    d1_ast
-        .nodes_mut()
-        .insert(ObjectId::new("n:start").unwrap(), FlowNode::new("Start"));
-    session.diagrams_mut().insert(
-        d1.clone(),
-        Diagram::new(d1.clone(), "Diagram 1", DiagramAst::Flowchart(d1_ast)),
-    );
+    d1_ast.nodes_mut().insert(ObjectId::new("n:start").unwrap(), FlowNode::new("Start"));
+    session
+        .diagrams_mut()
+        .insert(d1.clone(), Diagram::new(d1.clone(), "Diagram 1", DiagramAst::Flowchart(d1_ast)));
 
     let d2 = DiagramId::new("d2").unwrap();
     let mut d2_ast = FlowchartAst::default();
-    d2_ast
-        .nodes_mut()
-        .insert(ObjectId::new("n:end").unwrap(), FlowNode::new("End"));
-    session.diagrams_mut().insert(
-        d2.clone(),
-        Diagram::new(d2.clone(), "Diagram 2", DiagramAst::Flowchart(d2_ast)),
-    );
+    d2_ast.nodes_mut().insert(ObjectId::new("n:end").unwrap(), FlowNode::new("End"));
+    session
+        .diagrams_mut()
+        .insert(d2.clone(), Diagram::new(d2.clone(), "Diagram 2", DiagramAst::Flowchart(d2_ast)));
 
     session.set_active_diagram_id(Some(d1));
     folder.save_session(&session).unwrap();
@@ -291,17 +272,11 @@ fn save_diagram_meta_stores_relative_paths_and_load_resolves_them(ctx: SessionFo
     folder.save_diagram_meta(&meta).unwrap();
 
     let sidecar_path = folder.diagram_meta_path(&mmd_path).unwrap();
-    assert_eq!(
-        sidecar_path,
-        session_dir.join("diagrams/auth-flow.meta.json")
-    );
+    assert_eq!(sidecar_path, session_dir.join("diagrams/auth-flow.meta.json"));
 
     let meta_str = std::fs::read_to_string(&sidecar_path).unwrap();
     let meta_json: serde_json::Value = serde_json::from_str(&meta_str).unwrap();
-    assert_eq!(
-        meta_json["mmd_path"].as_str().unwrap(),
-        "diagrams/auth-flow.mmd"
-    );
+    assert_eq!(meta_json["mmd_path"].as_str().unwrap(), "diagrams/auth-flow.mmd");
     assert!(meta_json.get("stable_id_map").is_some());
     assert!(meta_json.get("xrefs").is_some());
 
@@ -370,12 +345,8 @@ fn save_session_exports_canonical_mmd_and_text_unicode(ctx: SessionFolderTestCtx
     let mut seq_ast = SequenceAst::default();
     let p_alice = ObjectId::new("p:alice").unwrap();
     let p_bob = ObjectId::new("p:bob").unwrap();
-    seq_ast
-        .participants_mut()
-        .insert(p_alice.clone(), SequenceParticipant::new("Alice"));
-    seq_ast
-        .participants_mut()
-        .insert(p_bob.clone(), SequenceParticipant::new("Bob"));
+    seq_ast.participants_mut().insert(p_alice.clone(), SequenceParticipant::new("Alice"));
+    seq_ast.participants_mut().insert(p_bob.clone(), SequenceParticipant::new("Bob"));
     seq_ast.messages_mut().push(SequenceMessage::new(
         ObjectId::new("m:0001").unwrap(),
         p_alice.clone(),
@@ -384,11 +355,8 @@ fn save_session_exports_canonical_mmd_and_text_unicode(ctx: SessionFolderTestCtx
         "Hello",
         1000,
     ));
-    let seq_diagram = Diagram::new(
-        seq_id.clone(),
-        "Seq Example",
-        DiagramAst::Sequence(seq_ast.clone()),
-    );
+    let seq_diagram =
+        Diagram::new(seq_id.clone(), "Seq Example", DiagramAst::Sequence(seq_ast.clone()));
     let seq_expected_mmd = export_sequence_diagram(&seq_ast).unwrap();
     let seq_layout = layout_sequence(&seq_ast).unwrap();
     let mut seq_expected_text = render_sequence_unicode(&seq_ast, &seq_layout).unwrap();
@@ -399,21 +367,13 @@ fn save_session_exports_canonical_mmd_and_text_unicode(ctx: SessionFolderTestCtx
     let mut flow_ast = FlowchartAst::default();
     let n_start = ObjectId::new("n:start").unwrap();
     let n_end = ObjectId::new("n:end").unwrap();
+    flow_ast.nodes_mut().insert(n_start.clone(), FlowNode::new("Start"));
+    flow_ast.nodes_mut().insert(n_end.clone(), FlowNode::new("End"));
     flow_ast
-        .nodes_mut()
-        .insert(n_start.clone(), FlowNode::new("Start"));
-    flow_ast
-        .nodes_mut()
-        .insert(n_end.clone(), FlowNode::new("End"));
-    flow_ast.edges_mut().insert(
-        ObjectId::new("e:0001").unwrap(),
-        FlowEdge::new(n_start.clone(), n_end.clone()),
-    );
-    let flow_diagram = Diagram::new(
-        flow_id.clone(),
-        "Flow Example",
-        DiagramAst::Flowchart(flow_ast.clone()),
-    );
+        .edges_mut()
+        .insert(ObjectId::new("e:0001").unwrap(), FlowEdge::new(n_start.clone(), n_end.clone()));
+    let flow_diagram =
+        Diagram::new(flow_id.clone(), "Flow Example", DiagramAst::Flowchart(flow_ast.clone()));
     let flow_expected_mmd = export_flowchart(&flow_ast).unwrap();
     let flow_layout = layout_flowchart(&flow_ast).unwrap();
     let mut flow_expected_text = render_flowchart_unicode(&flow_ast, &flow_layout).unwrap();
@@ -444,25 +404,13 @@ fn save_session_exports_canonical_mmd_and_text_unicode(ctx: SessionFolderTestCtx
     // Exported files are written under the session folder.
     let seq_mmd_path = session_dir.join("diagrams/d1.mmd");
     let seq_text_path = session_dir.join("diagrams/d1.ascii.txt");
-    assert_eq!(
-        std::fs::read_to_string(&seq_mmd_path).unwrap(),
-        seq_expected_mmd
-    );
-    assert_eq!(
-        std::fs::read_to_string(&seq_text_path).unwrap(),
-        seq_expected_text
-    );
+    assert_eq!(std::fs::read_to_string(&seq_mmd_path).unwrap(), seq_expected_mmd);
+    assert_eq!(std::fs::read_to_string(&seq_text_path).unwrap(), seq_expected_text);
 
     let flow_mmd_path = session_dir.join("diagrams/d2.mmd");
     let flow_text_path = session_dir.join("diagrams/d2.ascii.txt");
-    assert_eq!(
-        std::fs::read_to_string(&flow_mmd_path).unwrap(),
-        flow_expected_mmd
-    );
-    assert_eq!(
-        std::fs::read_to_string(&flow_text_path).unwrap(),
-        flow_expected_text
-    );
+    assert_eq!(std::fs::read_to_string(&flow_mmd_path).unwrap(), flow_expected_mmd);
+    assert_eq!(std::fs::read_to_string(&flow_text_path).unwrap(), flow_expected_text);
 }
 
 #[cfg(unix)]
@@ -485,12 +433,8 @@ fn save_session_refuses_writing_through_symlinked_diagrams_dir(ctx: SessionFolde
     let mut seq_ast = SequenceAst::default();
     let p_alice = ObjectId::new("p:alice").unwrap();
     let p_bob = ObjectId::new("p:bob").unwrap();
-    seq_ast
-        .participants_mut()
-        .insert(p_alice.clone(), SequenceParticipant::new("Alice"));
-    seq_ast
-        .participants_mut()
-        .insert(p_bob.clone(), SequenceParticipant::new("Bob"));
+    seq_ast.participants_mut().insert(p_alice.clone(), SequenceParticipant::new("Alice"));
+    seq_ast.participants_mut().insert(p_bob.clone(), SequenceParticipant::new("Bob"));
     seq_ast.messages_mut().push(SequenceMessage::new(
         ObjectId::new("m:0001").unwrap(),
         p_alice,
@@ -499,10 +443,9 @@ fn save_session_refuses_writing_through_symlinked_diagrams_dir(ctx: SessionFolde
         "Hello",
         1,
     ));
-    session.diagrams_mut().insert(
-        seq_id.clone(),
-        Diagram::new(seq_id, "Seq Example", DiagramAst::Sequence(seq_ast)),
-    );
+    session
+        .diagrams_mut()
+        .insert(seq_id.clone(), Diagram::new(seq_id, "Seq Example", DiagramAst::Sequence(seq_ast)));
 
     let err = folder.save_session(&session).unwrap_err();
     match err {
@@ -594,12 +537,8 @@ fn save_and_load_session_supports_encoded_ids_for_diagrams_and_walkthroughs(
     let mut seq_ast = SequenceAst::default();
     let p_alice = ObjectId::new("p:alice").unwrap();
     let p_bob = ObjectId::new("p:bob").unwrap();
-    seq_ast
-        .participants_mut()
-        .insert(p_alice.clone(), SequenceParticipant::new("Alice"));
-    seq_ast
-        .participants_mut()
-        .insert(p_bob.clone(), SequenceParticipant::new("Bob"));
+    seq_ast.participants_mut().insert(p_alice.clone(), SequenceParticipant::new("Alice"));
+    seq_ast.participants_mut().insert(p_bob.clone(), SequenceParticipant::new("Bob"));
     seq_ast.messages_mut().push(SequenceMessage::new(
         ObjectId::new("m:0001").unwrap(),
         p_alice,
@@ -610,22 +549,15 @@ fn save_and_load_session_supports_encoded_ids_for_diagrams_and_walkthroughs(
     ));
     session.diagrams_mut().insert(
         diagram_id.clone(),
-        Diagram::new(
-            diagram_id.clone(),
-            "Seq Example",
-            DiagramAst::Sequence(seq_ast),
-        ),
+        Diagram::new(diagram_id.clone(), "Seq Example", DiagramAst::Sequence(seq_ast)),
     );
 
     let walkthrough_id = WalkthroughId::new("w:1").unwrap();
     let mut walkthrough = Walkthrough::new(walkthrough_id.clone(), "Walkthrough");
-    walkthrough.nodes_mut().push(WalkthroughNode::new(
-        WalkthroughNodeId::new("n:start").unwrap(),
-        "Start",
-    ));
-    session
-        .walkthroughs_mut()
-        .insert(walkthrough_id.clone(), walkthrough);
+    walkthrough
+        .nodes_mut()
+        .push(WalkthroughNode::new(WalkthroughNodeId::new("n:start").unwrap(), "Start"));
+    session.walkthroughs_mut().insert(walkthrough_id.clone(), walkthrough);
 
     folder.save_session(&session).unwrap();
 
@@ -679,12 +611,8 @@ fn removed_walkthrough_does_not_resurrect_after_save_load(ctx: SessionFolderTest
 
     let w1 = WalkthroughId::new("w1").unwrap();
     let w2 = WalkthroughId::new("w2").unwrap();
-    session
-        .walkthroughs_mut()
-        .insert(w1.clone(), Walkthrough::new(w1.clone(), "One"));
-    session
-        .walkthroughs_mut()
-        .insert(w2.clone(), Walkthrough::new(w2.clone(), "Two"));
+    session.walkthroughs_mut().insert(w1.clone(), Walkthrough::new(w1.clone(), "One"));
+    session.walkthroughs_mut().insert(w2.clone(), Walkthrough::new(w2.clone(), "Two"));
 
     folder.save_session(&session).unwrap();
 
@@ -758,12 +686,8 @@ fn save_session_and_load_session_round_trips_diagrams_and_walkthroughs(ctx: Sess
     let mut seq_ast = SequenceAst::default();
     let p_alice = ObjectId::new("p:Alice").unwrap();
     let p_bob = ObjectId::new("p:Bob").unwrap();
-    seq_ast
-        .participants_mut()
-        .insert(p_alice.clone(), SequenceParticipant::new("Alice"));
-    seq_ast
-        .participants_mut()
-        .insert(p_bob.clone(), SequenceParticipant::new("Bob"));
+    seq_ast.participants_mut().insert(p_alice.clone(), SequenceParticipant::new("Alice"));
+    seq_ast.participants_mut().insert(p_bob.clone(), SequenceParticipant::new("Bob"));
     seq_ast.messages_mut().push(SequenceMessage::new(
         ObjectId::new("m:0001").unwrap(),
         p_alice.clone(),
@@ -791,16 +715,12 @@ fn save_session_and_load_session_round_trips_diagrams_and_walkthroughs(ctx: Sess
     end.set_mermaid_id(Some("end"));
     flow_ast.nodes_mut().insert(node_start_id.clone(), start);
     flow_ast.nodes_mut().insert(node_end_id.clone(), end);
-    flow_ast.edges_mut().insert(
-        ObjectId::new("e:0001").unwrap(),
-        FlowEdge::new(node_start_id, node_end_id),
-    );
+    flow_ast
+        .edges_mut()
+        .insert(ObjectId::new("e:0001").unwrap(), FlowEdge::new(node_start_id, node_end_id));
     session.diagrams_mut().insert(flow_id.clone(), {
-        let mut diagram = Diagram::new(
-            flow_id.clone(),
-            "Flow Example",
-            DiagramAst::Flowchart(flow_ast),
-        );
+        let mut diagram =
+            Diagram::new(flow_id.clone(), "Flow Example", DiagramAst::Flowchart(flow_ast));
         diagram.bump_rev();
         diagram
     });
@@ -826,16 +746,10 @@ fn save_session_and_load_session_round_trips_diagrams_and_walkthroughs(ctx: Sess
     walkthrough.nodes_mut().push(node_start);
 
     let node_end_id = WalkthroughNodeId::new("n:end").unwrap();
-    walkthrough
-        .nodes_mut()
-        .push(WalkthroughNode::new(node_end_id.clone(), "End"));
+    walkthrough.nodes_mut().push(WalkthroughNode::new(node_end_id.clone(), "End"));
 
-    walkthrough
-        .edges_mut()
-        .push(WalkthroughEdge::new(node_start_id, node_end_id, "next"));
-    session
-        .walkthroughs_mut()
-        .insert(walkthrough_id.clone(), walkthrough);
+    walkthrough.edges_mut().push(WalkthroughEdge::new(node_start_id, node_end_id, "next"));
+    session.walkthroughs_mut().insert(walkthrough_id.clone(), walkthrough);
 
     session.set_active_diagram_id(Some(seq_id.clone()));
     session.set_active_walkthrough_id(Some(walkthrough_id.clone()));
@@ -874,13 +788,10 @@ fn save_and_load_preserves_stable_object_ids_across_mermaid_visible_renames(
     let participant_bob_id = ObjectId::new("p:bob").unwrap();
     let message_id = ObjectId::new("m:0001").unwrap();
     let mut seq_ast = SequenceAst::default();
-    seq_ast.participants_mut().insert(
-        participant_alice_id.clone(),
-        SequenceParticipant::new("Alicia"),
-    );
     seq_ast
         .participants_mut()
-        .insert(participant_bob_id.clone(), SequenceParticipant::new("Bob"));
+        .insert(participant_alice_id.clone(), SequenceParticipant::new("Alicia"));
+    seq_ast.participants_mut().insert(participant_bob_id.clone(), SequenceParticipant::new("Bob"));
     seq_ast.messages_mut().push(SequenceMessage::new(
         message_id,
         participant_alice_id.clone(),
@@ -889,10 +800,9 @@ fn save_and_load_preserves_stable_object_ids_across_mermaid_visible_renames(
         "Hi",
         1000,
     ));
-    session.diagrams_mut().insert(
-        seq_id.clone(),
-        Diagram::new(seq_id.clone(), "Seq", DiagramAst::Sequence(seq_ast)),
-    );
+    session
+        .diagrams_mut()
+        .insert(seq_id.clone(), Diagram::new(seq_id.clone(), "Seq", DiagramAst::Sequence(seq_ast)));
 
     let flow_id = DiagramId::new("d-flow").unwrap();
     let node_authorize_id = ObjectId::new("n:authorize").unwrap();
@@ -903,14 +813,11 @@ fn save_and_load_preserves_stable_object_ids_across_mermaid_visible_renames(
     authorize.set_mermaid_id(Some("authz"));
     let mut end = FlowNode::new("End");
     end.set_mermaid_id(Some("end"));
-    flow_ast
-        .nodes_mut()
-        .insert(node_authorize_id.clone(), authorize);
+    flow_ast.nodes_mut().insert(node_authorize_id.clone(), authorize);
     flow_ast.nodes_mut().insert(node_end_id.clone(), end);
-    flow_ast.edges_mut().insert(
-        edge_id,
-        FlowEdge::new(node_authorize_id.clone(), node_end_id.clone()),
-    );
+    flow_ast
+        .edges_mut()
+        .insert(edge_id, FlowEdge::new(node_authorize_id.clone(), node_end_id.clone()));
     session.diagrams_mut().insert(
         flow_id.clone(),
         Diagram::new(flow_id.clone(), "Flow", DiagramAst::Flowchart(flow_ast)),
@@ -927,34 +834,22 @@ fn save_and_load_preserves_stable_object_ids_across_mermaid_visible_renames(
         CategoryPath::new(vec!["flow".to_owned(), "node".to_owned()]).unwrap(),
         node_authorize_id,
     );
-    session.xrefs_mut().insert(
-        xref_id,
-        XRef::new(from_ref, to_ref, "relates_to", ModelXRefStatus::Ok),
-    );
+    session
+        .xrefs_mut()
+        .insert(xref_id, XRef::new(from_ref, to_ref, "relates_to", ModelXRefStatus::Ok));
 
     folder.save_session(&session).unwrap();
 
-    let seq_sidecar = folder
-        .load_diagram_meta(&folder.default_diagram_mmd_path(&seq_id))
-        .unwrap();
+    let seq_sidecar = folder.load_diagram_meta(&folder.default_diagram_mmd_path(&seq_id)).unwrap();
     assert_eq!(
-        seq_sidecar
-            .stable_id_map
-            .by_name
-            .get("Alicia")
-            .map(String::as_str),
+        seq_sidecar.stable_id_map.by_name.get("Alicia").map(String::as_str),
         Some("p:alice")
     );
 
-    let flow_sidecar = folder
-        .load_diagram_meta(&folder.default_diagram_mmd_path(&flow_id))
-        .unwrap();
+    let flow_sidecar =
+        folder.load_diagram_meta(&folder.default_diagram_mmd_path(&flow_id)).unwrap();
     assert_eq!(
-        flow_sidecar
-            .stable_id_map
-            .by_mermaid_id
-            .get("authz")
-            .map(String::as_str),
+        flow_sidecar.stable_id_map.by_mermaid_id.get("authz").map(String::as_str),
         Some("n:authorize")
     );
 
@@ -976,9 +871,7 @@ fn save_and_load_session_round_trips_inline_notes_via_sidecar(ctx: SessionFolder
     let mut alice = SequenceParticipant::new("Alice");
     alice.set_note(Some("caller must be authenticated"));
     seq_ast.participants_mut().insert(p_alice.clone(), alice);
-    seq_ast
-        .participants_mut()
-        .insert(p_bob.clone(), SequenceParticipant::new("Bob"));
+    seq_ast.participants_mut().insert(p_bob.clone(), SequenceParticipant::new("Bob"));
     seq_ast.messages_mut().push(SequenceMessage::new(
         ObjectId::new("m:0001").unwrap(),
         p_alice.clone(),
@@ -987,10 +880,9 @@ fn save_and_load_session_round_trips_inline_notes_via_sidecar(ctx: SessionFolder
         "Hello",
         1000,
     ));
-    session.diagrams_mut().insert(
-        seq_id.clone(),
-        Diagram::new(seq_id, "Seq Notes", DiagramAst::Sequence(seq_ast)),
-    );
+    session
+        .diagrams_mut()
+        .insert(seq_id.clone(), Diagram::new(seq_id, "Seq Notes", DiagramAst::Sequence(seq_ast)));
 
     // Flowchart diagram.
     let flow_id = DiagramId::new("d2").unwrap();
@@ -999,17 +891,14 @@ fn save_and_load_session_round_trips_inline_notes_via_sidecar(ctx: SessionFolder
     let node_end_id = ObjectId::new("n:end").unwrap();
     let mut node_start = FlowNode::new("Start");
     node_start.set_mermaid_id(Some("start"));
-    flow_ast
-        .nodes_mut()
-        .insert(node_start_id.clone(), node_start);
+    flow_ast.nodes_mut().insert(node_start_id.clone(), node_start);
     let mut node_end = FlowNode::new("End");
     node_end.set_mermaid_id(Some("end"));
     node_end.set_note(Some("must be idempotent"));
     flow_ast.nodes_mut().insert(node_end_id.clone(), node_end);
-    flow_ast.edges_mut().insert(
-        ObjectId::new("e:0001").unwrap(),
-        FlowEdge::new(node_start_id, node_end_id),
-    );
+    flow_ast
+        .edges_mut()
+        .insert(ObjectId::new("e:0001").unwrap(), FlowEdge::new(node_start_id, node_end_id));
     session.diagrams_mut().insert(
         flow_id.clone(),
         Diagram::new(flow_id, "Flow Notes", DiagramAst::Flowchart(flow_ast)),
@@ -1031,20 +920,11 @@ fn save_and_load_flowchart_preserves_edge_ids_and_style_via_sidecar(ctx: Session
     let mut flow_ast = FlowchartAst::default();
     let node_a = ObjectId::new("n:a").unwrap();
     let node_b = ObjectId::new("n:b").unwrap();
-    flow_ast
-        .nodes_mut()
-        .insert(node_a.clone(), FlowNode::new("A"));
-    flow_ast
-        .nodes_mut()
-        .insert(node_b.clone(), FlowNode::new("B"));
+    flow_ast.nodes_mut().insert(node_a.clone(), FlowNode::new("A"));
+    flow_ast.nodes_mut().insert(node_b.clone(), FlowNode::new("B"));
     flow_ast.edges_mut().insert(
         ObjectId::new("e:custom").unwrap(),
-        FlowEdge::new_with(
-            node_a,
-            node_b,
-            Some("yes".to_owned()),
-            Some("dashed".to_owned()),
-        ),
+        FlowEdge::new_with(node_a, node_b, Some("yes".to_owned()), Some("dashed".to_owned())),
     );
     session.diagrams_mut().insert(
         flow_id.clone(),
@@ -1074,19 +954,12 @@ fn load_session_does_not_reuse_edge_ids_from_sidecar_for_new_edges(ctx: SessionF
     let node_a = ObjectId::new("n:a").unwrap();
     let node_b = ObjectId::new("n:b").unwrap();
     let node_c = ObjectId::new("n:c").unwrap();
+    flow_ast.nodes_mut().insert(node_a.clone(), FlowNode::new("A"));
+    flow_ast.nodes_mut().insert(node_b.clone(), FlowNode::new("B"));
+    flow_ast.nodes_mut().insert(node_c.clone(), FlowNode::new("C"));
     flow_ast
-        .nodes_mut()
-        .insert(node_a.clone(), FlowNode::new("A"));
-    flow_ast
-        .nodes_mut()
-        .insert(node_b.clone(), FlowNode::new("B"));
-    flow_ast
-        .nodes_mut()
-        .insert(node_c.clone(), FlowNode::new("C"));
-    flow_ast.edges_mut().insert(
-        ObjectId::new("e:0001").unwrap(),
-        FlowEdge::new(node_a.clone(), node_b),
-    );
+        .edges_mut()
+        .insert(ObjectId::new("e:0001").unwrap(), FlowEdge::new(node_a.clone(), node_b));
     session.diagrams_mut().insert(
         flow_id.clone(),
         Diagram::new(flow_id.clone(), "Flow", DiagramAst::Flowchart(flow_ast)),
@@ -1122,12 +995,8 @@ fn save_and_load_sequence_preserves_message_ids_via_sidecar_even_when_parse_orde
     let mut seq_ast = SequenceAst::default();
     let p_alice = ObjectId::new("p:Alice").unwrap();
     let p_bob = ObjectId::new("p:Bob").unwrap();
-    seq_ast
-        .participants_mut()
-        .insert(p_alice.clone(), SequenceParticipant::new("Alice"));
-    seq_ast
-        .participants_mut()
-        .insert(p_bob.clone(), SequenceParticipant::new("Bob"));
+    seq_ast.participants_mut().insert(p_alice.clone(), SequenceParticipant::new("Alice"));
+    seq_ast.participants_mut().insert(p_bob.clone(), SequenceParticipant::new("Bob"));
     seq_ast.messages_mut().push(SequenceMessage::new(
         ObjectId::new("m:alpha").unwrap(),
         p_alice.clone(),
@@ -1144,10 +1013,9 @@ fn save_and_load_sequence_preserves_message_ids_via_sidecar_even_when_parse_orde
         "Second",
         2000,
     ));
-    session.diagrams_mut().insert(
-        seq_id.clone(),
-        Diagram::new(seq_id.clone(), "Seq", DiagramAst::Sequence(seq_ast)),
-    );
+    session
+        .diagrams_mut()
+        .insert(seq_id.clone(), Diagram::new(seq_id.clone(), "Seq", DiagramAst::Sequence(seq_ast)));
 
     folder.save_session(&session).unwrap();
 
@@ -1191,12 +1059,8 @@ fn load_session_does_not_reuse_message_ids_from_sidecar_for_new_messages(
     let mut seq_ast = SequenceAst::default();
     let p_alice = ObjectId::new("p:Alice").unwrap();
     let p_bob = ObjectId::new("p:Bob").unwrap();
-    seq_ast
-        .participants_mut()
-        .insert(p_alice.clone(), SequenceParticipant::new("Alice"));
-    seq_ast
-        .participants_mut()
-        .insert(p_bob.clone(), SequenceParticipant::new("Bob"));
+    seq_ast.participants_mut().insert(p_alice.clone(), SequenceParticipant::new("Alice"));
+    seq_ast.participants_mut().insert(p_bob.clone(), SequenceParticipant::new("Bob"));
     seq_ast.messages_mut().push(SequenceMessage::new(
         ObjectId::new("m:0001").unwrap(),
         p_alice.clone(),
@@ -1205,10 +1069,9 @@ fn load_session_does_not_reuse_message_ids_from_sidecar_for_new_messages(
         "First",
         1000,
     ));
-    session.diagrams_mut().insert(
-        seq_id.clone(),
-        Diagram::new(seq_id.clone(), "Seq", DiagramAst::Sequence(seq_ast)),
-    );
+    session
+        .diagrams_mut()
+        .insert(seq_id.clone(), Diagram::new(seq_id.clone(), "Seq", DiagramAst::Sequence(seq_ast)));
 
     folder.save_session(&session).unwrap();
 
@@ -1240,15 +1103,9 @@ fn xrefs_targeting_flow_edges_and_seq_messages_round_trip_without_becoming_dangl
     let node_a = ObjectId::new("n:a").unwrap();
     let node_b = ObjectId::new("n:b").unwrap();
     let edge_id = ObjectId::new("e:custom").unwrap();
-    flow_ast
-        .nodes_mut()
-        .insert(node_a.clone(), FlowNode::new("A"));
-    flow_ast
-        .nodes_mut()
-        .insert(node_b.clone(), FlowNode::new("B"));
-    flow_ast
-        .edges_mut()
-        .insert(edge_id.clone(), FlowEdge::new(node_a, node_b));
+    flow_ast.nodes_mut().insert(node_a.clone(), FlowNode::new("A"));
+    flow_ast.nodes_mut().insert(node_b.clone(), FlowNode::new("B"));
+    flow_ast.edges_mut().insert(edge_id.clone(), FlowEdge::new(node_a, node_b));
     session.diagrams_mut().insert(
         flow_id.clone(),
         Diagram::new(flow_id.clone(), "Flow", DiagramAst::Flowchart(flow_ast)),
@@ -1259,12 +1116,8 @@ fn xrefs_targeting_flow_edges_and_seq_messages_round_trip_without_becoming_dangl
     let p_alice = ObjectId::new("p:Alice").unwrap();
     let p_bob = ObjectId::new("p:Bob").unwrap();
     let message_id = ObjectId::new("m:alpha").unwrap();
-    seq_ast
-        .participants_mut()
-        .insert(p_alice.clone(), SequenceParticipant::new("Alice"));
-    seq_ast
-        .participants_mut()
-        .insert(p_bob.clone(), SequenceParticipant::new("Bob"));
+    seq_ast.participants_mut().insert(p_alice.clone(), SequenceParticipant::new("Alice"));
+    seq_ast.participants_mut().insert(p_bob.clone(), SequenceParticipant::new("Bob"));
     seq_ast.messages_mut().push(SequenceMessage::new(
         message_id.clone(),
         p_alice,
@@ -1273,10 +1126,9 @@ fn xrefs_targeting_flow_edges_and_seq_messages_round_trip_without_becoming_dangl
         "Hello",
         1000,
     ));
-    session.diagrams_mut().insert(
-        seq_id.clone(),
-        Diagram::new(seq_id.clone(), "Seq", DiagramAst::Sequence(seq_ast)),
-    );
+    session
+        .diagrams_mut()
+        .insert(seq_id.clone(), Diagram::new(seq_id.clone(), "Seq", DiagramAst::Sequence(seq_ast)));
 
     let from_ref = ObjectRef::new(
         flow_id.clone(),
@@ -1291,12 +1143,7 @@ fn xrefs_targeting_flow_edges_and_seq_messages_round_trip_without_becoming_dangl
     let xref_id = XRefId::new("x:1").unwrap();
     session.xrefs_mut().insert(
         xref_id.clone(),
-        XRef::new(
-            from_ref.clone(),
-            to_ref.clone(),
-            "relates_to",
-            ModelXRefStatus::Ok,
-        ),
+        XRef::new(from_ref.clone(), to_ref.clone(), "relates_to", ModelXRefStatus::Ok),
     );
 
     folder.save_session(&session).unwrap();
@@ -1316,11 +1163,7 @@ fn save_session_writes_diagram_sidecars(ctx: SessionFolderTestCtx) {
     let diagram_id = DiagramId::new("d1").unwrap();
     session.diagrams_mut().insert(
         diagram_id.clone(),
-        Diagram::new(
-            diagram_id.clone(),
-            "Flow",
-            DiagramAst::Flowchart(FlowchartAst::default()),
-        ),
+        Diagram::new(diagram_id.clone(), "Flow", DiagramAst::Flowchart(FlowchartAst::default())),
     );
 
     folder.save_session(&session).unwrap();
@@ -1343,11 +1186,7 @@ fn load_session_is_compatible_when_diagram_sidecars_are_missing(ctx: SessionFold
     let diagram_id = DiagramId::new("d1").unwrap();
     session.diagrams_mut().insert(
         diagram_id.clone(),
-        Diagram::new(
-            diagram_id.clone(),
-            "Flow",
-            DiagramAst::Flowchart(FlowchartAst::default()),
-        ),
+        Diagram::new(diagram_id.clone(), "Flow", DiagramAst::Flowchart(FlowchartAst::default())),
     );
     folder.save_session(&session).unwrap();
 
@@ -1367,11 +1206,7 @@ fn load_session_errors_when_diagram_sidecar_is_invalid_json(ctx: SessionFolderTe
     let diagram_id = DiagramId::new("d1").unwrap();
     session.diagrams_mut().insert(
         diagram_id.clone(),
-        Diagram::new(
-            diagram_id.clone(),
-            "Flow",
-            DiagramAst::Flowchart(FlowchartAst::default()),
-        ),
+        Diagram::new(diagram_id.clone(), "Flow", DiagramAst::Flowchart(FlowchartAst::default())),
     );
     folder.save_session(&session).unwrap();
 

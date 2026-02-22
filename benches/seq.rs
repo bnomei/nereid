@@ -22,24 +22,16 @@ mod profiler;
 fn checksum_layout(layout: &SequenceLayout) -> u64 {
     let mut acc = 0u64;
 
-    acc = acc
-        .wrapping_mul(131)
-        .wrapping_add(layout.participant_cols().len() as u64);
-    acc = acc
-        .wrapping_mul(131)
-        .wrapping_add(layout.messages().len() as u64);
+    acc = acc.wrapping_mul(131).wrapping_add(layout.participant_cols().len() as u64);
+    acc = acc.wrapping_mul(131).wrapping_add(layout.messages().len() as u64);
 
     for (participant_id, col) in layout.participant_cols() {
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(participant_id.as_str().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(participant_id.as_str().len() as u64);
         acc = acc.wrapping_mul(131).wrapping_add(*col as u64);
     }
 
     for msg in layout.messages() {
-        acc = acc
-            .wrapping_mul(131)
-            .wrapping_add(msg.message_id().as_str().len() as u64);
+        acc = acc.wrapping_mul(131).wrapping_add(msg.message_id().as_str().len() as u64);
         acc = acc.wrapping_mul(131).wrapping_add(msg.from_col() as u64);
         acc = acc.wrapping_mul(131).wrapping_add(msg.to_col() as u64);
         acc = acc.wrapping_mul(131).wrapping_add(msg.row() as u64);
@@ -52,14 +44,8 @@ fn benches_seq(c: &mut Criterion) {
     let mut group = c.benchmark_group("seq.layout");
 
     for (case_id, ast) in [
-        (
-            fixtures::seq::Case::Small.id(),
-            fixtures::seq::fixture(fixtures::seq::Case::Small),
-        ),
-        (
-            fixtures::seq::Case::Medium.id(),
-            fixtures::seq::fixture(fixtures::seq::Case::Medium),
-        ),
+        (fixtures::seq::Case::Small.id(), fixtures::seq::fixture(fixtures::seq::Case::Small)),
+        (fixtures::seq::Case::Medium.id(), fixtures::seq::fixture(fixtures::seq::Case::Medium)),
         (
             fixtures::seq::Case::LargeLongText.id(),
             fixtures::seq::fixture(fixtures::seq::Case::LargeLongText),

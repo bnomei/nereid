@@ -20,6 +20,8 @@ Nereid is:
 - MCP-first: typed tools for diagram, xref, walkthrough, and query workflows.
 - Keyboard-first: fast panel navigation, hint jumps, chaining, and search.
 
+<a title="click to open" target="_blank" style="cursor: zoom-in;" href="https://raw.githubusercontent.com/bnomei/nereid/main/screenshot.png"><img src="https://raw.githubusercontent.com/bnomei/nereid/main/screenshot.png" alt="screenshot" style="width: 100%;" /></a>
+
 ## Installation
 
 ### From source

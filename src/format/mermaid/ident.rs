@@ -37,10 +37,7 @@ pub(super) fn validate_mermaid_ident(ident: &str) -> Result<(), MermaidIdentErro
     if ident.contains('/') {
         return Err(MermaidIdentError::ContainsSlash);
     }
-    if let Some(ch) = ident
-        .chars()
-        .find(|c| !c.is_ascii_alphanumeric() && *c != '_')
-    {
+    if let Some(ch) = ident.chars().find(|c| !c.is_ascii_alphanumeric() && *c != '_') {
         return Err(MermaidIdentError::InvalidChar { ch });
     }
     Ok(())

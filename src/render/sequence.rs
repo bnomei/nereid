@@ -75,10 +75,7 @@ impl fmt::Display for SequenceRenderError {
                 write!(f, "invalid participant column: {col}")
             }
             Self::InvalidBlockMembership { block_id, reason } => {
-                write!(
-                    f,
-                    "invalid block membership (block_id={block_id}): {reason}"
-                )
+                write!(f, "invalid block membership (block_id={block_id}): {reason}")
             }
         }
     }
@@ -123,16 +120,10 @@ pub fn render_sequence_unicode_with_options(
 
     for (col, participant_id) in participants {
         let participant = ast.participants().get(participant_id).ok_or_else(|| {
-            SequenceRenderError::MissingParticipant {
-                participant_id: participant_id.clone(),
-            }
+            SequenceRenderError::MissingParticipant { participant_id: participant_id.clone() }
         })?;
         let name = participant.mermaid_name();
-        let note = if options.show_notes {
-            participant.note()
-        } else {
-            None
-        };
+        let note = if options.show_notes { participant.note() } else { None };
 
         let (box_inner_width, box_total_width) = box_widths_prefixed(name, options);
         let box_x0 = cursor_x;
@@ -153,10 +144,7 @@ pub fn render_sequence_unicode_with_options(
         cursor_x = box_x1 + 1 + COL_GAP;
     }
 
-    let width = participant_renders
-        .last()
-        .map(|p| p.box_x1 + 1 + RIGHT_MARGIN)
-        .unwrap_or(1);
+    let width = participant_renders.last().map(|p| p.box_x1 + 1 + RIGHT_MARGIN).unwrap_or(1);
 
     let message_top_y = box_height + HEADER_GAP;
     let self_loop_rows = collect_self_loop_rows(layout);
@@ -195,35 +183,21 @@ pub fn render_sequence_unicode_with_options(
 
     for msg_layout in layout.messages() {
         let msg = messages_by_id.get(msg_layout.message_id()).ok_or_else(|| {
-            SequenceRenderError::MissingMessage {
-                message_id: msg_layout.message_id().clone(),
-            }
+            SequenceRenderError::MissingMessage { message_id: msg_layout.message_id().clone() }
         })?;
 
-        let from_x = *lifeline_x_by_col.get(&msg_layout.from_col()).ok_or(
-            SequenceRenderError::InvalidParticipantColumn {
-                col: msg_layout.from_col(),
-            },
-        )?;
-        let to_x = *lifeline_x_by_col.get(&msg_layout.to_col()).ok_or(
-            SequenceRenderError::InvalidParticipantColumn {
-                col: msg_layout.to_col(),
-            },
-        )?;
+        let from_x = *lifeline_x_by_col
+            .get(&msg_layout.from_col())
+            .ok_or(SequenceRenderError::InvalidParticipantColumn { col: msg_layout.from_col() })?;
+        let to_x = *lifeline_x_by_col
+            .get(&msg_layout.to_col())
+            .ok_or(SequenceRenderError::InvalidParticipantColumn { col: msg_layout.to_col() })?;
 
         let y = row_y_for(msg_layout.row(), &row_y_by_row, message_top_y);
         let message_text = prefixed_object_label(msg.text(), options);
         let self_right_limit =
             self_message_right_limit(msg_layout.from_col(), &next_lifeline_x_by_col, width);
-        draw_message(
-            &mut canvas,
-            from_x,
-            to_x,
-            y,
-            msg.kind(),
-            &message_text,
-            self_right_limit,
-        )?;
+        draw_message(&mut canvas, from_x, to_x, y, msg.kind(), &message_text, self_right_limit)?;
     }
 
     let overlays = draw_sequence_block_decorations(
@@ -265,16 +239,10 @@ pub fn render_sequence_unicode_annotated_with_options(
 
     for (col, participant_id) in participants {
         let participant = ast.participants().get(participant_id).ok_or_else(|| {
-            SequenceRenderError::MissingParticipant {
-                participant_id: participant_id.clone(),
-            }
+            SequenceRenderError::MissingParticipant { participant_id: participant_id.clone() }
         })?;
         let name = participant.mermaid_name();
-        let note = if options.show_notes {
-            participant.note()
-        } else {
-            None
-        };
+        let note = if options.show_notes { participant.note() } else { None };
 
         let (box_inner_width, box_total_width) = box_widths_prefixed(name, options);
         let box_x0 = cursor_x;
@@ -295,10 +263,7 @@ pub fn render_sequence_unicode_annotated_with_options(
         cursor_x = box_x1 + 1 + COL_GAP;
     }
 
-    let width = participant_renders
-        .last()
-        .map(|p| p.box_x1 + 1 + RIGHT_MARGIN)
-        .unwrap_or(1);
+    let width = participant_renders.last().map(|p| p.box_x1 + 1 + RIGHT_MARGIN).unwrap_or(1);
 
     let message_top_y = box_height + HEADER_GAP;
     let self_loop_rows = collect_self_loop_rows(layout);
@@ -367,16 +332,12 @@ pub fn render_sequence_unicode_annotated_with_options(
     }
 
     for msg_layout in layout.messages() {
-        let from_x = *lifeline_x_by_col.get(&msg_layout.from_col()).ok_or(
-            SequenceRenderError::InvalidParticipantColumn {
-                col: msg_layout.from_col(),
-            },
-        )?;
-        let to_x = *lifeline_x_by_col.get(&msg_layout.to_col()).ok_or(
-            SequenceRenderError::InvalidParticipantColumn {
-                col: msg_layout.to_col(),
-            },
-        )?;
+        let from_x = *lifeline_x_by_col
+            .get(&msg_layout.from_col())
+            .ok_or(SequenceRenderError::InvalidParticipantColumn { col: msg_layout.from_col() })?;
+        let to_x = *lifeline_x_by_col
+            .get(&msg_layout.to_col())
+            .ok_or(SequenceRenderError::InvalidParticipantColumn { col: msg_layout.to_col() })?;
 
         let y = row_y_for(msg_layout.row(), &row_y_by_row, message_top_y);
         let mut spans = Vec::<LineSpan>::new();
@@ -431,10 +392,7 @@ pub fn render_sequence_unicode_annotated_with_options(
     }
 
     clamp_highlight_index_to_text(&mut highlight_index, &text);
-    Ok(AnnotatedRender {
-        text,
-        highlight_index,
-    })
+    Ok(AnnotatedRender { text, highlight_index })
 }
 
 // Extracted sequence rendering internals and block drawing helpers.

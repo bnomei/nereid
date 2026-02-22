@@ -74,13 +74,7 @@ pub struct Diagram {
 impl Diagram {
     pub fn new(diagram_id: DiagramId, name: impl Into<String>, ast: DiagramAst) -> Self {
         let kind = ast.kind();
-        Self {
-            diagram_id,
-            name: name.into(),
-            kind,
-            ast,
-            rev: 0,
-        }
+        Self { diagram_id, name: name.into(), kind, ast, rev: 0 }
     }
 
     pub fn diagram_id(&self) -> &DiagramId {
@@ -102,10 +96,7 @@ impl Diagram {
     pub fn replace_ast(&mut self, ast: DiagramAst) -> Result<DiagramAst, DiagramAstKindMismatch> {
         let found = ast.kind();
         if found != self.kind {
-            return Err(DiagramAstKindMismatch {
-                expected: self.kind,
-                found,
-            });
+            return Err(DiagramAstKindMismatch { expected: self.kind, found });
         }
 
         Ok(std::mem::replace(&mut self.ast, ast))
@@ -145,9 +136,7 @@ mod tests {
         diagram.bump_rev();
         diagram.bump_rev();
 
-        diagram
-            .set_ast(DiagramAst::Sequence(SequenceAst::default()))
-            .expect("set_ast");
+        diagram.set_ast(DiagramAst::Sequence(SequenceAst::default())).expect("set_ast");
 
         assert_eq!(diagram.diagram_id(), &diagram_id);
         assert_eq!(diagram.name(), "Example");
@@ -161,11 +150,8 @@ mod tests {
     #[test]
     fn diagram_rejects_replacing_ast_with_different_kind() {
         let diagram_id = DiagramId::new("d1").expect("diagram id");
-        let mut diagram = Diagram::new(
-            diagram_id,
-            "Example",
-            DiagramAst::Sequence(SequenceAst::default()),
-        );
+        let mut diagram =
+            Diagram::new(diagram_id, "Example", DiagramAst::Sequence(SequenceAst::default()));
 
         let result = diagram.replace_ast(DiagramAst::Flowchart(FlowchartAst::default()));
 

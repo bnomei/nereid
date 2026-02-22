@@ -26,9 +26,7 @@ pub(crate) fn gen_labels(n: usize, hint_chars: &str) -> Vec<String> {
 
     if k == 1 {
         let ch = alphabet[0];
-        return (1..=n)
-            .map(|len| std::iter::repeat(ch).take(len).collect())
-            .collect();
+        return (1..=n).map(|len| std::iter::repeat(ch).take(len).collect()).collect();
     }
 
     fn pow_saturating(base: usize, exp: usize) -> usize {
@@ -71,22 +69,14 @@ mod tests {
 
     #[test]
     fn gen_labels_n_le_k() {
-        assert_eq!(
-            gen_labels(3, "abc"),
-            vec!["a".to_string(), "b".to_string(), "c".to_string()]
-        );
+        assert_eq!(gen_labels(3, "abc"), vec!["a".to_string(), "b".to_string(), "c".to_string()]);
     }
 
     #[test]
     fn gen_labels_n_eq_k_plus_one() {
         assert_eq!(
             gen_labels(4, "abc"),
-            vec![
-                "a".to_string(),
-                "b".to_string(),
-                "c".to_string(),
-                "aa".to_string()
-            ]
+            vec!["a".to_string(), "b".to_string(), "c".to_string(), "aa".to_string()]
         );
     }
 
@@ -100,18 +90,12 @@ mod tests {
             assert!(uniq.insert(l.as_str()), "duplicate label: {l}");
         }
 
-        let expected_first: Vec<String> = ["s", "a", "d", "f", "j"]
-            .iter()
-            .copied()
-            .map(String::from)
-            .collect();
+        let expected_first: Vec<String> =
+            ["s", "a", "d", "f", "j"].iter().copied().map(String::from).collect();
         assert_eq!(&labels[..5], expected_first.as_slice());
 
-        let expected_last: Vec<String> = ["sp", "sg", "sh", "as", "aa"]
-            .iter()
-            .copied()
-            .map(String::from)
-            .collect();
+        let expected_last: Vec<String> =
+            ["sp", "sg", "sh", "as", "aa"].iter().copied().map(String::from).collect();
         assert_eq!(&labels[25..], expected_last.as_slice());
     }
 

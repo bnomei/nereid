@@ -71,11 +71,7 @@ pub struct ObjectRef {
 
 impl ObjectRef {
     pub fn new(diagram_id: DiagramId, category: CategoryPath, object_id: ObjectId) -> Self {
-        Self {
-            diagram_id,
-            category,
-            object_id,
-        }
+        Self { diagram_id, category, object_id }
     }
 
     pub fn diagram_id(&self) -> &DiagramId {
@@ -92,13 +88,10 @@ impl ObjectRef {
 
     pub fn parse(input: &str) -> Result<Self, ParseObjectRefError> {
         const PREFIX: &str = "d:";
-        let rest = input
-            .strip_prefix(PREFIX)
-            .ok_or(ParseObjectRefError::MissingPrefix)?;
+        let rest = input.strip_prefix(PREFIX).ok_or(ParseObjectRefError::MissingPrefix)?;
 
-        let (diagram_id_str, remainder) = rest
-            .split_once('/')
-            .ok_or(ParseObjectRefError::MissingCategory)?;
+        let (diagram_id_str, remainder) =
+            rest.split_once('/').ok_or(ParseObjectRefError::MissingCategory)?;
 
         if diagram_id_str.is_empty() {
             return Err(ParseObjectRefError::MissingDiagramId);
@@ -110,9 +103,8 @@ impl ObjectRef {
             return Err(ParseObjectRefError::MissingCategory);
         }
 
-        let (category_str, object_id_str) = remainder
-            .rsplit_once('/')
-            .ok_or(ParseObjectRefError::MissingObjectId)?;
+        let (category_str, object_id_str) =
+            remainder.rsplit_once('/').ok_or(ParseObjectRefError::MissingObjectId)?;
 
         if category_str.is_empty() {
             return Err(ParseObjectRefError::MissingCategory);
@@ -121,21 +113,14 @@ impl ObjectRef {
             return Err(ParseObjectRefError::MissingObjectId);
         }
 
-        let category_segments = category_str
-            .split('/')
-            .map(|s| s.to_owned())
-            .collect::<Vec<_>>();
+        let category_segments = category_str.split('/').map(|s| s.to_owned()).collect::<Vec<_>>();
         let category =
             CategoryPath::new(category_segments).map_err(ParseObjectRefError::InvalidCategory)?;
 
         let object_id = ObjectId::new(object_id_str.to_owned())
             .map_err(ParseObjectRefError::InvalidObjectId)?;
 
-        Ok(Self {
-            diagram_id,
-            category,
-            object_id,
-        })
+        Ok(Self { diagram_id, category, object_id })
     }
 }
 
@@ -222,11 +207,7 @@ mod tests {
         assert_eq!(parsed.to_string(), s);
         assert_eq!(
             parsed.category().segments(),
-            &[
-                "custom".to_owned(),
-                "category".to_owned(),
-                "kind".to_owned()
-            ]
+            &["custom".to_owned(), "category".to_owned(), "kind".to_owned()]
         );
         assert_eq!(parsed.object_id().as_str(), "o:1");
         assert_eq!(parsed.diagram_id().as_str(), "diag");
@@ -234,17 +215,13 @@ mod tests {
 
     #[test]
     fn rejects_missing_prefix() {
-        let err = "x:diag/seq/participant/p:alice"
-            .parse::<ObjectRef>()
-            .unwrap_err();
+        let err = "x:diag/seq/participant/p:alice".parse::<ObjectRef>().unwrap_err();
         assert_eq!(err, ParseObjectRefError::MissingPrefix);
     }
 
     #[test]
     fn rejects_missing_diagram_id() {
-        let err = "d:/seq/participant/p:alice"
-            .parse::<ObjectRef>()
-            .unwrap_err();
+        let err = "d:/seq/participant/p:alice".parse::<ObjectRef>().unwrap_err();
         assert_eq!(err, ParseObjectRefError::MissingDiagramId);
     }
 

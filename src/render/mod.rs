@@ -138,12 +138,9 @@ fn box_edges_from_char(ch: char) -> Option<BoxEdges> {
         UNICODE_BOX_TEE_LEFT => Some(BoxEdges::UP.union(BoxEdges::DOWN).union(BoxEdges::LEFT)),
         UNICODE_BOX_TEE_DOWN => Some(BoxEdges::LEFT.union(BoxEdges::RIGHT).union(BoxEdges::DOWN)),
         UNICODE_BOX_TEE_UP => Some(BoxEdges::LEFT.union(BoxEdges::RIGHT).union(BoxEdges::UP)),
-        UNICODE_BOX_CROSS => Some(
-            BoxEdges::LEFT
-                .union(BoxEdges::RIGHT)
-                .union(BoxEdges::UP)
-                .union(BoxEdges::DOWN),
-        ),
+        UNICODE_BOX_CROSS => {
+            Some(BoxEdges::LEFT.union(BoxEdges::RIGHT).union(BoxEdges::UP).union(BoxEdges::DOWN))
+        }
         _ => None,
     }
 }
@@ -193,16 +190,9 @@ impl Canvas {
 
     /// Creates a new canvas filled with `fill`.
     pub fn new_filled(width: usize, height: usize, fill: char) -> Result<Self, CanvasError> {
-        let len = width
-            .checked_mul(height)
-            .ok_or(CanvasError::AreaOverflow { width, height })?;
+        let len = width.checked_mul(height).ok_or(CanvasError::AreaOverflow { width, height })?;
 
-        Ok(Self {
-            width,
-            height,
-            cells: vec![fill; len],
-            box_edges: vec![BoxEdges::NONE; len],
-        })
+        Ok(Self { width, height, cells: vec![fill; len], box_edges: vec![BoxEdges::NONE; len] })
     }
 
     pub fn width(&self) -> usize {
@@ -254,12 +244,7 @@ impl Canvas {
     /// - If `text` exceeds the row: clips at the right edge.
     pub fn write_str(&mut self, x: usize, y: usize, text: &str) -> Result<(), CanvasError> {
         if y >= self.height {
-            return Err(CanvasError::OutOfBounds {
-                x,
-                y,
-                width: self.width,
-                height: self.height,
-            });
+            return Err(CanvasError::OutOfBounds { x, y, width: self.width, height: self.height });
         }
 
         let mut x = x;
@@ -393,12 +378,7 @@ impl Canvas {
 
     fn index_of(&self, x: usize, y: usize) -> Result<usize, CanvasError> {
         if !self.in_bounds(x, y) {
-            return Err(CanvasError::OutOfBounds {
-                x,
-                y,
-                width: self.width,
-                height: self.height,
-            });
+            return Err(CanvasError::OutOfBounds { x, y, width: self.width, height: self.height });
         }
 
         Ok((y * self.width) + x)
@@ -411,11 +391,7 @@ impl Canvas {
         }
 
         let connected = self.connected_box_edges(x, y, edges);
-        let edges_for_render = if connected.is_empty() {
-            edges
-        } else {
-            connected
-        };
+        let edges_for_render = if connected.is_empty() { edges } else { connected };
         box_char_from_edges(edges_for_render)
     }
 
@@ -476,16 +452,8 @@ impl fmt::Display for Canvas {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CanvasError {
-    AreaOverflow {
-        width: usize,
-        height: usize,
-    },
-    OutOfBounds {
-        x: usize,
-        y: usize,
-        width: usize,
-        height: usize,
-    },
+    AreaOverflow { width: usize, height: usize },
+    OutOfBounds { x: usize, y: usize, width: usize, height: usize },
 }
 
 impl fmt::Display for CanvasError {
@@ -494,12 +462,7 @@ impl fmt::Display for CanvasError {
             Self::AreaOverflow { width, height } => {
                 write!(f, "canvas area overflow: {width}*{height}")
             }
-            Self::OutOfBounds {
-                x,
-                y,
-                width,
-                height,
-            } => {
+            Self::OutOfBounds { x, y, width, height } => {
                 write!(f, "out of bounds: ({x},{y}) for {width}x{height} canvas")
             }
         }
@@ -525,30 +488,14 @@ mod tests {
     fn set_out_of_bounds_errors() {
         let mut c = Canvas::new(2, 2).expect("canvas");
         let err = c.set(2, 0, 'X').unwrap_err();
-        assert_eq!(
-            err,
-            CanvasError::OutOfBounds {
-                x: 2,
-                y: 0,
-                width: 2,
-                height: 2
-            }
-        );
+        assert_eq!(err, CanvasError::OutOfBounds { x: 2, y: 0, width: 2, height: 2 });
     }
 
     #[test]
     fn get_out_of_bounds_errors() {
         let c = Canvas::new(2, 2).expect("canvas");
         let err = c.get(0, 2).unwrap_err();
-        assert_eq!(
-            err,
-            CanvasError::OutOfBounds {
-                x: 0,
-                y: 2,
-                width: 2,
-                height: 2
-            }
-        );
+        assert_eq!(err, CanvasError::OutOfBounds { x: 0, y: 2, width: 2, height: 2 });
     }
 
     #[test]
@@ -561,13 +508,7 @@ mod tests {
     #[test]
     fn rejects_area_overflow() {
         let err = Canvas::new_filled(usize::MAX, 2, '.').unwrap_err();
-        assert_eq!(
-            err,
-            CanvasError::AreaOverflow {
-                width: usize::MAX,
-                height: 2
-            }
-        );
+        assert_eq!(err, CanvasError::AreaOverflow { width: usize::MAX, height: 2 });
     }
 
     #[test]
@@ -595,15 +536,7 @@ mod tests {
     fn draw_box_out_of_bounds_is_not_partial() {
         let mut c = Canvas::new_filled(4, 3, '.').expect("canvas");
         let err = c.draw_box(0, 0, 4, 2).unwrap_err();
-        assert_eq!(
-            err,
-            CanvasError::OutOfBounds {
-                x: 4,
-                y: 0,
-                width: 4,
-                height: 3
-            }
-        );
+        assert_eq!(err, CanvasError::OutOfBounds { x: 4, y: 0, width: 4, height: 3 });
         assert_eq!(c.to_string(), "....\n....\n....");
     }
 

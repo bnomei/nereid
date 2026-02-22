@@ -556,6 +556,7 @@ fn blend_low_priority_layer(base: &mut Canvas, overlay: &Canvas) -> Result<(), C
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_sequence_block(
     canvas: &mut Canvas,
     block: &SequenceBlock,
@@ -631,6 +632,7 @@ fn layout_max_row(message_row_by_id: &BTreeMap<ObjectId, usize>) -> Option<usize
     message_row_by_id.values().copied().max()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn insert_sequence_block_highlights(
     highlight_index: &mut HighlightIndex,
     diagram_id: &DiagramId,

@@ -26,12 +26,9 @@ pub(crate) fn flowchart_small_dag() -> FlowchartAst {
     ast.nodes_mut().insert(n_c.clone(), FlowNode::new("C"));
     ast.nodes_mut().insert(n_d.clone(), FlowNode::new("D"));
 
-    ast.edges_mut()
-        .insert(oid("e:ab"), FlowEdge::new(n_a.clone(), n_b.clone()));
-    ast.edges_mut()
-        .insert(oid("e:ac"), FlowEdge::new(n_a, n_c.clone()));
-    ast.edges_mut()
-        .insert(oid("e:bd"), FlowEdge::new(n_b, n_d.clone()));
+    ast.edges_mut().insert(oid("e:ab"), FlowEdge::new(n_a.clone(), n_b.clone()));
+    ast.edges_mut().insert(oid("e:ac"), FlowEdge::new(n_a, n_c.clone()));
+    ast.edges_mut().insert(oid("e:bd"), FlowEdge::new(n_b, n_d.clone()));
     ast.edges_mut().insert(oid("e:cd"), FlowEdge::new(n_c, n_d));
 
     ast
@@ -49,10 +46,8 @@ pub(crate) fn flowchart_obstacle_route() -> FlowchartAst {
     ast.nodes_mut().insert(n_b.clone(), FlowNode::new("B"));
     ast.nodes_mut().insert(n_d.clone(), FlowNode::new("D"));
 
-    ast.edges_mut()
-        .insert(oid("e:ab"), FlowEdge::new(n_a.clone(), n_b.clone()));
-    ast.edges_mut()
-        .insert(oid("e:bd"), FlowEdge::new(n_b.clone(), n_d.clone()));
+    ast.edges_mut().insert(oid("e:ab"), FlowEdge::new(n_a.clone(), n_b.clone()));
+    ast.edges_mut().insert(oid("e:bd"), FlowEdge::new(n_b.clone(), n_d.clone()));
     ast.edges_mut().insert(oid("e:ad"), FlowEdge::new(n_a, n_d));
 
     ast
@@ -68,18 +63,13 @@ pub(crate) fn flowchart_node_overlap_avoidance_regression() -> FlowchartAst {
     let n_d = oid("n:d");
 
     ast.nodes_mut().insert(n_a.clone(), FlowNode::new("A"));
-    ast.nodes_mut()
-        .insert(n_b.clone(), FlowNode::new("WideObstacle"));
-    ast.nodes_mut()
-        .insert(n_c.clone(), FlowNode::new("AlsoWideObstacle"));
+    ast.nodes_mut().insert(n_b.clone(), FlowNode::new("WideObstacle"));
+    ast.nodes_mut().insert(n_c.clone(), FlowNode::new("AlsoWideObstacle"));
     ast.nodes_mut().insert(n_d.clone(), FlowNode::new("D"));
 
-    ast.edges_mut()
-        .insert(oid("e:ab"), FlowEdge::new(n_a.clone(), n_b.clone()));
-    ast.edges_mut()
-        .insert(oid("e:bc"), FlowEdge::new(n_b.clone(), n_c.clone()));
-    ast.edges_mut()
-        .insert(oid("e:cd"), FlowEdge::new(n_c.clone(), n_d.clone()));
+    ast.edges_mut().insert(oid("e:ab"), FlowEdge::new(n_a.clone(), n_b.clone()));
+    ast.edges_mut().insert(oid("e:bc"), FlowEdge::new(n_b.clone(), n_c.clone()));
+    ast.edges_mut().insert(oid("e:cd"), FlowEdge::new(n_c.clone(), n_d.clone()));
     ast.edges_mut().insert(oid("e:ad"), FlowEdge::new(n_a, n_d));
 
     ast

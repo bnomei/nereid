@@ -26,10 +26,8 @@ fn snapshot_two_participants_one_message() {
     let p_alice = ObjectId::new("p:alice").expect("participant id");
     let p_bob = ObjectId::new("p:bob").expect("participant id");
 
-    ast.participants_mut()
-        .insert(p_alice.clone(), SequenceParticipant::new("Alice"));
-    ast.participants_mut()
-        .insert(p_bob.clone(), SequenceParticipant::new("Bob"));
+    ast.participants_mut().insert(p_alice.clone(), SequenceParticipant::new("Alice"));
+    ast.participants_mut().insert(p_bob.clone(), SequenceParticipant::new("Bob"));
 
     ast.messages_mut().push(SequenceMessage::new(
         ObjectId::new("m:0001").expect("message id"),
@@ -58,8 +56,7 @@ fn snapshot_participant_notes_toggle() {
     let mut alice = SequenceParticipant::new("Alice");
     alice.set_note(Some("note"));
     ast.participants_mut().insert(p_alice.clone(), alice);
-    ast.participants_mut()
-        .insert(p_bob.clone(), SequenceParticipant::new("Bob"));
+    ast.participants_mut().insert(p_bob.clone(), SequenceParticipant::new("Bob"));
 
     ast.messages_mut().push(SequenceMessage::new(
         ObjectId::new("m:0001").expect("message id"),
@@ -90,11 +87,7 @@ fn snapshot_participant_notes_toggle() {
     let notes_on = render_sequence_unicode_with_options(
         &ast,
         &layout,
-        RenderOptions {
-            show_notes: true,
-            prefix_object_labels: false,
-            flowchart_extra_col_gap: 0,
-        },
+        RenderOptions { show_notes: true, prefix_object_labels: false, flowchart_extra_col_gap: 0 },
     )
     .expect("render");
     assert_eq!(
@@ -230,12 +223,9 @@ fn snapshot_three_participants_two_way_messages() {
     let p_bob = ObjectId::new("p:bob").expect("participant id");
     let p_carol = ObjectId::new("p:carol").expect("participant id");
 
-    ast.participants_mut()
-        .insert(p_alice.clone(), SequenceParticipant::new("Alice"));
-    ast.participants_mut()
-        .insert(p_bob.clone(), SequenceParticipant::new("Bob"));
-    ast.participants_mut()
-        .insert(p_carol.clone(), SequenceParticipant::new("Carol"));
+    ast.participants_mut().insert(p_alice.clone(), SequenceParticipant::new("Alice"));
+    ast.participants_mut().insert(p_bob.clone(), SequenceParticipant::new("Bob"));
+    ast.participants_mut().insert(p_carol.clone(), SequenceParticipant::new("Carol"));
 
     ast.messages_mut().push(SequenceMessage::new(
         ObjectId::new("m:0001").expect("message id"),
@@ -269,10 +259,8 @@ fn self_message_uses_wider_stub_and_keeps_both_right_corners() {
     let p_a = ObjectId::new("p:a").expect("participant id");
     let p_b = ObjectId::new("p:b").expect("participant id");
 
-    ast.participants_mut()
-        .insert(p_a.clone(), SequenceParticipant::new("A"));
-    ast.participants_mut()
-        .insert(p_b.clone(), SequenceParticipant::new("B"));
+    ast.participants_mut().insert(p_a.clone(), SequenceParticipant::new("A"));
+    ast.participants_mut().insert(p_b.clone(), SequenceParticipant::new("B"));
     ast.messages_mut().push(SequenceMessage::new(
         ObjectId::new("m:0001").expect("message id"),
         p_a.clone(),
@@ -291,14 +279,9 @@ fn self_message_uses_wider_stub_and_keeps_both_right_corners() {
         .position(|line| line.contains("Hold"))
         .unwrap_or_else(|| panic!("self-message line in:\n{rendered}"));
     let top_chars = lines[msg_line_idx].chars().collect::<Vec<_>>();
-    let top_corner_idx = top_chars
-        .iter()
-        .position(|ch| *ch == '┐')
-        .expect("top right corner");
-    let top_start_idx = top_chars
-        .iter()
-        .position(|ch| !ch.is_whitespace())
-        .expect("self loop start");
+    let top_corner_idx = top_chars.iter().position(|ch| *ch == '┐').expect("top right corner");
+    let top_start_idx =
+        top_chars.iter().position(|ch| !ch.is_whitespace()).expect("self loop start");
     assert!(top_corner_idx > top_start_idx);
     assert!(top_corner_idx.saturating_sub(top_start_idx) > SELF_MESSAGE_STUB_LEN);
     assert_eq!(top_chars[top_corner_idx.saturating_sub(1)], '─');
@@ -313,10 +296,8 @@ fn annotated_render_indexes_participants_and_messages() {
     let p_alice = ObjectId::new("p:alice").expect("participant id");
     let p_bob = ObjectId::new("p:bob").expect("participant id");
 
-    ast.participants_mut()
-        .insert(p_alice.clone(), SequenceParticipant::new("Alice"));
-    ast.participants_mut()
-        .insert(p_bob.clone(), SequenceParticipant::new("Bob"));
+    ast.participants_mut().insert(p_alice.clone(), SequenceParticipant::new("Alice"));
+    ast.participants_mut().insert(p_bob.clone(), SequenceParticipant::new("Bob"));
 
     ast.messages_mut().push(SequenceMessage::new(
         ObjectId::new("m:0001").expect("message id"),
@@ -331,23 +312,15 @@ fn annotated_render_indexes_participants_and_messages() {
     let diagram_id = DiagramId::new("d-seq").expect("diagram id");
     let annotated = render_sequence_unicode_annotated(&diagram_id, &ast, &layout).expect("render");
 
-    assert_eq!(
-        annotated.text,
-        render_sequence_unicode(&ast, &layout).expect("plain render")
-    );
+    assert_eq!(annotated.text, render_sequence_unicode(&ast, &layout).expect("plain render"));
 
-    let alice_ref: ObjectRef = "d:d-seq/seq/participant/p:alice"
-        .parse()
-        .expect("object ref");
+    let alice_ref: ObjectRef = "d:d-seq/seq/participant/p:alice".parse().expect("object ref");
     let bob_ref: ObjectRef = "d:d-seq/seq/participant/p:bob".parse().expect("object ref");
     let msg_ref: ObjectRef = "d:d-seq/seq/message/m:0001".parse().expect("object ref");
 
     let alice_text = collect_spanned_text(
         &annotated.text,
-        annotated
-            .highlight_index
-            .get(&alice_ref)
-            .expect("alice spans"),
+        annotated.highlight_index.get(&alice_ref).expect("alice spans"),
     );
     assert!(alice_text.contains("Alice"));
 
@@ -385,14 +358,9 @@ A->>B: Post\n";
     let annotated = render_sequence_unicode_annotated(&diagram_id, &ast, &layout).expect("render");
 
     let block_id = ast.blocks().first().expect("block").block_id().to_string();
-    let block_ref: ObjectRef = format!("d:d-seq/seq/block/{block_id}")
-        .parse()
-        .expect("block ref");
+    let block_ref: ObjectRef = format!("d:d-seq/seq/block/{block_id}").parse().expect("block ref");
 
-    let spans = annotated
-        .highlight_index
-        .get(&block_ref)
-        .expect("block spans");
+    let spans = annotated.highlight_index.get(&block_ref).expect("block spans");
     assert!(!spans.is_empty());
 
     let block_text = collect_spanned_text(&annotated.text, spans);

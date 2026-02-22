@@ -43,10 +43,7 @@ fn mermaid_ascii_readme_supported_sequence_cases_render() {
         let rendered = render_sequence_unicode(&ast, &layout).unwrap_or_else(|err| {
             panic!("expected {case} to render successfully, got error: {err}")
         });
-        assert!(
-            !rendered.trim().is_empty(),
-            "expected {case} to render non-empty output"
-        );
+        assert!(!rendered.trim().is_empty(), "expected {case} to render non-empty output");
     }
 }
 

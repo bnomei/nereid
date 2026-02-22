@@ -90,9 +90,7 @@ pub fn render_diagram_unicode_with_options(
         }
         DiagramAst::Flowchart(ast) => {
             let layout = layout_flowchart(ast)?;
-            Ok(render_flowchart_unicode_with_options(
-                ast, &layout, options,
-            )?)
+            Ok(render_flowchart_unicode_with_options(ast, &layout, options)?)
         }
     }
 }
@@ -148,10 +146,8 @@ mod tests {
         let p_alice = oid("p:alice");
         let p_bob = oid("p:bob");
 
-        ast.participants_mut()
-            .insert(p_alice.clone(), SequenceParticipant::new("Alice"));
-        ast.participants_mut()
-            .insert(p_bob.clone(), SequenceParticipant::new("Bob"));
+        ast.participants_mut().insert(p_alice.clone(), SequenceParticipant::new("Alice"));
+        ast.participants_mut().insert(p_bob.clone(), SequenceParticipant::new("Bob"));
 
         ast.messages_mut().push(SequenceMessage::new(
             oid("m:0001"),

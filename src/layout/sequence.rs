@@ -65,22 +65,15 @@ impl SequenceMessageLayout {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SequenceLayoutError {
-    UnknownParticipant {
-        message_id: ObjectId,
-        participant_id: ObjectId,
-    },
+    UnknownParticipant { message_id: ObjectId, participant_id: ObjectId },
 }
 
 impl std::fmt::Display for SequenceLayoutError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::UnknownParticipant {
-                message_id,
-                participant_id,
-            } => write!(
-                f,
-                "message {message_id} references unknown participant {participant_id}"
-            ),
+            Self::UnknownParticipant { message_id, participant_id } => {
+                write!(f, "message {message_id} references unknown participant {participant_id}")
+            }
         }
     }
 }
@@ -130,10 +123,7 @@ pub fn layout_sequence(ast: &SequenceAst) -> Result<SequenceLayout, SequenceLayo
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(SequenceLayout {
-        participant_cols,
-        messages,
-    })
+    Ok(SequenceLayout { participant_cols, messages })
 }
 
 #[cfg(test)]
@@ -152,12 +142,9 @@ mod tests {
         let p_carol = ObjectId::new("p:carol").expect("participant id");
 
         // Insert participants intentionally out of order; BTreeMap should keep deterministic ordering.
-        ast.participants_mut()
-            .insert(p_bob.clone(), SequenceParticipant::new("Bob"));
-        ast.participants_mut()
-            .insert(p_alice.clone(), SequenceParticipant::new("Alice"));
-        ast.participants_mut()
-            .insert(p_carol.clone(), SequenceParticipant::new("Carol"));
+        ast.participants_mut().insert(p_bob.clone(), SequenceParticipant::new("Bob"));
+        ast.participants_mut().insert(p_alice.clone(), SequenceParticipant::new("Alice"));
+        ast.participants_mut().insert(p_carol.clone(), SequenceParticipant::new("Carol"));
 
         let m_0002 = ObjectId::new("m:0002").expect("message id");
         let m_0001 = ObjectId::new("m:0001").expect("message id");
@@ -197,11 +184,8 @@ mod tests {
         let ast = fixture_ast_messages_out_of_order();
         let layout = layout_sequence(&ast).expect("layout");
 
-        let participants = layout
-            .participant_cols()
-            .keys()
-            .map(|id| id.as_str().to_owned())
-            .collect::<Vec<_>>();
+        let participants =
+            layout.participant_cols().keys().map(|id| id.as_str().to_owned()).collect::<Vec<_>>();
         assert_eq!(participants, vec!["p:alice", "p:bob", "p:carol"]);
 
         assert_eq!(
@@ -210,11 +194,7 @@ mod tests {
                 .iter()
                 .map(|(id, col)| (id.as_str().to_owned(), *col))
                 .collect::<Vec<_>>(),
-            vec![
-                ("p:alice".to_owned(), 0),
-                ("p:bob".to_owned(), 1),
-                ("p:carol".to_owned(), 2)
-            ]
+            vec![("p:alice".to_owned(), 0), ("p:bob".to_owned(), 1), ("p:carol".to_owned(), 2)]
         );
     }
 
@@ -231,11 +211,7 @@ mod tests {
         // order_key tie breaks by message_id
         assert_eq!(
             messages,
-            vec![
-                ("m:0001".to_owned(), 0),
-                ("m:0002".to_owned(), 1),
-                ("m:0003".to_owned(), 2)
-            ]
+            vec![("m:0001".to_owned(), 0), ("m:0002".to_owned(), 1), ("m:0003".to_owned(), 2)]
         );
 
         let m_0001 = &layout.messages()[0];
@@ -249,8 +225,7 @@ mod tests {
 
         let mut ast2 = SequenceAst::default();
         for (id, participant) in ast1.participants() {
-            ast2.participants_mut()
-                .insert(id.clone(), participant.clone());
+            ast2.participants_mut().insert(id.clone(), participant.clone());
         }
 
         // Insert messages in reverse order.
@@ -267,8 +242,7 @@ mod tests {
     fn layout_errors_on_unknown_participants() {
         let mut ast = SequenceAst::default();
         let p_alice = ObjectId::new("p:alice").expect("participant id");
-        ast.participants_mut()
-            .insert(p_alice.clone(), SequenceParticipant::new("Alice"));
+        ast.participants_mut().insert(p_alice.clone(), SequenceParticipant::new("Alice"));
 
         let missing = ObjectId::new("p:missing").expect("participant id");
         let m_0001 = ObjectId::new("m:0001").expect("message id");

@@ -24,30 +24,16 @@ fn benches_flow(c: &mut Criterion) {
         let mut group = c.benchmark_group("flow.layout");
 
         for (case_id, ast) in [
-            (
-                "small",
-                fixtures::flow::fixture(fixtures::flow::Case::Small),
-            ),
-            (
-                "medium_dense",
-                fixtures::flow::fixture(fixtures::flow::Case::MediumDense),
-            ),
-            (
-                "large_long_labels",
-                fixtures::flow::fixture(fixtures::flow::Case::LargeLongLabels),
-            ),
+            ("small", fixtures::flow::fixture(fixtures::flow::Case::Small)),
+            ("medium_dense", fixtures::flow::fixture(fixtures::flow::Case::MediumDense)),
+            ("large_long_labels", fixtures::flow::fixture(fixtures::flow::Case::LargeLongLabels)),
         ] {
             let nodes = ast.nodes().len() as u64;
             group.throughput(Throughput::Elements(nodes));
             group.bench_function(case_id, move |b| {
                 b.iter(|| {
                     let layout = layout_flowchart(black_box(&ast)).expect("layout");
-                    black_box(
-                        layout
-                            .layers()
-                            .len()
-                            .wrapping_add(layout.node_placements().len()),
-                    )
+                    black_box(layout.layers().len().wrapping_add(layout.node_placements().len()))
                 })
             });
         }
@@ -59,18 +45,9 @@ fn benches_flow(c: &mut Criterion) {
         let mut group = c.benchmark_group("flow.route");
 
         for (case_id, ast) in [
-            (
-                "small",
-                fixtures::flow::fixture(fixtures::flow::Case::Small),
-            ),
-            (
-                "medium_dense",
-                fixtures::flow::fixture(fixtures::flow::Case::MediumDense),
-            ),
-            (
-                "large_long_labels",
-                fixtures::flow::fixture(fixtures::flow::Case::LargeLongLabels),
-            ),
+            ("small", fixtures::flow::fixture(fixtures::flow::Case::Small)),
+            ("medium_dense", fixtures::flow::fixture(fixtures::flow::Case::MediumDense)),
+            ("large_long_labels", fixtures::flow::fixture(fixtures::flow::Case::LargeLongLabels)),
             (
                 "routing_stress",
                 fixtures::flow::dag(fixtures::flow::DagParams::new(16, 30, 3, 4, 12)),
