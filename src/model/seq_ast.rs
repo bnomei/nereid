@@ -60,10 +60,7 @@ impl SequenceAst {
     }
 
     pub fn find_block(&self, block_id: &ObjectId) -> Option<&SequenceBlock> {
-        fn find<'a>(
-            blocks: &'a [SequenceBlock],
-            block_id: &ObjectId,
-        ) -> Option<&'a SequenceBlock> {
+        fn find<'a>(blocks: &'a [SequenceBlock], block_id: &ObjectId) -> Option<&'a SequenceBlock> {
             for block in blocks {
                 if block.block_id() == block_id {
                     return Some(block);
