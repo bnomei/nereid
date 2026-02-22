@@ -31,8 +31,7 @@ Treat these as separate concerns:
 ## Core Principles
 
 - Treat AST as source of truth; rendered text and Mermaid text are projections.
-- Treat session files (`nereid-session.meta.json`, `diagrams/*.mmd`, `walkthroughs/*.wt.json`) as app-managed state snapshots that can be rewritten frequently while Nereid runs.
-  Use MCP/TUI mutations so IDs, revs, selections, xrefs, and persistence stay consistent.
+- Session files (`nereid-session.meta.json`, `diagrams/*.mmd`, `walkthroughs/*.wt.json`) are app-managed snapshots and can be rewritten frequently while Nereid runs.
 - Use canonical `ObjectRef` everywhere:
   `d:<diagram_id>/<seq|flow>/<participant|message|node|edge>/<object_id>`.
 - Prefer small reads first (`diagram.stat`, `diagram.get_slice`, `diagram.diff`, `walkthrough.diff`).
@@ -40,6 +39,15 @@ Treat these as separate concerns:
 - Gate edits with `base_rev` and keep ops minimal.
 - Record evidence as refs (xrefs and walkthrough nodes) so reasoning is resumable.
 - Keep dangling xrefs visible as TODO artifacts unless asked to clean them.
+
+## Execution Discipline
+
+- Use MCP tools as the only source of truth.
+- Do not inspect `src/`, `tests/`, `docs/`, or `data/` to answer runtime collaboration questions.
+- Make the first relevant MCP call immediately after reading the user prompt.
+- Prefer direct MCP execution over schema/code exploration.
+- If payload shape is unclear, call the tool once and adapt from validation errors.
+- Use shell/file probing only when the user explicitly asks for file-level inspection or storage debugging.
 
 ## Tool Groups
 

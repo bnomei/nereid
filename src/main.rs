@@ -142,14 +142,33 @@ fn main() {
         let mcp_http_port = options.mcp_http_port.unwrap_or(DEFAULT_MCP_HTTP_PORT);
 
         let (tui_session, tui_session_folder, mcp) = if options.demo {
+            // In demo mode we still need a shared persistence channel so TUI and MCP can
+            // synchronize multi-selection and other session mutations.
+            let now_millis = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(0);
+            let demo_dir = std::env::temp_dir().join(format!(
+                "nereid-demo-session-{}-{now_millis}",
+                std::process::id()
+            ));
+            let folder = if options.durable_writes {
+                nereid::store::SessionFolder::new(demo_dir)
+                    .with_durability(nereid::store::WriteDurability::Durable)
+            } else {
+                nereid::store::SessionFolder::new(demo_dir)
+            };
             let session = nereid::tui::demo_session();
+            folder.save_session(&session)?;
             let tui_session = session.clone();
-            let mcp = nereid::mcp::NereidMcp::new_with_agent_highlights_and_ui_state(
+            let tui_session_folder = folder.clone();
+            let mcp = nereid::mcp::NereidMcp::new_persistent_with_agent_highlights_and_ui_state(
                 session,
+                folder,
                 agent_highlights.clone(),
                 Some(ui_state.clone()),
             );
-            (tui_session, None, mcp)
+            (tui_session, Some(tui_session_folder), mcp)
         } else {
             let dir = options.session_dir.unwrap_or_else(|| ".".to_owned());
             let folder = if options.durable_writes {

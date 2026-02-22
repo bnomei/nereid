@@ -25,6 +25,22 @@
 4. `walkthrough.apply_ops`
    - matcher: `walkthrough_id` `equals` `wt-demo`
    - matcher: `base_rev` `equals` value returned by `walkthrough.stat`
+   - example payload:
+     - replace `base_rev` with the exact `walkthrough.stat.digest.rev` at runtime
+     ```json
+     {
+       "walkthrough_id": "wt-demo",
+       "base_rev": 3,
+       "ops": [
+         {
+           "type": "add_node",
+           "node_id": "n:wrap",
+           "title": "Wrap up",
+           "refs": ["d:om-13-return/flow/node/n:sail_home"]
+         }
+       ]
+     }
+     ```
 5. `walkthrough.diff`
    - matcher: `walkthrough_id` `equals` `wt-demo`
 6. `walkthrough.get_node`

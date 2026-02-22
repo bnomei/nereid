@@ -377,7 +377,6 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
     let Json(view) =
         runtime.block_on(async { server.view_get_state().await.expect("view.read_state") });
     assert_eq!(view.active_diagram_id.as_deref(), Some(diagram_id));
-    assert_eq!(view.zoom, 1.0);
 
     let Json(diagrams) =
         runtime.block_on(async { server.diagram_list().await.expect("diagram.list") });

@@ -254,7 +254,6 @@ pub struct ViewScroll {
 pub struct ViewGetStateResponse {
     pub active_diagram_id: Option<String>,
     pub scroll: ViewScroll,
-    pub zoom: f64,
     pub panes: BTreeMap<String, bool>,
     pub context: ReadContext,
 }

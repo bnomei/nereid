@@ -744,7 +744,6 @@ async fn view_get_state_returns_stable_defaults() {
     assert_eq!(result.active_diagram_id.as_deref(), Some("d-seq"));
     assert_eq!(result.scroll.x, 0.0);
     assert_eq!(result.scroll.y, 0.0);
-    assert_eq!(result.zoom, 1.0);
     assert!(result.panes.is_empty());
     assert_eq!(
         result.context.session_active_diagram_id.as_deref(),

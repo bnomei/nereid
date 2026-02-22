@@ -21,6 +21,7 @@ target/*
 .idea/
 
 .DS_STORE
+.DS_Store
 .env
 
 docs/

@@ -225,6 +225,37 @@ Common keys:
 
 Nereid sticks to the terminal's ANSI palette (16 colors + text attributes like bold/dim/reverse), so it inherits your terminal theme (light/dark, base16, etc)without implementing full app theming. You can also enforce a set of colors via an `NEREID_TUI_PALETTE` environment variable.
 
+
+## Demo Playbooks
+
+- Playbooks directory: [https://github.com/bnomei/nereid/tree/main/tests/playbooks](https://github.com/bnomei/nereid/tree/main/tests/playbooks)
+
+Prompts:
+
+1. `From the demo index, the story node for the marlin fight — where does its nav link go? Return target diagram_id and target object_ref.`
+2. `In the terrace dialogue where the boy mentions the Yankees, find the DiMaggio line and return the message object_ref plus exact text.`
+3. `In the routing demo with crossings, can Start reach Done? Return yes/no and one shortest path as node refs.`
+4. `From the DiMaggio motif in the motifs diagram, find the baseball quote that says "makes the difference" and read it. Return the route and the quote.`
+5. `Enable follow-AI and spotlight d:om-12-sharks/seq/participant/p:mako. Then confirm follow_ai and current agent attention.`
+6. `From the demo index, list every nav xref that lands in a sequence diagram (not flowchart). Return target diagram_id and target object_ref for each.`
+7. `In the flowchart demo with alpha/beta edges, find the edge labeled "beta" and return its edge object_ref plus from/to node refs.`
+8. `In the dialogue where the boy asks to go fishing again, starting from message id m:ask_go, return the next two messages after it (object_ref + text).`
+9. `Find the shortest route from d:demo-flow/flow/node/n:a to d:demo-flow/flow/edge/e:cd. Return the full route as object_refs in order.`
+10. `Starting from the "Lions" node in the cast map, find the shortest route to the Lions participant in the dreams sequence. Return the full route as object_refs in order.`
+11. `On the demo index, find the node whose note says "routing + tees". Use that node to follow its nav xref to the target diagram. Then answer: can n:start reach n:done, and return one shortest path as node refs. Include the source node object_ref and the target diagram_id.`
+12. `In the ambiguous OK demo, multiple messages say "OK". Return the object_ref for the OK message in the "cache miss" else branch where api talks to db, and include its from/to participant IDs and message_id.`
+13. `Without changing anything, tell me the active diagram id and the number of selected objects.`
+14. `In the flowchart demo with alpha/beta labels, give me the local neighborhood (radius 1) around the node labeled "A", including node refs and edge refs.`
+15. `On the flowchart demo with alpha/beta edges, tell me: cycles (if any), dead-end nodes, the top out-degree node, and unreachable nodes when starting from n:b.`
+16. `Create a new sequence diagram pb-16-seq with a->>b: Ping, then add another message a->>b: Extra, and report the diff, current counts, and a rendered text preview.`
+17. `Create a temporary flowchart diagram pb-17-flow, then delete it and confirm it is gone from diagram.list.`
+18. `List walkthroughs, open wt-demo, then report current walkthrough id, node/edge counts, and a short render preview.`
+19. `On walkthrough wt-demo, add a node n:wrap titled "Wrap up" that references the Sail home node in the return diagram, then show the diff since the previous rev and read back that node.`
+20. `Show me the raw Mermaid source for the flowchart demo with alpha/beta edges, and point to the exact line that encodes the beta edge.`
+21. `Switch to the routing demo with crossings, then list every node reachable from Start.`
+22. `Do a quick protocol audit of the terrace dialogue: list only the lines spoken by the boy to the old man, returning message refs and text.`
+23. `From the DiMaggio motif node, list all outbound xref neighbors as object refs.`
+
 ## Configuration
 
 Environment variables:

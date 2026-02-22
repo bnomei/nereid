@@ -341,7 +341,7 @@ Rules:
 - `attention.agent.read() -> { object_ref?, diagram_id?, context }`
 - `follow_ai.read() -> { enabled, context }`
 - `selection.read() -> { object_refs:[], context }`
-- `view.read_state() -> { active_diagram_id?, scroll, zoom, panes, context }`
+- `view.read_state() -> { active_diagram_id?, scroll, panes, context }`
 
 `context` is shared read metadata:
 `{ session_active_diagram_id?, human_active_diagram_id?, human_active_object_ref?, follow_ai?, ui_rev?, ui_session_rev? }`

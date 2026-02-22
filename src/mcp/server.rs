@@ -832,7 +832,7 @@ impl NereidMcp {
         Ok(response)
     }
 
-    /// Read UI view state (active diagram, scroll, zoom, panes); use with
+    /// Read UI view state (active diagram, scroll, panes); use with
     /// `attention.human.read`/`attention.agent.read` for orientation without mutating focus.
     #[tool(name = "view.read_state")]
     async fn view_get_state(&self) -> Result<Json<ViewGetStateResponse>, ErrorData> {
@@ -847,7 +847,6 @@ impl NereidMcp {
         Ok(Json(ViewGetStateResponse {
             active_diagram_id,
             scroll: ViewScroll { x: 0.0, y: 0.0 },
-            zoom: 1.0,
             panes: BTreeMap::new(),
             context,
         }))
@@ -1004,8 +1003,7 @@ impl NereidMcp {
         Ok(Json(WalkthroughGetNodeResponse { node, context }))
     }
 
-    /// Get a compact walkthrough digest (rev + counts); use before `walkthrough.apply_ops` and
-    /// to decide whether `walkthrough.read`/`walkthrough.diff` is needed.
+    /// Read current walkthrough revision and counts; call before walkthrough mutations.
     #[tool(name = "walkthrough.stat")]
     async fn walkthrough_stat(
         &self,
@@ -1066,8 +1064,7 @@ impl NereidMcp {
         Ok(Json(WalkthroughRenderTextResponse { text, context }))
     }
 
-    /// Get walkthrough delta since a revision; default refresh after `walkthrough.apply_ops` or
-    /// concurrent edits.
+    /// Read walkthrough delta since a revision; call after mutations to verify applied changes.
     #[tool(name = "walkthrough.diff")]
     async fn walkthrough_diff(
         &self,
@@ -1130,8 +1127,7 @@ impl NereidMcp {
         Ok(Json(delta))
     }
 
-    /// Apply structured walkthrough ops gated by `base_rev`; pair with `walkthrough.stat` and
-    /// `walkthrough.diff` for conflict-safe updates.
+    /// Apply walkthrough ops using `base_rev` from `walkthrough.stat`; on conflict, refresh and retry.
     #[tool(name = "walkthrough.apply_ops")]
     async fn walkthrough_apply_ops(
         &self,
@@ -1685,9 +1681,7 @@ impl NereidMcp {
         Ok(response)
     }
 
-    /// Read one or many objects by canonical `object_ref`/`object_refs`; use after
-    /// `diagram.get_slice`, `seq.*`, `flow.*`, or `route.find` to inspect concrete fields before
-    /// proposing edits.
+    /// Read concrete object fields by ref; use this as evidence before answering.
     #[tool(name = "object.read")]
     async fn object_read(
         &self,
@@ -2660,8 +2654,7 @@ impl NereidMcp {
         Ok(Json(response))
     }
 
-    /// Get full JSON-friendly diagram AST (potentially large); prefer `diagram.stat` +
-    /// `diagram.get_slice` unless full structure is required.
+    /// Read full diagram AST for id/label resolution; prefer this over session-file reads.
     #[tool(name = "diagram.get_ast")]
     async fn diagram_get_ast(
         &self,

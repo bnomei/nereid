@@ -13,7 +13,7 @@
 3. Ensure the session starts fresh with no selection (restart demo session if needed).
 
 ## User Prompt
-`Without changing anything, tell me the active diagram id, current zoom level, and the number of selected objects.`
+`Without changing anything, tell me the active diagram id and the number of selected objects.`
 
 ## Expected Tool Calls
 ### Required (order matters)
@@ -35,12 +35,11 @@
 
 ## Expected Assistant Output
 - Must include active diagram id `demo-00-index`.
-- Must include zoom level `1.0`.
 - Must state selected object count is `0`.
 
 ## Pass/Fail Checklist
 - [ ] Required tool calls happened in order.
-- [ ] Output includes active diagram id, zoom, and selection count.
+- [ ] Output includes active diagram id and selection count.
 - [ ] No forbidden mutating calls were made.
 
 ## Notes
