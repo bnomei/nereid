@@ -24,8 +24,14 @@ jobs:
       - name: Install cargo-codspeed
         run: cargo install cargo-codspeed
 
+      # The `specs/` directory in the repo root conflicts with the GCC linker,
+      # which interprets it as a compiler spec file. Move it aside during the
+      # build and restore it before running.
       - name: Build benchmarks
-        run: cargo codspeed build
+        run: |
+          mv specs _specs_backup
+          cargo codspeed build -m simulation
+          mv _specs_backup specs
 
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v4
