@@ -24,16 +24,24 @@ Nereid is:
 
 ## Installation
 
+### Cargo (crates.io)
+```bash
+cargo install nereid
+```
+
+### Homebrew
+```bash
+brew install bnomei/nereid/nereid
+```
+
+### GitHub Releases
+Download a prebuilt archive from the GitHub Releases page, extract it, and place `nereid` on your `PATH`.
+
 ### From source
 ```bash
 git clone https://github.com/bnomei/nereid.git
 cd nereid
 cargo build --release
-```
-
-### Cargo (local path)
-```bash
-cargo install --path .
 ```
 
 ## Quickstart
