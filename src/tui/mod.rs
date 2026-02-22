@@ -138,7 +138,7 @@ pub fn run_with_session_with_ui_state(
 }
 
 fn draw(frame: &mut Frame<'_>, app: &mut App) {
-    let area = frame.size();
+    let area = frame.area();
 
     let layout = Layout::default()
         .direction(Direction::Vertical)
@@ -437,7 +437,7 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) {
                 .saturating_add(1)
                 .saturating_add(query.chars().count() as u16)
                 .min(status_area.x.saturating_add(status_area.width.saturating_sub(1)));
-            frame.set_cursor(cursor_x, status_area.y);
+            frame.set_cursor_position((cursor_x, status_area.y));
         }
         return;
     }
