@@ -32,8 +32,7 @@ base64 = "0.22"
 rapidfuzz = "0.5"
 
 [dev-dependencies]
-criterion = "0.5"
-pprof = { version = "0.15.0", features = ["criterion", "flamegraph"] }
+criterion = { version = "4.3.0", package = "codspeed-criterion-compat" }
 rstest = "0.26"
 
 [[bench]]
