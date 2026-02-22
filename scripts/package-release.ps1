@@ -1,7 +1,7 @@
 param(
   [Parameter(Mandatory = $true)][string]$Target,
   [Parameter(Mandatory = $true)][string]$Version,
-  [string]$BinName = 'tmux-mcp-rs',
+  [string]$BinName = 'nereid',
   [string]$OutDir = 'dist'
 )
 
@@ -18,7 +18,7 @@ $outDirFull = (Resolve-Path $OutDir).Path
 $archiveName = "$BinName-v$Version-$Target.zip"
 $archivePath = Join-Path $outDirFull $archiveName
 
-$tempDir = Join-Path $env:TEMP ("tmux-mcp-rs-" + [Guid]::NewGuid().ToString())
+$tempDir = Join-Path $env:TEMP ("nereid-" + [Guid]::NewGuid().ToString())
 New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
 try {
   Copy-Item -Path $binPath -Destination (Join-Path $tempDir "$BinName.exe") -Force

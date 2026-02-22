@@ -3,7 +3,7 @@ set -euo pipefail
 
 : "${TARGET:?TARGET is required}"
 : "${VERSION:?VERSION is required}"
-BIN_NAME=${BIN_NAME:-tmux-mcp-rs}
+BIN_NAME=${BIN_NAME:-nereid}
 OUT_DIR=${OUT_DIR:-dist}
 
 mkdir -p "$OUT_DIR"
