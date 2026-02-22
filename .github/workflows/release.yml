@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 env:
-  BIN_NAME: raymon
+  BIN_NAME: nereid
 
 jobs:
   build:
