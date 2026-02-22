@@ -952,12 +952,10 @@ mod tests {
     use crate::model::ObjectId;
     use std::collections::BTreeMap;
 
-    fn semantic_view(
-        ast: &FlowchartAst,
-    ) -> (
-        BTreeMap<String, (String, String)>,
-        BTreeMap<(String, String, Option<String>), usize>,
-    ) {
+    type FlowNodeSemanticView = BTreeMap<String, (String, String)>;
+    type FlowEdgeSemanticView = BTreeMap<(String, String, Option<String>), usize>;
+
+    fn semantic_view(ast: &FlowchartAst) -> (FlowNodeSemanticView, FlowEdgeSemanticView) {
         let nodes = ast
             .nodes()
             .iter()

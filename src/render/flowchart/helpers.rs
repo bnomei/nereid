@@ -688,8 +688,8 @@ fn assign_edge_gap_lanes_classic(
 
         for usage in usages.iter() {
             let mut assigned = None;
-            for lane_idx in 0..lane_occupied.len() {
-                if !intervals_overlap(&usage.intervals, &lane_occupied[lane_idx]) {
+            for (lane_idx, occupied) in lane_occupied.iter().enumerate() {
+                if !intervals_overlap(&usage.intervals, occupied) {
                     assigned = Some(lane_idx);
                     break;
                 }
@@ -785,8 +785,8 @@ fn assign_edge_gap_lanes_classic(
         }
 
         // Re-run lane assignment for this gap including stub rows as occupied.
-        for edge_idx in 0..edge_count {
-            edge_gap_lanes[edge_idx][gap_idx] = None;
+        for lanes in edge_gap_lanes.iter_mut().take(edge_count) {
+            lanes[gap_idx] = None;
         }
 
         let mut enhanced_usages = Vec::<EdgeGapUsage>::new();
@@ -831,8 +831,8 @@ fn assign_edge_gap_lanes_classic(
         let mut lane_occupied = Vec::<Vec<(usize, usize)>>::new();
         for usage in enhanced_usages.iter() {
             let mut assigned = None;
-            for lane_idx in 0..lane_occupied.len() {
-                if !intervals_overlap(&usage.intervals, &lane_occupied[lane_idx]) {
+            for (lane_idx, occupied) in lane_occupied.iter().enumerate() {
+                if !intervals_overlap(&usage.intervals, occupied) {
                     assigned = Some(lane_idx);
                     break;
                 }
@@ -1565,8 +1565,8 @@ fn route_grid_x_to_lane_gap(
         }
     }
 
-    for j in (idx + 1)..route.len() {
-        let x = route[j].x();
+    for point in route.iter().skip(idx + 1) {
+        let x = point.x();
         if x == grid_x {
             continue;
         }

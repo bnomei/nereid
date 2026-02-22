@@ -1001,9 +1001,11 @@ async fn streamable_http_tools_call_updates_shared_agent_attention_state() {
     let agent_highlights = Arc::new(Mutex::new(BTreeSet::new()));
     let server = NereidMcp::new_with_agent_highlights(demo_session(), agent_highlights.clone());
 
-    let mut config = StreamableHttpServerConfig::default();
-    config.stateful_mode = false;
-    config.sse_keep_alive = None;
+    let config = StreamableHttpServerConfig {
+        stateful_mode: false,
+        sse_keep_alive: None,
+        ..StreamableHttpServerConfig::default()
+    };
 
     let session_manager = Arc::new(LocalSessionManager::default());
     let service = {

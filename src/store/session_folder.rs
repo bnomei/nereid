@@ -6,6 +6,7 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::fmt;
 use std::fs;
@@ -111,12 +112,15 @@ impl AsciiExportManager {
         let output_path = task.output_path().to_path_buf();
 
         let mut state = self.inner.state.lock().expect("ascii export lock poisoned");
-        if state.pending.contains_key(&output_path) {
-            state.pending.insert(output_path, task);
-            return;
+        match state.pending.entry(output_path.clone()) {
+            Entry::Occupied(mut entry) => {
+                entry.insert(task);
+                return;
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(task);
+            }
         }
-
-        state.pending.insert(output_path.clone(), task);
         state.queue.push_back(output_path);
         self.inner.cv.notify_one();
     }

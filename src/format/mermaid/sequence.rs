@@ -1071,6 +1071,9 @@ mod tests {
     use crate::model::seq_ast::{SequenceBlockKind, SequenceMessage, SequenceSectionKind};
     use std::collections::BTreeSet;
 
+    type SequenceParticipantSemanticView = BTreeSet<String>;
+    type SequenceMessageSemanticView = Vec<(String, String, SequenceMessageKind, String)>;
+
     fn assert_canonical_roundtrip(input: &str, expected: &str) {
         let ast1 = parse_sequence_diagram(input).expect("parse 1");
         let out1 = export_sequence_diagram(&ast1).expect("export 1");
@@ -1083,10 +1086,7 @@ mod tests {
 
     fn semantic_view(
         ast: &SequenceAst,
-    ) -> (
-        BTreeSet<String>,
-        Vec<(String, String, SequenceMessageKind, String)>,
-    ) {
+    ) -> (SequenceParticipantSemanticView, SequenceMessageSemanticView) {
         let participants = ast
             .participants()
             .values()

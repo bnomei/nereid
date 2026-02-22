@@ -1813,8 +1813,8 @@ impl App {
                     let first = ch.to_ascii_uppercase();
                     let filtered = targets
                         .iter()
-                        .cloned()
                         .filter(|target| target.label[0] == first)
+                        .cloned()
                         .collect::<Vec<_>>();
 
                     if filtered.is_empty() {
@@ -1921,12 +1921,8 @@ impl App {
     }
 
     fn compute_diagram_hint_targets(&mut self, kind: HintKind) -> Option<Vec<HintTarget>> {
-        let Some(diagram_id) = self.active_diagram_id().cloned() else {
-            return None;
-        };
-        let Some(diagram) = self.session.diagrams().get(&diagram_id) else {
-            return None;
-        };
+        let diagram_id = self.active_diagram_id().cloned()?;
+        let diagram = self.session.diagrams().get(&diagram_id)?;
 
         let hintable_refs = match diagram.ast() {
             DiagramAst::Flowchart(ast) => ast
@@ -2091,16 +2087,11 @@ impl App {
         if current.diagram_id() != previous.diagram_id() {
             return None;
         }
-        let Some(diagram) = self.session.diagrams().get(current.diagram_id()) else {
-            return None;
-        };
+        let diagram = self.session.diagrams().get(current.diagram_id())?;
 
         match diagram.ast() {
             DiagramAst::Flowchart(ast) => {
-                let is_flow_node = |r: &ObjectRef| match r.category().segments() {
-                    [a, b] if a == "flow" && b == "node" => true,
-                    _ => false,
-                };
+                let is_flow_node = |r: &ObjectRef| matches!(r.category().segments(), [a, b] if a == "flow" && b == "node");
                 if !is_flow_node(current) || !is_flow_node(previous) {
                     return None;
                 }
@@ -2135,10 +2126,7 @@ impl App {
                 })
             }
             DiagramAst::Sequence(ast) => {
-                let is_seq_participant = |r: &ObjectRef| match r.category().segments() {
-                    [a, b] if a == "seq" && b == "participant" => true,
-                    _ => false,
-                };
+                let is_seq_participant = |r: &ObjectRef| matches!(r.category().segments(), [a, b] if a == "seq" && b == "participant");
                 if !is_seq_participant(current) || !is_seq_participant(previous) {
                     return None;
                 }
@@ -2873,8 +2861,8 @@ fn apply_highlight_flags(flags_by_line: &mut [Vec<u8>], spans: &[LineSpan], flag
         let max_x = line.len().saturating_sub(1);
         let start = (*x0).min(max_x);
         let end = (*x1).min(max_x);
-        for x in start..=end {
-            line[x] |= flag;
+        for cell in line.iter_mut().take(end + 1).skip(start) {
+            *cell |= flag;
         }
     }
 }
@@ -2950,8 +2938,8 @@ fn fill_highlight_bridge_gaps_with_limit(
                 .iter()
                 .all(|ch| is_box_drawing_verticalish(*ch))
             {
-                for x in gap_start..gap_end {
-                    flags[x] |= flag;
+                for cell in flags.iter_mut().take(gap_end).skip(gap_start) {
+                    *cell |= flag;
                 }
             }
         }
@@ -2994,8 +2982,8 @@ fn apply_presence_flags(flags_by_line: &mut [Vec<bool>], spans: &[LineSpan]) {
 
         let start = (*x0).min(line.len().saturating_sub(1));
         let end = (*x1).min(line.len().saturating_sub(1));
-        for x in start..=end {
-            line[x] = true;
+        for cell in line.iter_mut().take(end + 1).skip(start) {
+            *cell = true;
         }
     }
 }
@@ -3014,8 +3002,8 @@ fn apply_bounding_area_flags(flags_by_line: &mut [Vec<bool>], spans: &[LineSpan]
         }
         let start = min_x.min(line.len().saturating_sub(1));
         let end = max_x.min(line.len().saturating_sub(1));
-        for x in start..=end {
-            line[x] = true;
+        for cell in line.iter_mut().take(end + 1).skip(start) {
+            *cell = true;
         }
     }
 }

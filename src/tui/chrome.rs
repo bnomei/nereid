@@ -515,9 +515,7 @@ fn render_help(frame: &mut Frame<'_>, app: &mut App, main_area: Rect) {
     .max()
     .unwrap_or(0);
 
-    let mut lines = Vec::<Line<'static>>::new();
-
-    lines.push(Line::from(Span::styled("--- Global ---", header_style)));
+    let mut lines = vec![Line::from(Span::styled("--- Global ---", header_style))];
     lines.push(help_kv("?", "Help (toggle)", key_col_width, key_style));
     lines.push(help_kv("q", "Quit", key_col_width, key_style));
     lines.push(help_kv("1", "Focus Diagram", key_col_width, key_style));

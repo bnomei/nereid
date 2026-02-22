@@ -3154,9 +3154,6 @@ impl NereidMcp {
         objects.sort();
         edges.sort();
 
-        let mut objects = objects;
-        let mut edges = edges;
-
         if include_categories.is_some() || exclude_categories.is_some() {
             fn category_of(ref_str: &str) -> Result<String, ErrorData> {
                 let parsed = ObjectRef::parse(ref_str).map_err(|err| {

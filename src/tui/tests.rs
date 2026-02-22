@@ -1061,9 +1061,9 @@ fn diagram_text_fills_multi_cell_selected_bridge_gaps_for_flow_edges() {
         .collect::<Vec<_>>();
 
     assert_eq!(line.len(), 5);
-    for idx in 1..=3 {
-        assert_eq!(line[idx].0, '│');
-        assert_eq!(line[idx].1.bg, Some(Color::DarkGray));
+    for cell in line.iter().take(4).skip(1) {
+        assert_eq!(cell.0, '│');
+        assert_eq!(cell.1.bg, Some(Color::DarkGray));
     }
 }
 

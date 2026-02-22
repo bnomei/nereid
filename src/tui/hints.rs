@@ -34,7 +34,7 @@ pub(crate) fn gen_labels(n: usize, hint_chars: &str) -> Vec<String> {
     fn pow_saturating(base: usize, exp: usize) -> usize {
         let mut acc = 1usize;
         for _ in 0..exp {
-            acc = acc.checked_mul(base).unwrap_or(usize::MAX);
+            acc = acc.saturating_mul(base);
         }
         acc
     }
