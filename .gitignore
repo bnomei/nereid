@@ -24,8 +24,8 @@ target/*
 .DS_Store
 .env
 
-docs/
-specs/
+docs/*
+specs/*
 
 # Generated flamegraphs + derived CSV/JSON summaries
 benchmarks/profiles/
