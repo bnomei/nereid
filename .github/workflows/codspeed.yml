@@ -29,9 +29,20 @@ jobs:
       # build and restore it before running.
       - name: Build benchmarks
         run: |
-          mv specs _specs_backup
+          moved_specs=0
+          if [ -d specs ]; then
+            mv specs _specs_backup
+            moved_specs=1
+          fi
+
+          restore_specs() {
+            if [ "$moved_specs" -eq 1 ] && [ -d _specs_backup ]; then
+              mv _specs_backup specs
+            fi
+          }
+          trap restore_specs EXIT
+
           cargo codspeed build -m simulation
-          mv _specs_backup specs
 
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v4
