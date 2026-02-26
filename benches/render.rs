@@ -40,29 +40,46 @@ fn benches_render(c: &mut Criterion) {
             black_box(rendered.len())
         })
     });
+    let seq_self_loop_dense = fixtures::seq::fixture(fixtures::seq::Case::SelfLoopDense);
+    group.bench_function(fixtures::seq::Case::SelfLoopDense.id(), move |b| {
+        b.iter(|| {
+            let layout = layout_sequence(black_box(&seq_self_loop_dense)).expect("layout_sequence");
+            let rendered =
+                render_sequence_unicode(black_box(&seq_self_loop_dense), black_box(&layout))
+                    .expect("render_sequence_unicode");
+            black_box(rendered.len())
+        })
+    });
+    let seq_nested_blocks = fixtures::seq::fixture(fixtures::seq::Case::NestedBlocks);
+    group.bench_function(fixtures::seq::Case::NestedBlocks.id(), move |b| {
+        b.iter(|| {
+            let layout = layout_sequence(black_box(&seq_nested_blocks)).expect("layout_sequence");
+            let rendered =
+                render_sequence_unicode(black_box(&seq_nested_blocks), black_box(&layout))
+                    .expect("render_sequence_unicode");
+            black_box(rendered.len())
+        })
+    });
     group.finish();
 
     let mut group = c.benchmark_group("render.flow");
-    let flow_small = fixtures::flow::fixture(fixtures::flow::Case::Small);
-    group.bench_function(fixtures::flow::Case::Small.id(), move |b| {
-        b.iter(|| {
-            let layout = layout_flowchart(black_box(&flow_small)).expect("layout_flowchart");
-            let rendered = render_flowchart_unicode(black_box(&flow_small), black_box(&layout))
-                .expect("render_flowchart_unicode");
-            black_box(rendered.len())
-        })
-    });
-    let flow_large_long_labels = fixtures::flow::fixture(fixtures::flow::Case::LargeLongLabels);
-    group.bench_function(fixtures::flow::Case::LargeLongLabels.id(), move |b| {
-        b.iter(|| {
-            let layout =
-                layout_flowchart(black_box(&flow_large_long_labels)).expect("layout_flowchart");
-            let rendered =
-                render_flowchart_unicode(black_box(&flow_large_long_labels), black_box(&layout))
+    for case in [
+        fixtures::flow::Case::Small,
+        fixtures::flow::Case::MediumDense,
+        fixtures::flow::Case::DenseCrossing,
+        fixtures::flow::Case::LargeLongLabels,
+        fixtures::flow::Case::RoutingStress,
+    ] {
+        let flow = fixtures::flow::fixture(case);
+        group.bench_function(case.id(), move |b| {
+            b.iter(|| {
+                let layout = layout_flowchart(black_box(&flow)).expect("layout_flowchart");
+                let rendered = render_flowchart_unicode(black_box(&flow), black_box(&layout))
                     .expect("render_flowchart_unicode");
-            black_box(rendered.len())
-        })
-    });
+                black_box(rendered.len())
+            })
+        });
+    }
     group.finish();
 }
 

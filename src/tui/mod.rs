@@ -56,7 +56,7 @@ const FOOTER_BRAND_COLOR: Color = Color::White;
 const FOOTER_BRAND: &str = "🅽 🅴 🆁 🅴 🅸 🅳 ";
 const NODE_HINT_CHARS: &str = "ASDFJKLEWCMPGH";
 const CENTER_BORDER_PADDING: i32 = 1;
-const TUI_FLOWCHART_EXTRA_COL_GAP: usize = 0;
+const TUI_FLOWCHART_EXTRA_COL_GAP: usize = 2;
 
 /// Runs the interactive terminal UI.
 ///
@@ -392,8 +392,9 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) {
                     (
                         view_title("Inspector", '4', Some(&format!("— {}", obj.object_ref))),
                         format!(
-                            "Label: {}\nRef: {}\nDiagram: {}\nCategory: {}\nObject: {}",
+                            "Label: {}\nNote: {}\nRef: {}\nDiagram: {}\nCategory: {}\nObject: {}",
                             obj.label,
+                            obj.note.as_deref().unwrap_or("—"),
                             obj.object_ref,
                             obj.object_ref.diagram_id(),
                             category,
@@ -458,6 +459,7 @@ include!("chrome.rs");
 #[derive(Debug, Clone)]
 struct SelectableObject {
     label: String,
+    note: Option<String>,
     object_ref: ObjectRef,
 }
 
@@ -961,6 +963,7 @@ impl App {
             if let Some(spans) = self.base_highlight_index.get(selected_ref) {
                 apply_highlight_flags(&mut flags_by_line, spans, 0b01);
                 fill_highlight_bridge_gaps(&mut flags_by_line, &self.base_diagram, 0b01);
+                fill_highlight_text_space_gaps(&mut flags_by_line, &self.base_diagram, 0b01);
                 if is_flow_edge_ref(selected_ref) {
                     fill_highlight_bridge_gaps_unbounded(
                         &mut flags_by_line,
@@ -984,6 +987,7 @@ impl App {
         }
         if has_selected_objects_in_diagram {
             fill_highlight_bridge_gaps(&mut flags_by_line, &self.base_diagram, 0b100);
+            fill_highlight_text_space_gaps(&mut flags_by_line, &self.base_diagram, 0b100);
             if has_selected_flow_edge {
                 fill_highlight_bridge_gaps_unbounded(&mut flags_by_line, &self.base_diagram, 0b100);
             }
@@ -999,6 +1003,7 @@ impl App {
         if let Some(object_ref) = agent_highlight {
             if let Some(spans) = self.base_highlight_index.get(&object_ref) {
                 apply_highlight_flags(&mut flags_by_line, spans, 0b10);
+                fill_highlight_text_space_gaps(&mut flags_by_line, &self.base_diagram, 0b10);
             }
         }
         let has_active_selection_in_diagram = has_selected_objects_in_diagram;
@@ -1832,17 +1837,28 @@ impl App {
         let diagram = self.session.diagrams().get(&diagram_id)?;
 
         let hintable_refs = match diagram.ast() {
-            DiagramAst::Flowchart(ast) => ast
-                .nodes()
-                .keys()
-                .map(|node_id| {
-                    ObjectRef::new(
+            DiagramAst::Flowchart(ast) => {
+                let mut refs = Vec::new();
+                let node_category = category_path(&["flow", "node"]);
+                let edge_category = category_path(&["flow", "edge"]);
+
+                for node_id in ast.nodes().keys() {
+                    refs.push(ObjectRef::new(
                         diagram_id.clone(),
-                        category_path(&["flow", "node"]),
+                        node_category.clone(),
                         node_id.clone(),
-                    )
-                })
-                .collect::<Vec<_>>(),
+                    ));
+                }
+                for edge_id in ast.edges().keys() {
+                    refs.push(ObjectRef::new(
+                        diagram_id.clone(),
+                        edge_category.clone(),
+                        edge_id.clone(),
+                    ));
+                }
+
+                refs
+            }
             DiagramAst::Sequence(ast) => {
                 let mut refs = Vec::new();
                 let participant_category = category_path(&["seq", "participant"]);
@@ -1877,17 +1893,39 @@ impl App {
             let Some(spans) = self.base_highlight_index.get(&object_ref) else {
                 continue;
             };
-            let Some((y0, x0, x1)) = hint_bounds_from_spans(spans) else {
-                continue;
-            };
-            let (y, fill_char) = match object_ref.category().segments() {
-                [a, b] if a == "flow" && b == "node" => (y0.saturating_add(1), ' '),
-                [a, b] if a == "seq" && b == "participant" => (y0.saturating_add(1), ' '),
-                [a, b] if a == "seq" && b == "message" => (y0, '─'),
+            let (y, inner_x0, inner_x1, fill_char) = match object_ref.category().segments() {
+                [a, b] if a == "flow" && b == "node" => {
+                    let Some((y0, x0, x1)) = hint_bounds_from_spans(spans) else {
+                        continue;
+                    };
+                    let inner_x0 = x0.saturating_add(1);
+                    let inner_x1 = x1.saturating_sub(1);
+                    (y0.saturating_add(1), inner_x0, inner_x1, ' ')
+                }
+                [a, b] if a == "flow" && b == "edge" => {
+                    let Some((y, inner_x0, inner_x1)) = flow_edge_hint_bounds(spans, &lines) else {
+                        continue;
+                    };
+                    (y, inner_x0, inner_x1, crate::render::UNICODE_BOX_HORIZONTAL)
+                }
+                [a, b] if a == "seq" && b == "participant" => {
+                    let Some((y0, x0, x1)) = hint_bounds_from_spans(spans) else {
+                        continue;
+                    };
+                    let inner_x0 = x0.saturating_add(1);
+                    let inner_x1 = x1.saturating_sub(1);
+                    (y0.saturating_add(1), inner_x0, inner_x1, ' ')
+                }
+                [a, b] if a == "seq" && b == "message" => {
+                    let Some((y0, x0, x1)) = hint_bounds_from_spans(spans) else {
+                        continue;
+                    };
+                    let inner_x0 = x0.saturating_add(1);
+                    let inner_x1 = x1.saturating_sub(1);
+                    (y0, inner_x0, inner_x1, '─')
+                }
                 _ => continue,
             };
-            let inner_x0 = x0.saturating_add(1);
-            let inner_x1 = x1.saturating_sub(1);
             if inner_x0 >= inner_x1 {
                 continue;
             }
@@ -1895,14 +1933,16 @@ impl App {
             let Some(line) = lines.get(y) else {
                 continue;
             };
-            if !hint_range_has_text(line, inner_x0, inner_x1, fill_char) {
+            if !is_flow_edge_ref(&object_ref)
+                && !hint_range_has_text(line, inner_x0, inner_x1, fill_char)
+            {
                 continue;
             }
 
             placements.push((object_ref, (y, inner_x0, inner_x1, fill_char)));
         }
 
-        placements.sort_by_cached_key(|(object_ref, _)| object_ref.to_string());
+        placements.sort_by(|(left, _), (right, _)| right.to_string().cmp(&left.to_string()));
 
         let hint_count = placements.len();
         if hint_count == 0 {
@@ -2742,6 +2782,64 @@ fn fill_highlight_bridge_gaps_unbounded(flags_by_line: &mut [Vec<u8>], diagram: 
     fill_highlight_bridge_gaps_with_limit(flags_by_line, diagram, flag, usize::MAX);
 }
 
+fn fill_highlight_text_space_gaps(flags_by_line: &mut [Vec<u8>], diagram: &str, flag: u8) {
+    const MAX_TEXT_SPACE_GAP: usize = 3;
+
+    for (y, line) in diagram.split('\n').enumerate() {
+        let Some(flags) = flags_by_line.get_mut(y) else {
+            continue;
+        };
+        if flags.len() < 3 {
+            continue;
+        }
+
+        let chars = line.chars().collect::<Vec<_>>();
+        let len = flags.len().min(chars.len());
+        if len < 3 {
+            continue;
+        }
+
+        let mut idx = 0usize;
+        while idx < len {
+            while idx < len && flags[idx] & flag != 0 {
+                idx += 1;
+            }
+            let gap_start = idx;
+            while idx < len && flags[idx] & flag == 0 {
+                idx += 1;
+            }
+            let gap_end = idx;
+
+            let gap_len = gap_end.saturating_sub(gap_start);
+            if gap_len == 0 || gap_len > MAX_TEXT_SPACE_GAP {
+                continue;
+            }
+            if gap_start == 0 || gap_end >= len {
+                continue;
+            }
+
+            let left = gap_start.saturating_sub(1);
+            let right = gap_end;
+            if flags[left] & flag == 0 || flags[right] & flag == 0 {
+                continue;
+            }
+            if chars[gap_start..gap_end].iter().any(|ch| *ch != ' ') {
+                continue;
+            }
+            if chars[left] == ' ' || chars[right] == ' ' {
+                continue;
+            }
+            if is_box_drawing_char(chars[left]) || is_box_drawing_char(chars[right]) {
+                continue;
+            }
+
+            for cell in flags.iter_mut().take(gap_end).skip(gap_start) {
+                *cell |= flag;
+            }
+        }
+    }
+}
+
 fn fill_highlight_bridge_gaps_with_limit(
     flags_by_line: &mut [Vec<u8>],
     diagram: &str,
@@ -2953,6 +3051,72 @@ fn hint_bounds_from_spans(spans: &[LineSpan]) -> Option<(usize, usize, usize)> {
     Some((min_y?, min_x0?, max_x1?))
 }
 
+fn flow_edge_hint_bounds(spans: &[LineSpan], lines: &[&str]) -> Option<(usize, usize, usize)> {
+    let mut best = None::<(i64, usize, usize, usize, usize)>;
+
+    for (y, x0, x1) in spans {
+        let Some(line) = lines.get(*y) else {
+            continue;
+        };
+        let chars = line.chars().collect::<Vec<_>>();
+        if chars.is_empty() {
+            continue;
+        }
+
+        let max_x = chars.len().saturating_sub(1);
+        let mut start = (*x0).min(max_x);
+        let mut end = (*x1).min(max_x);
+        if start > end {
+            std::mem::swap(&mut start, &mut end);
+        }
+
+        let mut first = None::<usize>;
+        let mut last = None::<usize>;
+        for x in start..=end {
+            if is_flow_edge_canvas_char(chars[x]) {
+                first = Some(first.unwrap_or(x));
+                last = Some(x);
+            }
+        }
+        if let (Some(first), Some(last)) = (first, last) {
+            start = first;
+            end = last;
+        }
+
+        if end.saturating_sub(start).saturating_add(1) < 3 {
+            end = (start + 2).min(max_x);
+            start = end.saturating_sub(2);
+        }
+        if end.saturating_sub(start).saturating_add(1) < 3 {
+            continue;
+        }
+
+        let width = end.saturating_sub(start).saturating_add(1);
+        let edge_cells = (start..=end).filter(|&x| is_flow_edge_canvas_char(chars[x])).count();
+        let text_cells = (start..=end).filter(|&x| is_hint_label_char(chars[x], ' ')).count();
+        let score = (edge_cells as i64) * 10 + (width.min(9) as i64) - (text_cells as i64) * 12;
+        let candidate = (score, width, *y, start, end);
+
+        match best {
+            Some((best_score, best_width, best_y, best_start, _))
+                if best_score > score
+                    || (best_score == score && best_width > width)
+                    || (best_score == score && best_width == width && best_y > *y)
+                    || (best_score == score
+                        && best_width == width
+                        && best_y == *y
+                        && best_start <= start) => {}
+            _ => best = Some(candidate),
+        }
+    }
+
+    best.map(|(_, _, y, start, end)| (y, start, end))
+}
+
+fn is_flow_edge_canvas_char(ch: char) -> bool {
+    is_box_drawing_char(ch) || matches!(ch, '▶' | '◀' | '▲' | '▼' | '○' | '✕')
+}
+
 fn is_box_drawing_char(ch: char) -> bool {
     matches!(
         ch,
@@ -2968,6 +3132,10 @@ fn is_box_drawing_char(ch: char) -> bool {
             | crate::render::UNICODE_BOX_TEE_UP
             | crate::render::UNICODE_BOX_CROSS
     )
+}
+
+fn is_flow_edge_hint_slot_char(ch: char) -> bool {
+    ch == ' ' || is_flow_edge_canvas_char(ch)
 }
 
 fn is_hint_label_char(ch: char, fill_char: char) -> bool {
@@ -3009,6 +3177,73 @@ fn apply_hint_target_to_line(
         style_overrides.resize(needed_len, None);
     }
 
+    let base_style = Style::default().fg(Color::White).bg(Color::Cyan).add_modifier(Modifier::BOLD);
+    let typed_style =
+        Style::default().fg(Color::DarkGray).bg(Color::Cyan).add_modifier(Modifier::BOLD);
+
+    if is_flow_edge_ref(&target.object_ref) {
+        if target.inner_x0 >= target.inner_x1 {
+            return;
+        }
+
+        let max_start = target.inner_x1.saturating_sub(1);
+        let mut tag_start = None::<usize>;
+        for x in target.inner_x0..=max_start {
+            let ch0 = line_chars.get(x).copied().unwrap_or(target.fill_char);
+            let ch1 = line_chars.get(x.saturating_add(1)).copied().unwrap_or(target.fill_char);
+            let free_slot = style_overrides.get(x).and_then(|style| *style).is_none()
+                && style_overrides.get(x.saturating_add(1)).and_then(|style| *style).is_none();
+            if free_slot && is_flow_edge_hint_slot_char(ch0) && is_flow_edge_hint_slot_char(ch1) {
+                tag_start = Some(x);
+                break;
+            }
+        }
+
+        if tag_start.is_none() {
+            let max_pair_start = line_chars.len().saturating_sub(2);
+            let search_start = target.inner_x0.saturating_sub(4).min(max_pair_start);
+            let search_end = target.inner_x1.saturating_add(4).min(max_pair_start);
+            if search_start <= search_end {
+                for x in search_start..=search_end {
+                    let ch0 = line_chars.get(x).copied().unwrap_or(target.fill_char);
+                    let ch1 =
+                        line_chars.get(x.saturating_add(1)).copied().unwrap_or(target.fill_char);
+                    let free_slot = style_overrides.get(x).and_then(|style| *style).is_none()
+                        && style_overrides
+                            .get(x.saturating_add(1))
+                            .and_then(|style| *style)
+                            .is_none();
+                    if free_slot
+                        && is_flow_edge_hint_slot_char(ch0)
+                        && is_flow_edge_hint_slot_char(ch1)
+                    {
+                        tag_start = Some(x);
+                        break;
+                    }
+                }
+            }
+        }
+
+        let Some(tag_x0) = tag_start else {
+            return;
+        };
+        let tag_x1 = tag_x0.saturating_add(1);
+        if tag_x1 >= line_chars.len() {
+            return;
+        }
+
+        line_chars[tag_x0] = target.label[0];
+        line_chars[tag_x1] = target.label[1];
+        if typed_first.is_some_and(|first| first == target.label[0]) {
+            style_overrides[tag_x0] = Some(typed_style);
+            style_overrides[tag_x1] = Some(base_style);
+        } else {
+            style_overrides[tag_x0] = Some(base_style);
+            style_overrides[tag_x1] = Some(base_style);
+        }
+        return;
+    }
+
     let mut label_start = None::<usize>;
     let mut label_end = None::<usize>;
     for x in target.inner_x0..=target.inner_x1 {
@@ -3021,64 +3256,65 @@ fn apply_hint_target_to_line(
         }
     }
 
-    let (label_start, mut label_end) = match (label_start, label_end) {
-        (Some(start), Some(end)) => (start, end),
-        _ => return,
+    let label_bounds = match (label_start, label_end) {
+        (Some(start), Some(end)) => Some((start, end)),
+        _ => None,
     };
 
-    let base_style = Style::default().fg(Color::White).bg(Color::Cyan).add_modifier(Modifier::BOLD);
-    let typed_style =
-        Style::default().fg(Color::DarkGray).bg(Color::Cyan).add_modifier(Modifier::BOLD);
-
     if target.fill_char == crate::render::UNICODE_BOX_HORIZONTAL {
-        let mut label_start = label_start;
-        let label_chars = line_chars[label_start..=label_end].to_vec();
-        let label_len = label_chars.len();
-        if label_len == 0 {
-            return;
-        }
+        let mut label_end = target.inner_x0.saturating_sub(1);
 
-        let needed_space = 3usize;
-        let mut right_space = target.inner_x1 - label_end;
-        if right_space < needed_space {
-            let required_shift = needed_space - right_space;
-            let left_pad = label_start.saturating_sub(target.inner_x0);
-            let shift_left = required_shift.min(left_pad);
-
-            if shift_left > 0 {
-                for x in label_start..=label_end {
-                    line_chars[x] = target.fill_char;
-                    style_overrides[x] = None;
-                }
-
-                let new_label_start = label_start.saturating_sub(shift_left);
-                let new_label_end = new_label_start.saturating_add(label_len.saturating_sub(1));
-                for (offset, ch) in label_chars.iter().copied().enumerate() {
-                    line_chars[new_label_start + offset] = ch;
-                }
-
-                label_start = new_label_start;
-                label_end = new_label_end;
+        if let Some((mut label_start, mut existing_label_end)) = label_bounds {
+            let label_chars = line_chars[label_start..=existing_label_end].to_vec();
+            let label_len = label_chars.len();
+            if label_len == 0 {
+                return;
             }
 
-            right_space = target.inner_x1 - label_end;
+            let needed_space = 3usize;
+            let mut right_space = target.inner_x1 - existing_label_end;
             if right_space < needed_space {
-                let truncate = needed_space - right_space;
-                if truncate >= label_len {
-                    for x in label_start..=label_end {
+                let required_shift = needed_space - right_space;
+                let left_pad = label_start.saturating_sub(target.inner_x0);
+                let shift_left = required_shift.min(left_pad);
+
+                if shift_left > 0 {
+                    for x in label_start..=existing_label_end {
                         line_chars[x] = target.fill_char;
                         style_overrides[x] = None;
                     }
-                    label_end = target.inner_x0.saturating_sub(1);
-                } else {
-                    let start = (label_end + 1).saturating_sub(truncate);
-                    for x in start..=label_end {
-                        line_chars[x] = target.fill_char;
-                        style_overrides[x] = None;
+
+                    let new_label_start = label_start.saturating_sub(shift_left);
+                    let new_label_end = new_label_start.saturating_add(label_len.saturating_sub(1));
+                    for (offset, ch) in label_chars.iter().copied().enumerate() {
+                        line_chars[new_label_start + offset] = ch;
                     }
-                    label_end = label_end.saturating_sub(truncate);
+
+                    label_start = new_label_start;
+                    existing_label_end = new_label_end;
+                }
+
+                right_space = target.inner_x1 - existing_label_end;
+                if right_space < needed_space {
+                    let truncate = needed_space - right_space;
+                    if truncate >= label_len {
+                        for x in label_start..=existing_label_end {
+                            line_chars[x] = target.fill_char;
+                            style_overrides[x] = None;
+                        }
+                        existing_label_end = target.inner_x0.saturating_sub(1);
+                    } else {
+                        let start = (existing_label_end + 1).saturating_sub(truncate);
+                        for x in start..=existing_label_end {
+                            line_chars[x] = target.fill_char;
+                            style_overrides[x] = None;
+                        }
+                        existing_label_end = existing_label_end.saturating_sub(truncate);
+                    }
                 }
             }
+
+            label_end = existing_label_end;
         }
 
         let scan_start = label_end.saturating_add(1).max(target.inner_x0);
@@ -3138,6 +3374,11 @@ fn apply_hint_target_to_line(
 
         return;
     }
+
+    let (label_start, label_end) = match label_bounds {
+        Some((start, end)) => (start, end),
+        None => return,
+    };
 
     let mut label_chars = line_chars[label_start..=label_end].to_vec();
     if label_chars.is_empty() {
@@ -3279,6 +3520,7 @@ fn objects_from_sequence_ast(diagram_id: &DiagramId, ast: &SequenceAst) -> Vec<S
         );
         out.push(SelectableObject {
             label: format!("participant {} ({})", participant_id, participant.mermaid_name()),
+            note: participant.note().map(|note| note.to_owned()),
             object_ref,
         });
     }
@@ -3294,6 +3536,7 @@ fn objects_from_sequence_ast(diagram_id: &DiagramId, ast: &SequenceAst) -> Vec<S
                 msg.to_participant_id(),
                 msg.text()
             ),
+            note: None,
             object_ref,
         });
     }
@@ -3311,6 +3554,7 @@ fn objects_from_flowchart_ast(diagram_id: &DiagramId, ast: &FlowchartAst) -> Vec
         let object_ref = ObjectRef::new(diagram_id.clone(), node_category.clone(), node_id.clone());
         out.push(SelectableObject {
             label: format!("node {} ({})", node_id, node.label()),
+            note: node.note().map(|note| note.to_owned()),
             object_ref,
         });
     }
@@ -3319,6 +3563,7 @@ fn objects_from_flowchart_ast(diagram_id: &DiagramId, ast: &FlowchartAst) -> Vec
         let object_ref = ObjectRef::new(diagram_id.clone(), edge_category.clone(), edge_id.clone());
         out.push(SelectableObject {
             label: format!("edge {} {}→{}", edge_id, edge.from_node_id(), edge.to_node_id()),
+            note: None,
             object_ref,
         });
     }

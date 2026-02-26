@@ -49,16 +49,42 @@ fn self_message_right_limit(
     }
 }
 
-fn self_message_stub_end(from_x: usize, right_limit: usize) -> Option<usize> {
+fn self_message_stub_end(
+    from_x: usize,
+    right_limit: usize,
+    preferred_stub_len: Option<usize>,
+) -> Option<usize> {
     if right_limit <= from_x {
         return None;
     }
 
     let available = right_limit.saturating_sub(from_x);
-    let preferred =
+    let fallback_preferred =
         available.saturating_mul(SELF_MESSAGE_STUB_FRACTION_NUM) / SELF_MESSAGE_STUB_FRACTION_DEN;
-    let stub_len = preferred.max(SELF_MESSAGE_STUB_LEN).min(available);
+    let target = preferred_stub_len.unwrap_or(fallback_preferred);
+    let stub_len = target.max(SELF_MESSAGE_STUB_LEN).min(SELF_MESSAGE_STUB_MAX_LEN).min(available);
     Some(from_x.saturating_add(stub_len))
+}
+
+fn self_message_stub_len_target(layout: &SequenceLayout, message_id: &ObjectId, text: &str) -> Option<usize> {
+    layout
+        .spacing_budget()
+        .self_loop_stub_len_by_message_id()
+        .get(message_id)
+        .copied()
+        .or_else(|| {
+            Some(
+                text_len(text)
+                    .saturating_add(SELF_MESSAGE_LABEL_LEFT_PADDING + SELF_MESSAGE_LABEL_RIGHT_RESERVE)
+                    .clamp(SELF_MESSAGE_STUB_LEN, SELF_MESSAGE_STUB_MAX_LEN),
+            )
+        })
+}
+
+fn self_message_label_bounds(from_x: usize, stub_end: usize) -> Option<(usize, usize)> {
+    let x0 = from_x.saturating_add(SELF_MESSAGE_LABEL_LEFT_PADDING);
+    let x1 = stub_end.saturating_sub(SELF_MESSAGE_LABEL_RIGHT_RESERVE);
+    (x0 <= x1).then_some((x0, x1))
 }
 
 fn messages_by_id(ast: &SequenceAst) -> BTreeMap<&ObjectId, &SequenceMessage> {
@@ -387,9 +413,18 @@ fn draw_message(
     kind: SequenceMessageKind,
     text: &str,
     self_right_limit: usize,
+    self_stub_len_target: Option<usize>,
 ) -> Result<(), SequenceRenderError> {
     if from_x == to_x {
-        return draw_self_message(canvas, from_x, y, kind, text, self_right_limit);
+        return draw_self_message(
+            canvas,
+            from_x,
+            y,
+            kind,
+            text,
+            self_right_limit,
+            self_stub_len_target,
+        );
     }
 
     let dir = if from_x < to_x {
@@ -424,10 +459,11 @@ fn draw_self_message(
     kind: SequenceMessageKind,
     text: &str,
     right_limit: usize,
+    self_stub_len_target: Option<usize>,
 ) -> Result<(), SequenceRenderError> {
     let max_canvas_x = canvas.width().saturating_sub(1);
     let right_limit = right_limit.min(max_canvas_x);
-    let Some(stub_end) = self_message_stub_end(from_x, right_limit) else {
+    let Some(stub_end) = self_message_stub_end(from_x, right_limit, self_stub_len_target) else {
         return Ok(());
     };
 
@@ -448,8 +484,10 @@ fn draw_self_message(
     canvas.set(stub_end, y1, super::UNICODE_BOX_BOTTOM_RIGHT)?;
     canvas.set(from_x, y1, arrow_head(kind, ArrowDir::Left))?;
 
-    // Keep one connector cell right before the top corner so long labels don't collapse `┐` to `│`.
-    write_message_text(canvas, from_x + 1, stub_end.saturating_sub(2), y, text)?;
+    // Keep deterministic corner-safe reserve near `┐` so dense labels cannot overwrite corner context.
+    if let Some((x0, x1)) = self_message_label_bounds(from_x, stub_end) {
+        write_message_text(canvas, x0, x1, y, text)?;
+    }
     Ok(())
 }
 

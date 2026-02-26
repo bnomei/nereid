@@ -14,6 +14,9 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use nereid::model::seq_ast::{
+    SequenceBlock, SequenceBlockKind, SequenceSection, SequenceSectionKind,
+};
 use nereid::model::{
     CategoryPath, Diagram, DiagramAst, DiagramId, FlowEdge, FlowNode, FlowchartAst, ObjectId,
     ObjectRef, SequenceAst, SequenceMessage, SequenceMessageKind, SequenceParticipant, Session,
@@ -180,6 +183,9 @@ pub mod flow {
         Small,
         MediumDense,
         LargeLongLabels,
+        DenseCrossing,
+        RoutingStress,
+        RoutingStressWide,
     }
 
     impl Case {
@@ -188,6 +194,9 @@ pub mod flow {
                 Self::Small => "small",
                 Self::MediumDense => "medium_dense",
                 Self::LargeLongLabels => "large_long_labels",
+                Self::DenseCrossing => "dense_crossing",
+                Self::RoutingStress => "routing_stress",
+                Self::RoutingStressWide => "routing_stress_wide",
             }
         }
 
@@ -196,6 +205,9 @@ pub mod flow {
                 Self::Small => DagParams::new(6, 10, 2, 0, 12),
                 Self::MediumDense => DagParams::new(12, 20, 4, 1, 12),
                 Self::LargeLongLabels => DagParams::new(24, 35, 4, 2, 64),
+                Self::DenseCrossing => DagParams::new(14, 24, 5, 3, 24),
+                Self::RoutingStress => DagParams::new(16, 30, 3, 4, 12),
+                Self::RoutingStressWide => DagParams::new(18, 34, 4, 5, 16),
             }
         }
     }
@@ -295,6 +307,8 @@ pub mod seq {
         SmallLongText,
         Medium,
         LargeLongText,
+        SelfLoopDense,
+        NestedBlocks,
     }
 
     impl Case {
@@ -304,6 +318,8 @@ pub mod seq {
                 Self::SmallLongText => "small_long_text",
                 Self::Medium => "medium",
                 Self::LargeLongText => "large_long_text",
+                Self::SelfLoopDense => "self_loop_dense",
+                Self::NestedBlocks => "nested_blocks",
             }
         }
 
@@ -313,6 +329,8 @@ pub mod seq {
                 Self::SmallLongText => Params::new(8, 40, true),
                 Self::Medium => Params::new(20, 200, false),
                 Self::LargeLongText => Params::new(40, 800, true),
+                Self::SelfLoopDense => Params::new(18, 280, true),
+                Self::NestedBlocks => Params::new(20, 220, true),
             }
         }
     }
@@ -336,6 +354,153 @@ pub mod seq {
         } else {
             format!("m{idx:04}")
         }
+    }
+
+    fn diagram_self_loop_dense(params: Params) -> SequenceAst {
+        assert!(params.participants >= 2, "participants must be >= 2");
+
+        let mut ast = SequenceAst::default();
+        let mut participant_ids = Vec::<ObjectId>::with_capacity(params.participants);
+        for idx in 0..params.participants {
+            let name = participant_name(idx);
+            let id = participant_id(&name);
+            ast.participants_mut().insert(id.clone(), SequenceParticipant::new(name));
+            participant_ids.push(id);
+        }
+
+        for idx in 0..params.messages {
+            let from = participant_ids[idx % params.participants].clone();
+            let to = if idx % 4 == 0 {
+                from.clone()
+            } else {
+                participant_ids[(idx + 1) % params.participants].clone()
+            };
+            let kind = match idx % 3 {
+                0 => SequenceMessageKind::Sync,
+                1 => SequenceMessageKind::Async,
+                _ => SequenceMessageKind::Return,
+            };
+            let text = if idx % 4 == 0 {
+                ascii_repeat_to_len(&format!("self_loop_{idx:06}_"), 's', 180)
+            } else {
+                message_text(idx, params.long_text)
+            };
+            let order_key = (idx as i64) * 1000;
+            ast.messages_mut().push(SequenceMessage::new(
+                message_id(idx),
+                from,
+                to,
+                kind,
+                text,
+                order_key,
+            ));
+        }
+
+        ast
+    }
+
+    fn diagram_nested_blocks(params: Params) -> SequenceAst {
+        assert!(params.participants >= 2, "participants must be >= 2");
+        assert!(params.messages >= 120, "nested block fixture needs enough messages");
+
+        let mut ast = SequenceAst::default();
+        let mut participant_ids = Vec::<ObjectId>::with_capacity(params.participants);
+        for idx in 0..params.participants {
+            let name = participant_name(idx);
+            let id = participant_id(&name);
+            ast.participants_mut().insert(id.clone(), SequenceParticipant::new(name));
+            participant_ids.push(id);
+        }
+
+        let mut msg_ids = Vec::<ObjectId>::with_capacity(params.messages);
+        for idx in 0..params.messages {
+            let from = participant_ids[idx % params.participants].clone();
+            let to = if idx % 9 == 0 {
+                from.clone()
+            } else {
+                participant_ids[(idx + 2) % params.participants].clone()
+            };
+            let kind = match idx % 3 {
+                0 => SequenceMessageKind::Sync,
+                1 => SequenceMessageKind::Async,
+                _ => SequenceMessageKind::Return,
+            };
+            let text = if idx % 5 == 0 {
+                ascii_repeat_to_len(&format!("blk_msg_{idx:06}_"), 'b', 170)
+            } else {
+                message_text(idx, params.long_text)
+            };
+            let id = message_id(idx);
+            let order_key = (idx as i64) * 1000;
+            ast.messages_mut().push(SequenceMessage::new(
+                id.clone(),
+                from,
+                to,
+                kind,
+                text,
+                order_key,
+            ));
+            msg_ids.push(id);
+        }
+
+        let outer_main = msg_ids[20..90].to_vec();
+        let outer_else = msg_ids[90..160].to_vec();
+        let nested_loop = msg_ids[50..80].to_vec();
+        let nested_opt = msg_ids[104..132].to_vec();
+
+        let nested_loop_block = SequenceBlock::new(
+            ObjectId::new("b:0901").expect("block id"),
+            SequenceBlockKind::Loop,
+            Some(ascii_repeat_to_len("Nested loop block header ", 'h', 72)),
+            vec![SequenceSection::new(
+                ObjectId::new("sec:0901:00").expect("section id"),
+                SequenceSectionKind::Main,
+                Some(ascii_repeat_to_len("Nested loop section ", 'l', 60)),
+                nested_loop,
+            )],
+            Vec::new(),
+        );
+
+        let nested_opt_block = SequenceBlock::new(
+            ObjectId::new("b:0902").expect("block id"),
+            SequenceBlockKind::Opt,
+            Some(ascii_repeat_to_len("Optional block with long header ", 'o', 70)),
+            vec![SequenceSection::new(
+                ObjectId::new("sec:0902:00").expect("section id"),
+                SequenceSectionKind::Main,
+                Some(ascii_repeat_to_len("Optional section ", 'p', 58)),
+                nested_opt,
+            )],
+            Vec::new(),
+        );
+
+        let outer_block = SequenceBlock::new(
+            ObjectId::new("b:0900").expect("block id"),
+            SequenceBlockKind::Alt,
+            Some(ascii_repeat_to_len(
+                "Outer alternative block header with deterministic long text ",
+                'a',
+                88,
+            )),
+            vec![
+                SequenceSection::new(
+                    ObjectId::new("sec:0900:00").expect("section id"),
+                    SequenceSectionKind::Main,
+                    Some(ascii_repeat_to_len("Main branch section ", 'm', 56)),
+                    outer_main,
+                ),
+                SequenceSection::new(
+                    ObjectId::new("sec:0900:01").expect("section id"),
+                    SequenceSectionKind::Else,
+                    Some(ascii_repeat_to_len("Else branch section ", 'e', 56)),
+                    outer_else,
+                ),
+            ],
+            vec![nested_loop_block, nested_opt_block],
+        );
+        ast.blocks_mut().push(outer_block);
+
+        ast
     }
 
     pub fn diagram(params: Params) -> SequenceAst {
@@ -375,7 +540,11 @@ pub mod seq {
     }
 
     pub fn fixture(case: Case) -> SequenceAst {
-        diagram(case.params())
+        match case {
+            Case::SelfLoopDense => diagram_self_loop_dense(case.params()),
+            Case::NestedBlocks => diagram_nested_blocks(case.params()),
+            _ => diagram(case.params()),
+        }
     }
 }
 

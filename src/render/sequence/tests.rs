@@ -18,7 +18,56 @@ use crate::model::seq_ast::{
     SequenceAst, SequenceMessage, SequenceMessageKind, SequenceParticipant,
 };
 use crate::model::{DiagramId, ObjectRef};
-use crate::render::RenderOptions;
+use crate::render::{HighlightIndex, RenderOptions};
+
+const DETERMINISM_REPEAT_RUNS: usize = 100;
+
+fn assert_highlight_spans_in_bounds(
+    fixture_id: &str,
+    text: &str,
+    highlight_index: &HighlightIndex,
+) {
+    let lines = text.split('\n').collect::<Vec<_>>();
+
+    for (object_ref, spans) in highlight_index {
+        assert!(
+            !spans.is_empty(),
+            "sequence fixture `{fixture_id}` produced empty spans for {object_ref}"
+        );
+        for (span_idx, (y, x0, x1)) in spans.iter().copied().enumerate() {
+            let line = lines.get(y).unwrap_or_else(|| {
+                panic!(
+                    "sequence fixture `{fixture_id}` has out-of-bounds y={y} for {object_ref} span #{span_idx}"
+                )
+            });
+            let line_chars = line.chars().collect::<Vec<_>>();
+            let line_len = super::super::text::text_len(line);
+            assert!(
+                line_len > 0,
+                "sequence fixture `{fixture_id}` has span on empty line for {object_ref} span #{span_idx}: (y={y}, x0={x0}, x1={x1})"
+            );
+            assert!(
+                x0 <= x1,
+                "sequence fixture `{fixture_id}` has inverted span for {object_ref} span #{span_idx}: (y={y}, x0={x0}, x1={x1})"
+            );
+            assert!(
+                x1 < line_len,
+                "sequence fixture `{fixture_id}` has out-of-bounds x1 for {object_ref} span #{span_idx}: (y={y}, x0={x0}, x1={x1}, line_len={line_len})"
+            );
+            for x in x0..=x1 {
+                let ch = *line_chars.get(x).unwrap_or_else(|| {
+                    panic!(
+                        "sequence fixture `{fixture_id}` missing char cell for {object_ref} span #{span_idx}: (y={y}, x={x}, line_len={line_len})"
+                    )
+                });
+                assert!(
+                    ch != ' ',
+                    "sequence fixture `{fixture_id}` has non-visible cell in span for {object_ref} span #{span_idx}: (y={y}, x={x})"
+                );
+            }
+        }
+    }
+}
 
 #[test]
 fn snapshot_two_participants_one_message() {
@@ -336,6 +385,7 @@ fn annotated_render_indexes_participants_and_messages() {
     );
     assert!(msg_text.contains("Hello"));
     assert!(msg_text.contains('▶'));
+    assert!(msg_text.contains('│'));
 }
 
 #[test]
@@ -364,5 +414,176 @@ A->>B: Post\n";
     assert!(!spans.is_empty());
 
     let block_text = collect_spanned_text(&annotated.text, spans);
-    assert!(block_text.contains("ALT Outer"));
+    assert!(block_text.contains("ALT"), "block text did not include ALT label:\n{block_text}");
+    assert!(block_text.contains("Outer"), "block text did not include block title:\n{block_text}");
+}
+
+#[test]
+fn annotated_render_highlights_match_visible_cells_for_participants_messages_blocks_sections() {
+    let fixture_id = "nested-visible-highlight-projection";
+    let input = "\
+sequenceDiagram\n\
+participant A\n\
+participant B\n\
+A->>B: Pre\n\
+alt Outer\n\
+B->>A: In0\n\
+opt Inner\n\
+B->>A: In1\n\
+end\n\
+B->>A: In2\n\
+else Other\n\
+B->>A: In3\n\
+end\n\
+A->>B: Post\n";
+
+    let ast = parse_sequence_diagram(input).expect("parse");
+    let layout = layout_sequence(&ast).expect("layout");
+    let diagram_id = DiagramId::new("d-seq-visible").expect("diagram id");
+    let annotated = render_sequence_unicode_annotated(&diagram_id, &ast, &layout).expect("render");
+
+    assert_highlight_spans_in_bounds(fixture_id, &annotated.text, &annotated.highlight_index);
+
+    let participant_a_id = ast
+        .participants()
+        .iter()
+        .find(|(_, participant)| participant.mermaid_name() == "A")
+        .map(|(id, _)| id.clone())
+        .expect("participant A");
+    let pre_msg_id = ast
+        .messages()
+        .iter()
+        .find(|message| message.text() == "Pre")
+        .map(|message| message.message_id().clone())
+        .expect("Pre message");
+    let top_block_id = ast.blocks().first().expect("top block").block_id().clone();
+    let else_section_id = ast
+        .blocks()
+        .first()
+        .and_then(|block| block.sections().get(1))
+        .map(|section| section.section_id().clone())
+        .expect("else section");
+
+    let participant_ref: ObjectRef = format!("d:d-seq-visible/seq/participant/{participant_a_id}")
+        .parse()
+        .expect("participant ref");
+    let message_ref: ObjectRef =
+        format!("d:d-seq-visible/seq/message/{pre_msg_id}").parse().expect("message ref");
+    let block_ref: ObjectRef =
+        format!("d:d-seq-visible/seq/block/{top_block_id}").parse().expect("block ref");
+    let section_ref: ObjectRef =
+        format!("d:d-seq-visible/seq/section/{else_section_id}").parse().expect("section ref");
+
+    for (kind, object_ref) in [
+        ("participant", &participant_ref),
+        ("message", &message_ref),
+        ("block", &block_ref),
+        ("section", &section_ref),
+    ] {
+        let spans = annotated.highlight_index.get(object_ref).unwrap_or_else(|| {
+            panic!("missing {kind} highlight object in fixture `{fixture_id}`: {object_ref}")
+        });
+        assert!(!spans.is_empty(), "empty {kind} spans for {object_ref}");
+    }
+
+    let participant_text = collect_spanned_text(
+        &annotated.text,
+        annotated.highlight_index.get(&participant_ref).expect("participant spans"),
+    );
+    assert!(participant_text.contains('A'));
+
+    let message_text = collect_spanned_text(
+        &annotated.text,
+        annotated.highlight_index.get(&message_ref).expect("message spans"),
+    );
+    assert!(message_text.contains("Pre"));
+    assert!(message_text.contains('▶'));
+
+    let block_text = collect_spanned_text(
+        &annotated.text,
+        annotated.highlight_index.get(&block_ref).expect("block spans"),
+    );
+    assert!(block_text.contains("ALT"), "block text did not include ALT label:\n{block_text}");
+    assert!(block_text.contains("Outer"), "block text did not include block title:\n{block_text}");
+
+    let section_text = collect_spanned_text(
+        &annotated.text,
+        annotated.highlight_index.get(&section_ref).expect("section spans"),
+    );
+    assert!(section_text.contains("ELSE"));
+    assert!(section_text.contains("Other"));
+}
+
+#[test]
+fn repeat_run_render_sequence_unicode_is_deterministic_for_nested_block_fixture() {
+    let fixture_id = "nested-alt-opt-else";
+    let input = "\
+sequenceDiagram\n\
+participant A\n\
+participant B\n\
+A->>B: Pre\n\
+alt Outer\n\
+B->>A: In0\n\
+opt Inner\n\
+B->>A: In1\n\
+end\n\
+B->>A: In2\n\
+else Other\n\
+B->>A: In3\n\
+end\n\
+A->>B: Post\n";
+
+    let ast = parse_sequence_diagram(input).expect("parse");
+    let layout = layout_sequence(&ast).expect("layout");
+    let baseline = render_sequence_unicode(&ast, &layout).expect("baseline render");
+
+    for run_idx in 1..=DETERMINISM_REPEAT_RUNS {
+        let rendered = render_sequence_unicode(&ast, &layout).expect("repeat render");
+        assert_eq!(
+            rendered, baseline,
+            "sequence determinism mismatch for fixture `{fixture_id}` at run {run_idx}"
+        );
+    }
+}
+
+#[test]
+fn repeat_run_render_sequence_unicode_annotated_is_deterministic_for_nested_block_fixture() {
+    let fixture_id = "nested-alt-opt-else";
+    let input = "\
+sequenceDiagram\n\
+participant A\n\
+participant B\n\
+A->>B: Pre\n\
+alt Outer\n\
+B->>A: In0\n\
+opt Inner\n\
+B->>A: In1\n\
+end\n\
+B->>A: In2\n\
+else Other\n\
+B->>A: In3\n\
+end\n\
+A->>B: Post\n";
+
+    let ast = parse_sequence_diagram(input).expect("parse");
+    let layout = layout_sequence(&ast).expect("layout");
+    let diagram_id = DiagramId::new("d-seq-det").expect("diagram id");
+    let baseline =
+        render_sequence_unicode_annotated(&diagram_id, &ast, &layout).expect("baseline render");
+
+    assert_highlight_spans_in_bounds(fixture_id, &baseline.text, &baseline.highlight_index);
+
+    for run_idx in 1..=DETERMINISM_REPEAT_RUNS {
+        let annotated =
+            render_sequence_unicode_annotated(&diagram_id, &ast, &layout).expect("repeat render");
+        assert_eq!(
+            annotated.text, baseline.text,
+            "sequence annotated text determinism mismatch for fixture `{fixture_id}` at run {run_idx}"
+        );
+        assert_eq!(
+            annotated.highlight_index, baseline.highlight_index,
+            "sequence annotated highlight determinism mismatch for fixture `{fixture_id}` at run {run_idx}"
+        );
+        assert_highlight_spans_in_bounds(fixture_id, &annotated.text, &annotated.highlight_index);
+    }
 }

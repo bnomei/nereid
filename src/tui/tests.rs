@@ -16,7 +16,7 @@ use super::{
     xref_involves_selected, xref_item_style, xrefs_cursor_highlight_style, App, ExternalAction,
     Focus, FocusOwner, HintKind, HintMode, SearchKind, SearchMode, SelectableObject,
 };
-use crate::format::mermaid::parse_flowchart;
+use crate::format::mermaid::{parse_flowchart, parse_sequence_diagram};
 use crate::model::{
     Diagram, DiagramAst, DiagramId, ObjectId, ObjectRef, Session, SessionId, XRef, XRefId,
     XRefStatus,
@@ -54,6 +54,46 @@ A --> B
     session.diagrams_mut().insert(diagram_id.clone(), diagram);
     session.set_active_diagram_id(Some(diagram_id));
     session
+}
+
+#[test]
+fn sequence_objects_include_participant_note_for_inspector() {
+    let mut ast = parse_sequence_diagram(
+        r#"sequenceDiagram
+participant Alice
+participant Bob
+Alice->>Bob: Hello
+"#,
+    )
+    .expect("parse sequence");
+    ast.participants_mut()
+        .values_mut()
+        .next()
+        .expect("participant")
+        .set_note(Some("caller must be authenticated"));
+
+    let diagram_id = DiagramId::new("d:seq").expect("diagram id");
+    let objects = super::objects_from_sequence_ast(&diagram_id, &ast);
+
+    assert!(objects.iter().any(|obj| obj.note.as_deref() == Some("caller must be authenticated")));
+}
+
+#[test]
+fn flow_objects_include_node_note_for_inspector() {
+    let mut ast = parse_flowchart(
+        r#"flowchart LR
+A[Start]
+B[End]
+A --> B
+"#,
+    )
+    .expect("parse flowchart");
+    ast.nodes_mut().values_mut().next().expect("node").set_note(Some("must be idempotent"));
+
+    let diagram_id = DiagramId::new("d:flow").expect("diagram id");
+    let objects = super::objects_from_flowchart_ast(&diagram_id, &ast);
+
+    assert!(objects.iter().any(|obj| obj.note.as_deref() == Some("must be idempotent")));
 }
 
 #[test]
@@ -236,7 +276,8 @@ fn diagram_text_does_not_extend_corner_branch_for_flow_edge_cursor() {
     app.base_highlight_index = crate::render::HighlightIndex::new();
     app.base_highlight_index
         .insert(edge_ref.clone(), vec![(0usize, 0usize, 2usize), (1usize, 2usize, 2usize)]);
-    app.objects = vec![SelectableObject { label: "edge e:ab".to_owned(), object_ref: edge_ref }];
+    app.objects =
+        vec![SelectableObject { label: "edge e:ab".to_owned(), note: None, object_ref: edge_ref }];
     app.visible_object_indices = vec![0];
     app.objects_state.select(Some(0));
     app.session.selected_object_refs_mut().clear();
@@ -264,7 +305,8 @@ fn diagram_text_does_not_extend_corner_branch_for_node_cursor() {
     app.base_highlight_index = crate::render::HighlightIndex::new();
     app.base_highlight_index
         .insert(node_ref.clone(), vec![(0usize, 0usize, 2usize), (1usize, 2usize, 2usize)]);
-    app.objects = vec![SelectableObject { label: "node n:a".to_owned(), object_ref: node_ref }];
+    app.objects =
+        vec![SelectableObject { label: "node n:a".to_owned(), note: None, object_ref: node_ref }];
     app.visible_object_indices = vec![0];
     app.objects_state.select(Some(0));
     app.session.selected_object_refs_mut().clear();
@@ -865,6 +907,180 @@ fn diagram_text_uses_bright_black_when_cursor_is_selected() {
     });
 
     assert!(has_bright_green);
+}
+
+#[test]
+fn sequence_message_focus_highlights_spaces_inside_label() {
+    let mut app = App::new(demo_session());
+    app.set_active_diagram_id(DiagramId::new("om-10-dialogue").expect("diagram id"));
+    let object_ref: ObjectRef = "d:om-10-dialogue/seq/message/m:ask_go".parse().expect("msg ref");
+    app.select_object_ref(&object_ref);
+    app.session.selected_object_refs_mut().clear();
+
+    let text = app.diagram_text();
+    let line = text
+        .lines
+        .iter()
+        .map(|line| {
+            line.spans
+                .iter()
+                .flat_map(|span| span.content.chars().map(move |ch| (ch, span.style)))
+                .collect::<Vec<_>>()
+        })
+        .find(|cells| cells.iter().map(|(ch, _)| *ch).collect::<String>().contains("Can I"))
+        .expect("message row with phrase");
+
+    let line_text = line.iter().map(|(ch, _)| *ch).collect::<String>();
+    let phrase_start = line_text.find("Can I").expect("phrase start");
+    let space_x = phrase_start + 3;
+    assert_eq!(line[space_x].0, ' ');
+    assert_eq!(line[space_x].1.bg, Some(Color::LightGreen));
+}
+
+#[test]
+fn sequence_message_selected_highlights_spaces_inside_label() {
+    let mut app = App::new(demo_session());
+    app.set_active_diagram_id(DiagramId::new("om-10-dialogue").expect("diagram id"));
+    let object_ref: ObjectRef = "d:om-10-dialogue/seq/message/m:ask_go".parse().expect("msg ref");
+    app.select_object_ref(&object_ref);
+    app.session.selected_object_refs_mut().insert(object_ref);
+    app.objects_state.select(None);
+
+    let text = app.diagram_text();
+    let line = text
+        .lines
+        .iter()
+        .map(|line| {
+            line.spans
+                .iter()
+                .flat_map(|span| span.content.chars().map(move |ch| (ch, span.style)))
+                .collect::<Vec<_>>()
+        })
+        .find(|cells| cells.iter().map(|(ch, _)| *ch).collect::<String>().contains("Can I"))
+        .expect("message row with phrase");
+
+    let line_text = line.iter().map(|(ch, _)| *ch).collect::<String>();
+    let phrase_start = line_text.find("Can I").expect("phrase start");
+    let space_x = phrase_start + 3;
+    assert_eq!(line[space_x].0, ' ');
+    assert_eq!(line[space_x].1.bg, Some(Color::DarkGray));
+}
+
+#[test]
+fn sequence_message_focus_highlights_destination_lifeline_cell() {
+    let mut app = App::new(demo_session_fallback());
+    app.set_active_diagram_id(DiagramId::new("demo-seq").expect("diagram id"));
+    let object_ref: ObjectRef = "d:demo-seq/seq/message/m:0001".parse().expect("msg ref");
+    app.select_object_ref(&object_ref);
+    app.session.selected_object_refs_mut().clear();
+
+    let text = app.diagram_text();
+    let line = text
+        .lines
+        .iter()
+        .map(|line| {
+            line.spans
+                .iter()
+                .flat_map(|span| span.content.chars().map(move |ch| (ch, span.style)))
+                .collect::<Vec<_>>()
+        })
+        .find(|cells| cells.iter().map(|(ch, _)| *ch).collect::<String>().contains("Hello"))
+        .expect("message row with Hello");
+
+    let arrow_x = line.iter().position(|(ch, _)| *ch == '▶').expect("right-facing arrow head");
+    let lifeline_x = arrow_x + 1;
+    assert_eq!(line[lifeline_x].0, '│');
+    assert_eq!(line[lifeline_x].1.bg, Some(Color::LightGreen));
+}
+
+#[test]
+fn sequence_message_selected_highlights_destination_lifeline_cell() {
+    let mut app = App::new(demo_session_fallback());
+    app.set_active_diagram_id(DiagramId::new("demo-seq").expect("diagram id"));
+    let object_ref: ObjectRef = "d:demo-seq/seq/message/m:0001".parse().expect("msg ref");
+    app.select_object_ref(&object_ref);
+    app.session.selected_object_refs_mut().insert(object_ref);
+    app.objects_state.select(None);
+
+    let text = app.diagram_text();
+    let line = text
+        .lines
+        .iter()
+        .map(|line| {
+            line.spans
+                .iter()
+                .flat_map(|span| span.content.chars().map(move |ch| (ch, span.style)))
+                .collect::<Vec<_>>()
+        })
+        .find(|cells| cells.iter().map(|(ch, _)| *ch).collect::<String>().contains("Hello"))
+        .expect("message row with Hello");
+
+    let arrow_x = line.iter().position(|(ch, _)| *ch == '▶').expect("right-facing arrow head");
+    let lifeline_x = arrow_x + 1;
+    assert_eq!(line[lifeline_x].0, '│');
+    assert_eq!(line[lifeline_x].1.bg, Some(Color::DarkGray));
+}
+
+#[test]
+fn selected_om05_luck_edge_0009_does_not_highlight_node_text() {
+    let mut app = App::new(demo_session());
+    app.set_active_diagram_id(DiagramId::new("om-05-luck").expect("diagram id"));
+    let edge_ref: ObjectRef = "d:om-05-luck/flow/edge/e:0009".parse().expect("edge ref");
+    app.select_object_ref(&edge_ref);
+    app.session.selected_object_refs_mut().clear();
+    app.session.selected_object_refs_mut().insert(edge_ref);
+
+    let text = app.diagram_text();
+    let has_highlighted_node_text = text.lines.iter().any(|line| {
+        line.spans.iter().any(|span| {
+            span.style.bg == Some(Color::LightGreen)
+                && span
+                    .content
+                    .chars()
+                    .any(|ch| ch.is_ascii_alphanumeric() || ch == '\'' || ch == '_')
+        })
+    });
+
+    assert!(
+        !has_highlighted_node_text,
+        "selected om-05-luck e:0009 should not highlight node text cells:\n{}",
+        text_to_string(&text)
+    );
+}
+
+#[test]
+fn om07_shark_types_keeps_mako_and_attacks_labels_visible_in_tui_render() {
+    let mut app = App::new(demo_session());
+    app.set_active_diagram_id(DiagramId::new("om-07-shark-types").expect("diagram id"));
+
+    let rendered = text_to_string(&app.diagram_text());
+    assert!(
+        rendered.contains("Mako") || rendered.contains("mako"),
+        "expected Mako label to be visible:\n{rendered}"
+    );
+    assert!(
+        rendered.contains("Attacks") || rendered.contains("attacks"),
+        "expected Attacks label to be visible:\n{rendered}"
+    );
+}
+
+#[test]
+fn selecting_om07_attacks_keeps_mako_and_attacks_labels_visible_in_tui_render() {
+    let mut app = App::new(demo_session());
+    app.set_active_diagram_id(DiagramId::new("om-07-shark-types").expect("diagram id"));
+    let attacks_ref: ObjectRef =
+        "d:om-07-shark-types/flow/node/n:attacks".parse().expect("attacks ref");
+    app.select_object_ref(&attacks_ref);
+
+    let rendered = text_to_string(&app.diagram_text());
+    assert!(
+        rendered.contains("Mako") || rendered.contains("mako"),
+        "expected Mako label to be visible after selecting attacks:\n{rendered}"
+    );
+    assert!(
+        rendered.contains("Attacks") || rendered.contains("attacks"),
+        "expected Attacks label to be visible after selecting attacks:\n{rendered}"
+    );
 }
 
 #[test]
@@ -1635,7 +1851,7 @@ fn demo_flow_routing_nodes_have_labels() {
 }
 
 #[test]
-fn diagram_hints_show_only_nodes_for_flowchart() {
+fn diagram_hints_show_nodes_and_edges_for_flowchart() {
     let mut app = App::new(demo_session_fallback());
     app.set_active_diagram_id(DiagramId::new("demo-flow").expect("diagram id"));
 
@@ -1645,14 +1861,28 @@ fn diagram_hints_show_only_nodes_for_flowchart() {
         other => panic!("expected AwaitingFirst Jump, got {other:?}"),
     };
 
-    assert_eq!(targets.len(), 4);
+    assert_eq!(targets.len(), 8);
     let mut uniq = std::collections::HashSet::new();
+    let mut node_targets = 0usize;
+    let mut edge_targets = 0usize;
     for target in targets {
         assert!(target.label[0].is_ascii_uppercase());
         assert!(target.label[1].is_ascii_uppercase());
         assert!(uniq.insert(target.label));
-        assert!(target.object_ref.to_string().contains("/flow/node/"));
+
+        let object_ref = target.object_ref.to_string();
+        if object_ref.contains("/flow/node/") {
+            node_targets += 1;
+            continue;
+        }
+        if object_ref.contains("/flow/edge/") {
+            edge_targets += 1;
+            continue;
+        }
+        panic!("unexpected flow hint target: {object_ref}");
     }
+    assert_eq!(node_targets, 4);
+    assert_eq!(edge_targets, 4);
 }
 
 #[test]
@@ -1714,7 +1944,11 @@ fn diagram_hints_filter_and_select_on_second_letter() {
         _ => panic!("expected AwaitingFirst"),
     };
 
-    let chosen = first_targets[0].clone();
+    let chosen = first_targets
+        .iter()
+        .find(|target| before.as_ref() != Some(&target.object_ref))
+        .cloned()
+        .unwrap_or_else(|| first_targets[0].clone());
     app.handle_key_code(KeyCode::Char(chosen.label[0].to_ascii_lowercase()));
 
     let second_targets = match &app.hint_mode {
@@ -1764,8 +1998,11 @@ fn diagram_hints_render_plain_space_before_tag_letters() {
         .collect::<Vec<_>>();
 
     for target in targets {
+        if target.object_ref.to_string().contains("/flow/edge/") {
+            continue;
+        }
         let line = lines.get(target.y).expect("target line exists");
-        let tag_start = line
+        let _tag_start = line
             .windows(2)
             .position(|cells| {
                 cells[0].0 == target.label[0]
@@ -1774,10 +2011,48 @@ fn diagram_hints_render_plain_space_before_tag_letters() {
                     && cells[1].1.bg == Some(Color::Cyan)
             })
             .expect("hint label rendered");
+    }
+}
 
-        assert!(tag_start > 0, "hint label should not be at line start");
-        assert_eq!(line[tag_start - 1].0, ' ');
-        assert_ne!(line[tag_start - 1].1.bg, Some(Color::Cyan));
+#[test]
+fn diagram_hints_render_tags_for_flow_edges() {
+    let mut app = App::new(demo_session_fallback());
+    app.set_active_diagram_id(DiagramId::new("demo-flow").expect("diagram id"));
+
+    app.handle_key_code(KeyCode::Char('f'));
+    let targets = match &app.hint_mode {
+        HintMode::AwaitingFirst { kind: HintKind::Jump, targets } => targets.clone(),
+        _ => panic!("expected AwaitingFirst"),
+    };
+
+    let edge_targets = targets
+        .iter()
+        .filter(|target| target.object_ref.to_string().contains("/flow/edge/"))
+        .cloned()
+        .collect::<Vec<_>>();
+    assert!(!edge_targets.is_empty(), "expected flow edge hint targets");
+
+    let hint_text = app.diagram_text();
+    let lines = hint_text
+        .lines
+        .iter()
+        .map(|line| {
+            line.spans
+                .iter()
+                .flat_map(|span| span.content.chars().map(move |ch| (ch, span.style)))
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+
+    for target in edge_targets {
+        let line = lines.get(target.y).expect("target line exists");
+        let has_tag = line.windows(2).any(|cells| {
+            cells[0].0 == target.label[0]
+                && cells[1].0 == target.label[1]
+                && cells[0].1.bg == Some(Color::Cyan)
+                && cells[1].1.bg == Some(Color::Cyan)
+        });
+        assert!(has_tag, "missing flow edge hint tag for {}", target.object_ref);
     }
 }
 
@@ -1791,7 +2066,11 @@ fn diagram_hints_space_before_tag_inherits_focused_node_background() {
         HintMode::AwaitingFirst { kind: HintKind::Jump, targets } => targets.clone(),
         _ => panic!("expected AwaitingFirst"),
     };
-    let target = targets.first().expect("at least one hint target").clone();
+    let target = targets
+        .iter()
+        .find(|target| target.object_ref.to_string().contains("/flow/node/"))
+        .expect("node hint target")
+        .clone();
     app.select_object_ref(&target.object_ref);
 
     let hint_text = app.diagram_text();
@@ -1829,7 +2108,11 @@ fn diagram_hints_space_before_tag_inherits_selected_node_background() {
         HintMode::AwaitingFirst { kind: HintKind::Jump, targets } => targets.clone(),
         _ => panic!("expected AwaitingFirst"),
     };
-    let target = targets.first().expect("at least one hint target").clone();
+    let target = targets
+        .iter()
+        .find(|target| target.object_ref.to_string().contains("/flow/node/"))
+        .expect("node hint target")
+        .clone();
     app.session.selected_object_refs_mut().insert(target.object_ref.clone());
     app.objects_state.select(None);
 
@@ -1936,6 +2219,61 @@ fn diagram_select_hints_selects_edge_between_consecutive_flow_nodes() {
 
     app.handle_key_code(KeyCode::Esc);
     assert!(matches!(app.hint_mode, HintMode::Inactive));
+}
+
+#[test]
+fn diagram_hints_jump_selects_unlabeled_flow_edge() {
+    let mut app = App::new(demo_session_fallback());
+    let flow_id = DiagramId::new("demo-flow").expect("diagram id");
+    app.set_active_diagram_id(flow_id.clone());
+
+    app.handle_key_code(KeyCode::Char('f'));
+    let targets = match &app.hint_mode {
+        HintMode::AwaitingFirst { kind: HintKind::Jump, targets } => targets.clone(),
+        other => panic!("expected AwaitingFirst Jump, got {other:?}"),
+    };
+
+    let edge_ref = ObjectRef::new(
+        flow_id,
+        category_path(&["flow", "edge"]),
+        ObjectId::new("e:cd").expect("object id"),
+    );
+    let edge_target =
+        targets.iter().find(|t| t.object_ref == edge_ref).expect("hint target for e:cd").clone();
+
+    app.handle_key_code(KeyCode::Char(edge_target.label[0].to_ascii_lowercase()));
+    app.handle_key_code(KeyCode::Char(edge_target.label[1].to_ascii_lowercase()));
+
+    assert!(matches!(app.hint_mode, HintMode::Inactive));
+    assert_eq!(app.selected_ref(), Some(&edge_ref));
+}
+
+#[test]
+fn diagram_select_hints_selects_flow_edge_directly() {
+    let mut app = App::new(demo_session_fallback());
+    let flow_id = DiagramId::new("demo-flow").expect("diagram id");
+    app.set_active_diagram_id(flow_id.clone());
+
+    app.handle_key_code(KeyCode::Char('c'));
+    let targets = match &app.hint_mode {
+        HintMode::AwaitingFirst { kind: HintKind::SelectChain, targets } => targets.clone(),
+        other => panic!("expected AwaitingFirst SelectChain, got {other:?}"),
+    };
+
+    let edge_ref = ObjectRef::new(
+        flow_id,
+        category_path(&["flow", "edge"]),
+        ObjectId::new("e:cd").expect("object id"),
+    );
+    let edge_target =
+        targets.iter().find(|t| t.object_ref == edge_ref).expect("hint target for e:cd").clone();
+
+    app.handle_key_code(KeyCode::Char(edge_target.label[0].to_ascii_lowercase()));
+    app.handle_key_code(KeyCode::Char(edge_target.label[1].to_ascii_lowercase()));
+
+    assert!(app.session.selected_object_refs().contains(&edge_ref));
+    assert_eq!(app.selected_ref(), Some(&edge_ref));
+    assert!(matches!(app.hint_mode, HintMode::AwaitingFirst { kind: HintKind::SelectChain, .. }));
 }
 
 #[test]

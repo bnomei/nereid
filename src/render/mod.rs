@@ -231,6 +231,14 @@ impl Canvas {
         Ok(())
     }
 
+    /// Sets the character at `(x, y)` replacing any previously merged box edges.
+    pub(crate) fn set_exact(&mut self, x: usize, y: usize, ch: char) -> Result<(), CanvasError> {
+        let idx = self.index_of(x, y)?;
+        self.cells[idx] = ch;
+        self.box_edges[idx] = box_edges_from_char(ch).unwrap_or(BoxEdges::NONE);
+        Ok(())
+    }
+
     /// Fills the entire canvas with `ch`.
     pub fn fill(&mut self, ch: char) {
         self.cells.fill(ch);
@@ -473,7 +481,8 @@ impl std::error::Error for CanvasError {}
 
 #[cfg(test)]
 mod tests {
-    use super::{Canvas, CanvasError};
+    use super::{clamp_highlight_index_to_text, Canvas, CanvasError, HighlightIndex};
+    use crate::model::ObjectRef;
 
     #[test]
     fn set_and_get_in_bounds() {
@@ -509,6 +518,75 @@ mod tests {
     fn rejects_area_overflow() {
         let err = Canvas::new_filled(usize::MAX, 2, '.').unwrap_err();
         assert_eq!(err, CanvasError::AreaOverflow { width: usize::MAX, height: 2 });
+    }
+
+    #[test]
+    fn clamp_highlight_index_to_text_clamps_right_edge_and_drops_invalid_spans() {
+        let mut highlight_index = HighlightIndex::new();
+        let kept_ref: ObjectRef = "d:d-clamp/seq/message/m:0001".parse().expect("keep object ref");
+        let dropped_ref: ObjectRef =
+            "d:d-clamp/seq/message/m:0002".parse().expect("drop object ref");
+
+        highlight_index.insert(
+            kept_ref.clone(),
+            vec![
+                (0, 1, 99), // x1 clamps to end-of-line.
+                (0, 4, 4),  // x0 starts out of bounds.
+                (1, 0, 0),  // empty-line span.
+                (2, 1, 9),  // x1 clamps to end-of-line.
+                (9, 0, 0),  // y out of bounds.
+            ],
+        );
+        highlight_index.insert(dropped_ref.clone(), vec![(1, 0, 0), (7, 0, 0)]);
+
+        clamp_highlight_index_to_text(&mut highlight_index, "abcd\n\nef");
+
+        assert_eq!(highlight_index.len(), 1, "expected only kept_ref to remain");
+        assert!(
+            !highlight_index.contains_key(&dropped_ref),
+            "expected object with only invalid spans to be removed"
+        );
+        assert_eq!(
+            highlight_index.remove(&kept_ref).expect("kept_ref spans"),
+            vec![(0, 1, 3), (2, 1, 1)],
+            "expected right-edge clamp and invalid-span pruning"
+        );
+    }
+
+    #[test]
+    fn clamp_highlight_index_to_text_produces_only_in_bounds_spans() {
+        let mut highlight_index = HighlightIndex::new();
+        let a_ref: ObjectRef = "d:d-clamp/flow/edge/e:a".parse().expect("a ref");
+        let b_ref: ObjectRef = "d:d-clamp/flow/edge/e:b".parse().expect("b ref");
+
+        highlight_index.insert(a_ref, vec![(0, 0, 5), (0, 2, 1), (2, 0, 0)]);
+        highlight_index.insert(b_ref, vec![(0, 1, 3), (3, 0, 0), (2, 1, 4)]);
+
+        let text = "abc\n\nwxyz";
+        clamp_highlight_index_to_text(&mut highlight_index, text);
+
+        let lines = text.split('\n').collect::<Vec<_>>();
+        for (object_ref, spans) in &highlight_index {
+            assert!(!spans.is_empty(), "clamp left empty span list for {object_ref}");
+            for (span_idx, (y, x0, x1)) in spans.iter().copied().enumerate() {
+                let line = lines.get(y).unwrap_or_else(|| {
+                    panic!("clamp left out-of-bounds y={y} for {object_ref} span #{span_idx}")
+                });
+                let line_len = super::text::text_len(line);
+                assert!(
+                    line_len > 0,
+                    "clamp left span on empty line for {object_ref} span #{span_idx}: (y={y}, x0={x0}, x1={x1})"
+                );
+                assert!(
+                    x0 <= x1,
+                    "clamp left inverted span for {object_ref} span #{span_idx}: (y={y}, x0={x0}, x1={x1})"
+                );
+                assert!(
+                    x1 < line_len,
+                    "clamp left out-of-bounds x1 for {object_ref} span #{span_idx}: (y={y}, x0={x0}, x1={x1}, line_len={line_len})"
+                );
+            }
+        }
     }
 
     #[test]
