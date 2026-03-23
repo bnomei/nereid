@@ -3219,14 +3219,9 @@ impl NereidMcp {
 #[tool_handler]
 impl ServerHandler for NereidMcp {
     fn get_info(&self) -> ServerInfo {
-        ServerInfo {
-            instructions: Some(
-                "Nereid diagram collaboration server (tools: diagram.list, diagram.open, diagram.delete, diagram.current, diagram.read, diagram.stat, diagram.diff, diagram.render_text, diagram.get_ast, diagram.get_slice, diagram.create_from_mermaid, diagram.apply_ops, diagram.propose_ops, walkthrough.list, walkthrough.open, walkthrough.current, walkthrough.read, walkthrough.stat, walkthrough.diff, walkthrough.render_text, walkthrough.get_node, walkthrough.apply_ops, route.find, attention.human.read, attention.agent.read, attention.agent.set, attention.agent.clear, follow_ai.read, follow_ai.set, selection.read, selection.update, view.read_state, object.read, xref.list, xref.neighbors, xref.add, xref.remove, seq.messages, seq.trace, seq.search, flow.reachable, flow.unreachable, flow.paths, flow.cycles, flow.dead_ends, flow.degrees)"
-                    .into(),
-            ),
-            capabilities: ServerCapabilities::builder().enable_tools().build(),
-            ..Default::default()
-        }
+        ServerInfo::new(ServerCapabilities::builder().enable_tools().build()).with_instructions(
+            "Nereid diagram collaboration server (tools: diagram.list, diagram.open, diagram.delete, diagram.current, diagram.read, diagram.stat, diagram.diff, diagram.render_text, diagram.get_ast, diagram.get_slice, diagram.create_from_mermaid, diagram.apply_ops, diagram.propose_ops, walkthrough.list, walkthrough.open, walkthrough.current, walkthrough.read, walkthrough.stat, walkthrough.diff, walkthrough.render_text, walkthrough.get_node, walkthrough.apply_ops, route.find, attention.human.read, attention.agent.read, attention.agent.set, attention.agent.clear, follow_ai.read, follow_ai.set, selection.read, selection.update, view.read_state, object.read, xref.list, xref.neighbors, xref.add, xref.remove, seq.messages, seq.trace, seq.search, flow.reachable, flow.unreachable, flow.paths, flow.cycles, flow.dead_ends, flow.degrees)",
+        )
     }
 }
 
