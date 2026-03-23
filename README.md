@@ -291,6 +291,14 @@ Benchmarks:
 ./scripts/bench-criterion compare
 ```
 
+## Local Pre-commit
+
+```bash
+prek validate-config prek.toml
+prek run --all-files
+prek install
+```
+
 ## License
 
 Nereid Free Use License (No Copying, No Derivatives) v1.0. See [`LICENSE`](LICENSE).

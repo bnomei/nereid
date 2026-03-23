@@ -1,0 +1,22 @@
+fail_fast = true
+default_install_hook_types = ["pre-commit"]
+exclude = { glob = ["target/**", "dist/**"] }
+
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "cargo-fmt"
+name = "cargo fmt"
+language = "system"
+entry = "cargo fmt --all -- --check"
+files = { glob = ["**/*.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain", "rust-toolchain.toml", ".cargo/**/*.toml"] }
+pass_filenames = false
+
+[[repos.hooks]]
+id = "cargo-clippy"
+name = "cargo clippy"
+language = "system"
+entry = "cargo clippy --all-targets --all-features -- -D warnings"
+files = { glob = ["**/*.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain", "rust-toolchain.toml", ".cargo/**/*.toml"] }
+pass_filenames = false

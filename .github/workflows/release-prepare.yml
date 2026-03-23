@@ -17,6 +17,10 @@ jobs:
           fetch-depth: 0
 
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release-plz-${{ runner.os }}
+          cache-on-failure: true
 
       - name: Run release-plz
         uses: release-plz/action@v0.5
