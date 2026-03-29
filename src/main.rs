@@ -190,10 +190,7 @@ fn main() {
         runtime.block_on(async move {
             let listener = tokio::net::TcpListener::bind(("127.0.0.1", mcp_http_port)).await?;
 
-            let config = StreamableHttpServerConfig {
-                stateful_mode: true,
-                ..StreamableHttpServerConfig::default()
-            };
+            let config = StreamableHttpServerConfig::default().with_stateful_mode(true);
             let shutdown_token = config.cancellation_token.clone();
             let server_shutdown = shutdown_token.clone();
 
