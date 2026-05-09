@@ -815,9 +815,8 @@ async fn streamable_http_tools_call_updates_shared_agent_attention_state() {
     let agent_highlights = Arc::new(Mutex::new(BTreeSet::new()));
     let server = NereidMcp::new_with_agent_highlights(demo_session(), agent_highlights.clone());
 
-    let config = StreamableHttpServerConfig::default()
-        .with_stateful_mode(false)
-        .with_sse_keep_alive(None);
+    let config =
+        StreamableHttpServerConfig::default().with_stateful_mode(false).with_sse_keep_alive(None);
 
     let session_manager = Arc::new(LocalSessionManager::default());
     let service = {
@@ -845,6 +844,7 @@ async fn streamable_http_tools_call_updates_shared_agent_attention_state() {
                 .uri("/mcp")
                 .header(axum::http::header::ACCEPT, "application/json, text/event-stream")
                 .header(axum::http::header::CONTENT_TYPE, "application/json")
+                .header(axum::http::header::HOST, "localhost")
                 .body(Body::from(body))
                 .expect("request"),
         )

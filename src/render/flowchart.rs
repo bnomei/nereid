@@ -266,13 +266,13 @@ fn normalize_edge_gap_lanes_for_bridge_alignment(
     layer_count: usize,
 ) {
     let mut edge_layers = Vec::<Option<(usize, usize)>>::with_capacity(ast.edges().len());
-    for (_edge_id, edge) in ast.edges() {
+    for edge in ast.edges().values() {
         let from_layer = node_renders.get(edge.from_node_id()).map(|render| render.layer);
         let to_layer = node_renders.get(edge.to_node_id()).map(|render| render.layer);
         edge_layers.push(from_layer.zip(to_layer));
     }
 
-    for gap_idx in 0..gap_widths.len() {
+    for (gap_idx, gap_width) in gap_widths.iter_mut().enumerate() {
         let mut assigned_edges = Vec::<(usize, usize)>::new();
         for (edge_idx, lanes) in edge_gap_lanes.iter().enumerate() {
             let Some(lane_idx) = lanes.get(gap_idx).copied().flatten() else {
@@ -375,7 +375,7 @@ fn normalize_edge_gap_lanes_for_bridge_alignment(
             }
         }
 
-        gap_widths[gap_idx] = compact_gap_width;
+        *gap_width = compact_gap_width;
     }
 }
 

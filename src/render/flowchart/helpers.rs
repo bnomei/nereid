@@ -920,12 +920,8 @@ fn connector_anchor_at(canvas: &Canvas, x: usize, y: usize) -> bool {
 }
 
 fn edge_cap_tail_overlay(canvas: &Canvas, cap: EdgeCapCell) -> Option<(usize, usize, char)> {
-    let Some((tail_dx, tail_dy)) = arrow_char_to_tail_delta(cap.ch) else {
-        return None;
-    };
-    let Some((tail_x, tail_y)) = step_cell(cap.x, cap.y, tail_dx, tail_dy) else {
-        return None;
-    };
+    let (tail_dx, tail_dy) = arrow_char_to_tail_delta(cap.ch)?;
+    let (tail_x, tail_y) = step_cell(cap.x, cap.y, tail_dx, tail_dy)?;
     let Ok(current_tail) = canvas.get(tail_x, tail_y) else {
         return None;
     };
@@ -1741,6 +1737,7 @@ fn assign_edge_gap_lanes_classic(
     (edge_gap_lanes, gap_widths)
 }
 
+#[allow(clippy::overly_complex_bool_expr)]
 fn assign_edge_gap_lanes_with_clearance(
     ast: &FlowchartAst,
     node_renders: &BTreeMap<ObjectId, NodeRender>,

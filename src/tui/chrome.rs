@@ -99,6 +99,16 @@ fn diagram_view_title(
     ])
 }
 
+fn diagram_note_title(note: &str) -> Line<'static> {
+    let note = note.lines().collect::<Vec<_>>().join(" ");
+
+    Line::from(vec![
+        Span::raw("─ ".to_owned()),
+        Span::styled(note, Style::default().fg(Color::DarkGray)),
+        Span::raw(" ".to_owned()),
+    ])
+}
+
 fn diagram_counter_label(diagram_index: Option<usize>, diagram_total: usize) -> String {
     if diagram_total == 0 {
         return "[0/0]".to_owned();
@@ -274,7 +284,6 @@ fn footer_help_line(app: &App, toast_suffix: &str, compact: bool) -> Line<'stati
         match app.focus {
             Focus::Diagram => match app.hint_mode {
                 HintMode::Inactive => {
-                    let notes = if app.show_notes { "n◼ " } else { "n◻ " };
                     push_footer_entry_maybe_disabled(
                         &mut spans,
                         "DIAGRAM",
@@ -317,12 +326,14 @@ fn footer_help_line(app: &App, toast_suffix: &str, compact: bool) -> Line<'stati
                         "g/t",
                         diagram_hotkeys_disabled,
                     );
-                    push_footer_entry_maybe_disabled(
-                        &mut spans,
-                        "NOTES",
-                        notes,
-                        diagram_hotkeys_disabled,
-                    );
+                    if app.show_notes {
+                        push_footer_entry_maybe_disabled(
+                            &mut spans,
+                            "NOTES",
+                            "n◼ ",
+                            diagram_hotkeys_disabled,
+                        );
+                    }
                 }
                 HintMode::AwaitingFirst { kind, .. } | HintMode::AwaitingSecond { kind, .. } => {
                     match kind {
@@ -528,6 +539,12 @@ fn render_help(frame: &mut Frame<'_>, app: &mut App, main_area: Rect) {
     lines.push(help_kv(
         "4",
         "Toggle inspector panel",
+        key_col_width,
+        key_style,
+    ));
+    lines.push(help_kv(
+        "5/N",
+        "Toggle notes panel",
         key_col_width,
         key_style,
     ));

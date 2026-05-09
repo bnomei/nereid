@@ -149,7 +149,8 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) {
 
     let sidebar_panel_count = usize::from(app.objects_visible)
         + usize::from(app.xrefs_visible)
-        + usize::from(app.inspector_visible);
+        + usize::from(app.inspector_visible)
+        + usize::from(app.notes_visible);
     let compact_footer = footer_uses_compact_mode(main_area, sidebar_panel_count);
     let sidebar_panels_visible = sidebar_panel_count > 0;
     let (diagram_area, palette_area, sidebar_content_area) = if sidebar_panels_visible {
@@ -180,6 +181,7 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) {
         Objects,
         XRefs,
         Inspector,
+        Notes,
     }
     let mut sidebar_panels = Vec::<SidebarPanel>::new();
     if app.objects_visible {
@@ -191,10 +193,14 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) {
     if app.inspector_visible {
         sidebar_panels.push(SidebarPanel::Inspector);
     }
+    if app.notes_visible {
+        sidebar_panels.push(SidebarPanel::Notes);
+    }
 
     let mut objects_area = None::<Rect>;
     let mut xrefs_area = None::<Rect>;
     let mut inspector_area = None::<Rect>;
+    let mut notes_area = None::<Rect>;
     if !sidebar_panels.is_empty() {
         let Some(sidebar_content_area) = sidebar_content_area else {
             unreachable!("sidebar panels require a sidebar content area");
@@ -202,10 +208,16 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) {
         let constraints = match sidebar_panels.len() {
             1 => vec![Constraint::Min(0)],
             2 => vec![Constraint::Percentage(50), Constraint::Percentage(50)],
-            _ => vec![
+            3 => vec![
                 Constraint::Percentage(30),
                 Constraint::Percentage(30),
                 Constraint::Percentage(40),
+            ],
+            _ => vec![
+                Constraint::Percentage(25),
+                Constraint::Percentage(25),
+                Constraint::Percentage(25),
+                Constraint::Percentage(25),
             ],
         };
         let content = Layout::default()
@@ -217,6 +229,7 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) {
                 SidebarPanel::Objects => objects_area = Some(content[idx]),
                 SidebarPanel::XRefs => xrefs_area = Some(content[idx]),
                 SidebarPanel::Inspector => inspector_area = Some(content[idx]),
+                SidebarPanel::Notes => notes_area = Some(content[idx]),
             }
         }
     }
@@ -242,6 +255,7 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) {
         diagram_index,
         diagram_total,
     );
+    let diagram_bottom_title = diagram_bottom_title(app);
     let diagram_border_style =
         panel_border_style_for_focus(app.focus, Focus::Diagram, app.focus_owner);
     let viewport_width = diagram_area.width.saturating_sub(2) as usize;
@@ -252,14 +266,14 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) {
     if left_pad > 0 || top_pad > 0 {
         diagram_text = pad_text(diagram_text, left_pad, top_pad);
     }
-    let diagram = Paragraph::new(diagram_text)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(diagram_title)
-                .border_style(diagram_border_style),
-        )
-        .scroll((scroll_y, scroll_x));
+    let mut diagram_block = Block::default()
+        .borders(Borders::ALL)
+        .title(diagram_title)
+        .border_style(diagram_border_style);
+    if let Some(diagram_bottom_title) = diagram_bottom_title {
+        diagram_block = diagram_block.title_bottom(diagram_bottom_title);
+    }
+    let diagram = Paragraph::new(diagram_text).block(diagram_block).scroll((scroll_y, scroll_x));
     frame.render_widget(diagram, diagram_area);
 
     if let Some(objects_area) = objects_area {
@@ -417,6 +431,19 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) {
         frame.render_widget(inspector, inspector_area);
     }
 
+    if let Some(notes_area) = notes_area {
+        let notes = Paragraph::new(app.current_note_text())
+            .style(Style::default().fg(INSPECTOR_COLOR))
+            .wrap(Wrap { trim: false })
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(INSPECTOR_COLOR))
+                    .title(view_title("Notes", '5', None)),
+            );
+        frame.render_widget(notes, notes_area);
+    }
+
     let toast_snapshot = app.toast.as_ref().map(|toast| (toast.message.clone(), toast.expires_at));
     let toast_suffix = match toast_snapshot {
         Some((message, expires_at)) if expires_at > Instant::now() => format!(" | {message}"),
@@ -566,6 +593,7 @@ struct App {
     xrefs_dangling_only: bool,
     xrefs_involving_only: bool,
     inspector_visible: bool,
+    notes_visible: bool,
     palette_visible: bool,
     follow_ai: bool,
     show_help: bool,
@@ -647,6 +675,7 @@ impl App {
             xrefs_dangling_only: false,
             xrefs_involving_only: false,
             inspector_visible: false,
+            notes_visible: false,
             palette_visible: false,
             follow_ai: true,
             show_help: false,
@@ -914,6 +943,14 @@ impl App {
 
     fn selected_ref(&self) -> Option<&ObjectRef> {
         self.selected_object().map(|obj| &obj.object_ref)
+    }
+
+    fn current_note_text(&self) -> String {
+        self.selected_object()
+            .and_then(|obj| obj.note.as_deref())
+            .filter(|note| !note.trim().is_empty())
+            .unwrap_or("No note")
+            .to_owned()
     }
 
     fn diagram_text(&self) -> Text<'static> {
@@ -1212,6 +1249,11 @@ impl App {
     fn toggle_inspector_visible(&mut self) {
         self.inspector_visible = !self.inspector_visible;
         self.set_toast(if self.inspector_visible { "Inspector shown" } else { "Inspector hidden" });
+    }
+
+    fn toggle_notes_visible(&mut self) {
+        self.notes_visible = !self.notes_visible;
+        self.set_toast(if self.notes_visible { "Notes shown" } else { "Notes hidden" });
     }
 
     fn toggle_palette_visible(&mut self) {
@@ -1564,6 +1606,7 @@ impl App {
             KeyCode::Char('2') => self.toggle_objects_visible_and_focus(),
             KeyCode::Char('3') => self.toggle_xrefs_visible_and_focus(),
             KeyCode::Char('4') => self.toggle_inspector_visible(),
+            KeyCode::Char('5') => self.toggle_notes_visible(),
             KeyCode::Char('|') => self.toggle_palette_visible(),
             KeyCode::Char('a') => self.toggle_follow_ai(),
             KeyCode::Char('d') => self.deselect_current_diagram_objects(),
@@ -1577,7 +1620,13 @@ impl App {
                     self.search_next();
                 }
             }
-            KeyCode::Char('N') => self.search_prev(),
+            KeyCode::Char('N') => {
+                if self.search_mode == SearchMode::Inactive {
+                    self.toggle_notes_visible();
+                } else {
+                    self.search_prev();
+                }
+            }
             KeyCode::Tab => {
                 self.cycle_focus_visible();
             }
@@ -2462,13 +2511,11 @@ impl TerminalSession {
         })?;
 
         let backend = CrosstermBackend::new(stdout);
-        let mut terminal = Terminal::new(backend).map_err(|err| {
+        let mut terminal = Terminal::new(backend).inspect_err(|_| {
             teardown_terminal();
-            err
         })?;
-        terminal.clear().map_err(|err| {
+        terminal.clear().inspect_err(|_| {
             teardown_terminal();
-            err
         })?;
 
         Ok(Self { terminal })
@@ -2627,6 +2674,10 @@ fn ensure_active_diagram_id(session: &mut Session) -> Option<DiagramId> {
 
     session.set_active_diagram_id(Some(first.clone()));
     Some(first)
+}
+
+fn diagram_bottom_title(app: &App) -> Option<Line<'static>> {
+    app.show_notes.then(|| diagram_note_title(&app.current_note_text()))
 }
 
 fn render_diagram_annotated(diagram: &Diagram, options: RenderOptions) -> (String, HighlightIndex) {
@@ -3072,8 +3123,8 @@ fn flow_edge_hint_bounds(spans: &[LineSpan], lines: &[&str]) -> Option<(usize, u
 
         let mut first = None::<usize>;
         let mut last = None::<usize>;
-        for x in start..=end {
-            if is_flow_edge_canvas_char(chars[x]) {
+        for (x, ch) in chars.iter().enumerate().take(end + 1).skip(start) {
+            if is_flow_edge_canvas_char(*ch) {
                 first = Some(first.unwrap_or(x));
                 last = Some(x);
             }
@@ -3734,7 +3785,7 @@ fn subsequence_stats(needle: &str, haystack: &str) -> Option<SubsequenceStats> {
 
             if first.is_none() {
                 first = Some(idx);
-                start_boundary = prev_hay.map_or(true, is_boundary_char);
+                start_boundary = prev_hay.is_none_or(is_boundary_char);
             }
 
             if let Some(prev) = prev_match {

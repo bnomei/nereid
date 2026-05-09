@@ -8,13 +8,14 @@
 
 use super::{
     apply_highlight_flags, category_path, demo_session, demo_session_fallback,
-    diagram_counter_label, diagram_view_title, ensure_active_diagram_id, export_diagram_mermaid,
-    fill_highlight_bridge_gaps, fill_highlight_bridge_gaps_unbounded,
-    fill_highlight_corner_branch_extensions, footer_help_line, objects_item_bg, osc52_sequence,
-    panel_border_style_for_focus, ranked_search_results, search_candidates_from_session,
-    search_footer_line, stack_main_panes_vertically, style_for_diagram_cell,
-    xref_involves_selected, xref_item_style, xrefs_cursor_highlight_style, App, ExternalAction,
-    Focus, FocusOwner, HintKind, HintMode, SearchKind, SearchMode, SelectableObject,
+    diagram_bottom_title, diagram_counter_label, diagram_note_title, diagram_view_title,
+    ensure_active_diagram_id, export_diagram_mermaid, fill_highlight_bridge_gaps,
+    fill_highlight_bridge_gaps_unbounded, fill_highlight_corner_branch_extensions,
+    footer_help_line, objects_item_bg, osc52_sequence, panel_border_style_for_focus,
+    ranked_search_results, search_candidates_from_session, search_footer_line,
+    stack_main_panes_vertically, style_for_diagram_cell, xref_involves_selected, xref_item_style,
+    xrefs_cursor_highlight_style, App, ExternalAction, Focus, FocusOwner, HintKind, HintMode,
+    SearchKind, SearchMode, SelectableObject,
 };
 use crate::format::mermaid::{parse_flowchart, parse_sequence_diagram};
 use crate::model::{
@@ -94,6 +95,37 @@ A --> B
     let objects = super::objects_from_flowchart_ast(&diagram_id, &ast);
 
     assert!(objects.iter().any(|obj| obj.note.as_deref() == Some("must be idempotent")));
+}
+
+#[test]
+fn current_note_text_tracks_selected_object_when_rendered_notes_hidden() {
+    let mut ast = parse_flowchart(
+        r#"flowchart LR
+A[Start]
+B[End]
+A --> B
+"#,
+    )
+    .expect("parse flowchart");
+    let (node_id, node) = ast.nodes_mut().iter_mut().next().expect("node");
+    node.set_note(Some("must be idempotent"));
+    let node_ref = ObjectRef::new(
+        DiagramId::new("flow").expect("diagram id"),
+        category_path(&["flow", "node"]),
+        node_id.clone(),
+    );
+
+    let mut session = Session::new(SessionId::new("s1").expect("session id"));
+    let diagram_id = node_ref.diagram_id().clone();
+    let diagram = Diagram::new(diagram_id.clone(), "Flow", DiagramAst::Flowchart(ast));
+    session.diagrams_mut().insert(diagram_id.clone(), diagram);
+    session.set_active_diagram_id(Some(diagram_id));
+
+    let mut app = App::new(session);
+    app.show_notes = false;
+    app.select_object_ref(&node_ref);
+
+    assert_eq!(app.current_note_text(), "must be idempotent");
 }
 
 #[test]
@@ -448,6 +480,7 @@ fn number_hotkeys_focus_views() {
     assert_eq!(app.focus, super::Focus::Diagram);
     assert!(!app.objects_visible);
     assert!(!app.xrefs_visible);
+    assert!(!app.notes_visible);
 
     app.handle_key_code(KeyCode::Char('2'));
     assert_eq!(app.focus, super::Focus::Objects);
@@ -457,8 +490,24 @@ fn number_hotkeys_focus_views() {
     assert_eq!(app.focus, super::Focus::XRefs);
     assert!(app.xrefs_visible);
 
+    app.handle_key_code(KeyCode::Char('5'));
+    assert_eq!(app.focus, super::Focus::XRefs);
+    assert!(app.notes_visible);
+
     app.handle_key_code(KeyCode::Char('1'));
     assert_eq!(app.focus, super::Focus::Diagram);
+}
+
+#[test]
+fn capital_n_toggles_notes_panel_when_search_inactive() {
+    let mut app = App::new(demo_session());
+    assert!(!app.notes_visible);
+
+    app.handle_key_code(KeyCode::Char('N'));
+    assert!(app.notes_visible);
+
+    app.handle_key_code(KeyCode::Char('N'));
+    assert!(!app.notes_visible);
 }
 
 #[test]
@@ -466,6 +515,7 @@ fn footer_toggle_entries_use_square_glyphs_without_parentheses() {
     let mut app = App::new(demo_session());
     let inactive = line_to_string(&footer_help_line(&app, "", false));
     assert!(inactive.contains("Notes:n◼ "));
+    assert!(!inactive.contains("5/N"));
     assert!(inactive.contains("Ai:a◼ "));
     assert!(!inactive.contains("n("));
     assert!(!inactive.contains("a("));
@@ -473,7 +523,9 @@ fn footer_toggle_entries_use_square_glyphs_without_parentheses() {
     app.show_notes = false;
     app.follow_ai = false;
     let active = line_to_string(&footer_help_line(&app, "", false));
-    assert!(active.contains("Notes:n◻ "));
+    assert!(!active.contains("Notes:n◻ "));
+    assert!(!active.contains("Notes:n"));
+    assert!(!active.contains("5/N"));
     assert!(active.contains("Ai:a◻ "));
 }
 
@@ -552,6 +604,59 @@ fn diagram_title_renders_counter_in_bright_green() {
     let counter_span =
         title.spans.iter().find(|span| span.content.as_ref() == "[04/12]").expect("counter span");
     assert_eq!(counter_span.style.fg, Some(Color::LightGreen));
+}
+
+#[test]
+fn diagram_note_title_shows_note_text_without_object_label() {
+    let title = diagram_note_title("must be idempotent\nsecond line");
+    let rendered = line_to_string(&title);
+
+    assert!(rendered.contains("must be idempotent second line"));
+    assert!(!rendered.contains("Current"));
+    assert!(!rendered.contains("node"));
+    let note_span = title
+        .spans
+        .iter()
+        .find(|span| span.content.as_ref() == "must be idempotent second line")
+        .expect("note");
+    assert_eq!(note_span.style.fg, Some(Color::DarkGray));
+}
+
+#[test]
+fn diagram_bottom_title_uses_note_text_only_when_rendered_notes_are_enabled() {
+    let mut ast = parse_flowchart(
+        r#"flowchart LR
+A[Start]
+B[End]
+A --> B
+"#,
+    )
+    .expect("parse flowchart");
+    let (node_id, node) = ast.nodes_mut().iter_mut().next().expect("node");
+    node.set_note(Some("must be idempotent"));
+    let node_ref = ObjectRef::new(
+        DiagramId::new("flow").expect("diagram id"),
+        category_path(&["flow", "node"]),
+        node_id.clone(),
+    );
+
+    let mut session = Session::new(SessionId::new("s1").expect("session id"));
+    let diagram_id = node_ref.diagram_id().clone();
+    let diagram = Diagram::new(diagram_id.clone(), "Flow", DiagramAst::Flowchart(ast));
+    session.diagrams_mut().insert(diagram_id.clone(), diagram);
+    session.set_active_diagram_id(Some(diagram_id));
+
+    let mut app = App::new(session);
+    app.select_object_ref(&node_ref);
+
+    app.show_notes = false;
+    assert!(diagram_bottom_title(&app).is_none());
+
+    app.show_notes = true;
+    let title = diagram_bottom_title(&app).expect("bottom title");
+    let rendered = line_to_string(&title);
+    assert!(rendered.contains("must be idempotent"));
+    assert!(!rendered.contains("node n:"));
 }
 
 #[test]
@@ -1662,6 +1767,7 @@ fn fuzzy_search_results_cycle_with_n_and_shift_n() {
     app.handle_key_code(KeyCode::Char('N'));
     let back = app.selected_ref().map(ToString::to_string);
     assert_eq!(first, back);
+    assert!(!app.notes_visible);
 
     let focused = app.selected_ref().map(ToString::to_string);
     app.handle_key_code(KeyCode::Esc); // clear search

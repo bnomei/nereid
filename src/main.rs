@@ -227,9 +227,7 @@ fn main() {
             let _ = server_handle.await;
 
             let tui_result = tui_join.map_err(|err| -> Box<dyn Error> { Box::new(err) })?;
-            tui_result.map_err(|err| {
-                Box::new(std::io::Error::new(std::io::ErrorKind::Other, err)) as Box<dyn Error>
-            })?;
+            tui_result.map_err(|err| Box::new(std::io::Error::other(err)) as Box<dyn Error>)?;
             Ok::<(), Box<dyn Error>>(())
         })?;
 

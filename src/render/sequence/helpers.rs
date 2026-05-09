@@ -62,7 +62,7 @@ fn self_message_stub_end(
     let fallback_preferred =
         available.saturating_mul(SELF_MESSAGE_STUB_FRACTION_NUM) / SELF_MESSAGE_STUB_FRACTION_DEN;
     let target = preferred_stub_len.unwrap_or(fallback_preferred);
-    let stub_len = target.max(SELF_MESSAGE_STUB_LEN).min(SELF_MESSAGE_STUB_MAX_LEN).min(available);
+    let stub_len = target.clamp(SELF_MESSAGE_STUB_LEN, SELF_MESSAGE_STUB_MAX_LEN).min(available);
     Some(from_x.saturating_add(stub_len))
 }
 
@@ -405,6 +405,7 @@ fn prefixed_object_label(label: &str, options: RenderOptions) -> String {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_message(
     canvas: &mut Canvas,
     from_x: usize,

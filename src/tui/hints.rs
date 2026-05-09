@@ -26,7 +26,7 @@ pub(crate) fn gen_labels(n: usize, hint_chars: &str) -> Vec<String> {
 
     if k == 1 {
         let ch = alphabet[0];
-        return (1..=n).map(|len| std::iter::repeat(ch).take(len).collect()).collect();
+        return (1..=n).map(|len| std::iter::repeat_n(ch, len).collect()).collect();
     }
 
     fn pow_saturating(base: usize, exp: usize) -> usize {

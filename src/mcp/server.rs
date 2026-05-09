@@ -1923,11 +1923,9 @@ impl NereidMcp {
             .messages()
             .iter()
             .filter(|msg| {
-                from_participant_id.as_ref().map_or(true, |from| msg.from_participant_id() == from)
+                from_participant_id.as_ref().is_none_or(|from| msg.from_participant_id() == from)
             })
-            .filter(|msg| {
-                to_participant_id.as_ref().map_or(true, |to| msg.to_participant_id() == to)
-            })
+            .filter(|msg| to_participant_id.as_ref().is_none_or(|to| msg.to_participant_id() == to))
             .collect::<Vec<_>>();
         messages.sort_by(|a, b| crate::model::SequenceMessage::cmp_in_order(a, b));
 
@@ -3216,7 +3214,7 @@ impl NereidMcp {
     }
 }
 
-#[tool_handler]
+#[tool_handler(router = self.tool_router)]
 impl ServerHandler for NereidMcp {
     fn get_info(&self) -> ServerInfo {
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build()).with_instructions(

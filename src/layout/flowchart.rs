@@ -1253,7 +1253,7 @@ fn fallback_polyline_soft_occupancy(
         let bends = route.len().saturating_sub(2) as u32;
         let length = expanded.len() as u32;
         let key = (hard_collisions, anchor_crossings, occupancy_cost, bends, length, route.clone());
-        if best_key.as_ref().map_or(true, |best| key < *best) {
+        if best_key.as_ref().is_none_or(|best| key < *best) {
             best_key = Some(key);
             best_route = route;
         }
