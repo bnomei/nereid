@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-05-09
+- Added the dedicated Notes pane.
+- Updated Cargo dependencies.
+
 ## [0.2.0] - 2026-03-23
 - Upgraded the MCP server stack to `rmcp` 1.2
 - Refreshed direct dependency patch/minor releases in the lockfile
