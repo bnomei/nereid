@@ -255,13 +255,11 @@ impl Canvas {
             return Err(CanvasError::OutOfBounds { x, y, width: self.width, height: self.height });
         }
 
-        let mut x = x;
-        for ch in text.chars() {
+        for (x, ch) in (x..).zip(text.chars()) {
             if x >= self.width {
                 break;
             }
             self.set(x, y, ch)?;
-            x += 1;
         }
 
         Ok(())

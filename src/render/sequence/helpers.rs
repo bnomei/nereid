@@ -1042,13 +1042,11 @@ fn canvas_to_string_trimmed_with_overlays(canvas: &Canvas, overlays: &[LabelOver
             continue;
         }
         let line = &mut lines[overlay.y];
-        let mut x = overlay.x;
-        for ch in overlay.text.chars() {
+        for (x, ch) in (overlay.x..).zip(overlay.text.chars()) {
             if x >= line.len() {
                 break;
             }
             line[x] = ch;
-            x += 1;
         }
     }
 

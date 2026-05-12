@@ -1991,7 +1991,7 @@ impl App {
             placements.push((object_ref, (y, inner_x0, inner_x1, fill_char)));
         }
 
-        placements.sort_by(|(left, _), (right, _)| right.to_string().cmp(&left.to_string()));
+        placements.sort_by_key(|(object_ref, _)| std::cmp::Reverse(object_ref.to_string()));
 
         let hint_count = placements.len();
         if hint_count == 0 {
