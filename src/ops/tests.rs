@@ -79,6 +79,123 @@ fn apply_seq_update_participant_preserves_role() {
 }
 
 #[test]
+fn apply_seq_add_participant_rejects_invalid_mermaid_name() {
+    let diagram_id = DiagramId::new("d:add-participant-invalid-name").expect("diagram id");
+    let mut diagram = crate::model::Diagram::new(
+        diagram_id,
+        "seq",
+        DiagramAst::Sequence(crate::model::SequenceAst::default()),
+    );
+
+    let participant_id = ObjectId::new("p:bad").expect("participant id");
+    let err = apply_ops(
+        &mut diagram,
+        0,
+        &[Op::Seq(SeqOp::AddParticipant {
+            participant_id,
+            mermaid_name: "Bad Name".to_owned(),
+        })],
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        err,
+        super::ApplyError::InvalidSeqParticipantMermaidName { .. }
+    ));
+    assert_eq!(diagram.rev(), 0);
+    let DiagramAst::Sequence(ast) = diagram.ast() else {
+        panic!("expected sequence ast");
+    };
+    assert!(ast.participants().is_empty());
+}
+
+#[test]
+fn apply_seq_add_participant_rejects_duplicate_mermaid_name() {
+    let diagram_id = DiagramId::new("d:add-participant-duplicate-name").expect("diagram id");
+    let mut diagram = crate::model::Diagram::new(
+        diagram_id,
+        "seq",
+        DiagramAst::Sequence(crate::model::SequenceAst::default()),
+    );
+
+    let alice_id = ObjectId::new("p:alice").expect("participant id");
+    let alice_duplicate_id = ObjectId::new("p:alice-duplicate").expect("participant id");
+    let err = apply_ops(
+        &mut diagram,
+        0,
+        &[
+            Op::Seq(SeqOp::AddParticipant {
+                participant_id: alice_id,
+                mermaid_name: "Alice".to_owned(),
+            }),
+            Op::Seq(SeqOp::AddParticipant {
+                participant_id: alice_duplicate_id,
+                mermaid_name: "Alice".to_owned(),
+            }),
+        ],
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        err,
+        super::ApplyError::DuplicateSeqParticipantMermaidName { .. }
+    ));
+    assert_eq!(diagram.rev(), 0);
+    let DiagramAst::Sequence(ast) = diagram.ast() else {
+        panic!("expected sequence ast");
+    };
+    assert!(ast.participants().is_empty());
+}
+
+#[test]
+fn apply_seq_update_participant_rejects_duplicate_mermaid_name() {
+    let diagram_id = DiagramId::new("d:update-participant-duplicate-name").expect("diagram id");
+    let mut diagram = crate::model::Diagram::new(
+        diagram_id,
+        "seq",
+        DiagramAst::Sequence(crate::model::SequenceAst::default()),
+    );
+
+    let alice_id = ObjectId::new("p:alice").expect("participant id");
+    let bob_id = ObjectId::new("p:bob").expect("participant id");
+    apply_ops(
+        &mut diagram,
+        0,
+        &[
+            Op::Seq(SeqOp::AddParticipant {
+                participant_id: alice_id,
+                mermaid_name: "Alice".to_owned(),
+            }),
+            Op::Seq(SeqOp::AddParticipant {
+                participant_id: bob_id.clone(),
+                mermaid_name: "Bob".to_owned(),
+            }),
+        ],
+    )
+    .expect("setup");
+
+    let err = apply_ops(
+        &mut diagram,
+        1,
+        &[Op::Seq(SeqOp::UpdateParticipant {
+            participant_id: bob_id.clone(),
+            patch: SeqParticipantPatch { mermaid_name: Some("Alice".to_owned()) },
+        })],
+    )
+    .unwrap_err();
+
+    assert!(matches!(
+        err,
+        super::ApplyError::DuplicateSeqParticipantMermaidName { .. }
+    ));
+    let DiagramAst::Sequence(ast) = diagram.ast() else {
+        panic!("expected sequence ast");
+    };
+    let bob = ast.participants().get(&bob_id).expect("bob participant");
+    assert_eq!(bob.mermaid_name(), "Bob");
+}
+
+#[test]
 fn apply_seq_set_participant_note_sets_note_and_records_delta_updated() {
     let diagram_id = DiagramId::new("d:seq-note").expect("diagram id");
     let mut diagram = crate::model::Diagram::new(
@@ -535,6 +652,35 @@ fn apply_flow_set_node_mermaid_id_rejects_invalid_identifiers() {
 }
 
 #[test]
+fn apply_flow_add_node_rejects_invalid_derived_mermaid_id() {
+    let diagram_id = DiagramId::new("d:add-node-invalid-derived-id").expect("diagram id");
+    let mut diagram = crate::model::Diagram::new(
+        diagram_id,
+        "flow",
+        DiagramAst::Flowchart(FlowchartAst::default()),
+    );
+
+    let node_id = ObjectId::new("n:bad-id").expect("node id");
+    let err = apply_ops(
+        &mut diagram,
+        0,
+        &[Op::Flow(FlowOp::AddNode {
+            node_id,
+            label: "Bad".to_owned(),
+            shape: None,
+        })],
+    )
+    .unwrap_err();
+
+    assert!(matches!(err, super::ApplyError::InvalidFlowNodeMermaidId { .. }));
+    assert_eq!(diagram.rev(), 0);
+    let DiagramAst::Flowchart(ast) = diagram.ast() else {
+        panic!("expected flowchart ast");
+    };
+    assert!(ast.nodes().is_empty());
+}
+
+#[test]
 fn apply_flow_set_node_mermaid_id_rejects_duplicates() {
     let diagram_id = DiagramId::new("d:set-node-mermaid-id-duplicate").expect("diagram id");
     let mut diagram = crate::model::Diagram::new(
@@ -567,6 +713,108 @@ fn apply_flow_set_node_mermaid_id_rejects_duplicates() {
         &mut diagram,
         1,
         &[Op::Flow(FlowOp::SetNodeMermaidId { node_id: node_a, mermaid_id: Some("b".to_owned()) })],
+    )
+    .unwrap_err();
+
+    assert!(matches!(err, super::ApplyError::DuplicateFlowNodeMermaidId { .. }));
+}
+
+#[test]
+fn apply_flow_add_node_rejects_duplicate_derived_mermaid_id() {
+    let diagram_id = DiagramId::new("d:add-node-duplicate-derived-id").expect("diagram id");
+    let mut diagram = crate::model::Diagram::new(
+        diagram_id,
+        "flow",
+        DiagramAst::Flowchart(FlowchartAst::default()),
+    );
+
+    let node_a = ObjectId::new("n:a").expect("node id");
+    let node_b = ObjectId::new("n:b").expect("node id");
+    apply_ops(
+        &mut diagram,
+        0,
+        &[Op::Flow(FlowOp::AddNode {
+            node_id: node_a.clone(),
+            label: "A".to_owned(),
+            shape: None,
+        })],
+    )
+    .expect("setup add");
+    apply_ops(
+        &mut diagram,
+        1,
+        &[Op::Flow(FlowOp::SetNodeMermaidId {
+            node_id: node_a,
+            mermaid_id: Some("b".to_owned()),
+        })],
+    )
+    .expect("setup mermaid id");
+
+    let err = apply_ops(
+        &mut diagram,
+        2,
+        &[Op::Flow(FlowOp::AddNode {
+            node_id: node_b,
+            label: "B".to_owned(),
+            shape: None,
+        })],
+    )
+    .unwrap_err();
+
+    assert!(matches!(err, super::ApplyError::DuplicateFlowNodeMermaidId { .. }));
+}
+
+#[test]
+fn apply_flow_clear_node_mermaid_id_rejects_derived_duplicate() {
+    let diagram_id = DiagramId::new("d:clear-node-mermaid-id-duplicate").expect("diagram id");
+    let mut diagram = crate::model::Diagram::new(
+        diagram_id,
+        "flow",
+        DiagramAst::Flowchart(FlowchartAst::default()),
+    );
+
+    let node_a = ObjectId::new("n:a").expect("node id");
+    let node_b = ObjectId::new("n:b").expect("node id");
+    apply_ops(
+        &mut diagram,
+        0,
+        &[
+            Op::Flow(FlowOp::AddNode {
+                node_id: node_a.clone(),
+                label: "A".to_owned(),
+                shape: None,
+            }),
+            Op::Flow(FlowOp::AddNode {
+                node_id: node_b.clone(),
+                label: "B".to_owned(),
+                shape: None,
+            }),
+        ],
+    )
+    .expect("setup add");
+    apply_ops(
+        &mut diagram,
+        1,
+        &[Op::Flow(FlowOp::SetNodeMermaidId {
+            node_id: node_a.clone(),
+            mermaid_id: Some("c".to_owned()),
+        })],
+    )
+    .expect("setup node a mermaid id");
+    apply_ops(
+        &mut diagram,
+        2,
+        &[Op::Flow(FlowOp::SetNodeMermaidId {
+            node_id: node_b,
+            mermaid_id: Some("a".to_owned()),
+        })],
+    )
+    .expect("setup node b mermaid id");
+
+    let err = apply_ops(
+        &mut diagram,
+        3,
+        &[Op::Flow(FlowOp::SetNodeMermaidId { node_id: node_a, mermaid_id: None })],
     )
     .unwrap_err();
 

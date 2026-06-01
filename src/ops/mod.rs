@@ -284,6 +284,14 @@ pub enum ApplyError {
     AlreadyExists { kind: ObjectKind, object_id: ObjectId },
     NotFound { kind: ObjectKind, object_id: ObjectId },
     MissingFlowNode { node_id: ObjectId },
+    InvalidSeqParticipantMermaidName {
+        mermaid_name: String,
+        reason: MermaidIdentError,
+    },
+    DuplicateSeqParticipantMermaidName {
+        mermaid_name: String,
+        participant_id: ObjectId,
+    },
     InvalidFlowNodeMermaidId { mermaid_id: String, reason: MermaidIdentError },
     DuplicateFlowNodeMermaidId { mermaid_id: String, node_id: ObjectId },
 }
@@ -305,6 +313,15 @@ impl fmt::Display for ApplyError {
                 write!(f, "object not found ({kind:?}, id={object_id})")
             }
             Self::MissingFlowNode { node_id } => write!(f, "flow node not found (id={node_id})"),
+            Self::InvalidSeqParticipantMermaidName { mermaid_name, reason } => {
+                write!(f, "invalid sequence participant Mermaid name '{mermaid_name}': {reason}")
+            }
+            Self::DuplicateSeqParticipantMermaidName { mermaid_name, participant_id } => {
+                write!(
+                    f,
+                    "sequence participant Mermaid name '{mermaid_name}' is already used by participant {participant_id}"
+                )
+            }
             Self::InvalidFlowNodeMermaidId { mermaid_id, reason } => {
                 write!(f, "invalid flow node Mermaid id '{mermaid_id}': {reason}")
             }

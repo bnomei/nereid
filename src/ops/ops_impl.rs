@@ -25,6 +25,7 @@ fn apply_seq_op(
                     object_id: participant_id.clone(),
                 });
             }
+            validate_seq_participant_mermaid_name(ast, None, mermaid_name)?;
             ast.participants_mut().insert(
                 participant_id.clone(),
                 SequenceParticipant::new(mermaid_name.clone()),
@@ -36,14 +37,19 @@ fn apply_seq_op(
             participant_id,
             patch,
         } => {
-            let Some(existing) = ast.participants_mut().get_mut(participant_id) else {
+            if !ast.participants().contains_key(participant_id) {
                 return Err(ApplyError::NotFound {
                     kind: ObjectKind::SeqParticipant,
                     object_id: participant_id.clone(),
                 });
-            };
+            }
 
             if let Some(mermaid_name) = &patch.mermaid_name {
+                validate_seq_participant_mermaid_name(ast, Some(participant_id), mermaid_name)?;
+                let existing = ast
+                    .participants_mut()
+                    .get_mut(participant_id)
+                    .expect("participant existence checked above");
                 existing.set_mermaid_name(mermaid_name.clone());
             }
             delta.record_updated(seq_participant_ref(diagram_id, participant_id));
@@ -256,22 +262,52 @@ fn normalize_flow_connector(raw_connector: Option<String>) -> Option<String> {
     (trimmed != "-->").then_some(trimmed)
 }
 
-fn validate_flow_node_mermaid_id(mermaid_id: &str) -> Result<(), MermaidIdentError> {
-    if mermaid_id.is_empty() {
+fn validate_mermaid_ident_for_ops(ident: &str) -> Result<(), MermaidIdentError> {
+    if ident.is_empty() {
         return Err(MermaidIdentError::Empty);
     }
-    if mermaid_id.chars().any(|ch| ch.is_whitespace()) {
+    if ident.chars().any(|ch| ch.is_whitespace()) {
         return Err(MermaidIdentError::ContainsWhitespace);
     }
-    if mermaid_id.contains('/') {
+    if ident.contains('/') {
         return Err(MermaidIdentError::ContainsSlash);
     }
-    if let Some(ch) = mermaid_id
+    if let Some(ch) = ident
         .chars()
         .find(|ch| !ch.is_ascii_alphanumeric() && *ch != '_')
     {
         return Err(MermaidIdentError::InvalidChar { ch });
     }
+    Ok(())
+}
+
+fn validate_seq_participant_mermaid_name(
+    ast: &SequenceAst,
+    participant_id: Option<&ObjectId>,
+    mermaid_name: &str,
+) -> Result<(), ApplyError> {
+    validate_mermaid_ident_for_ops(mermaid_name).map_err(|reason| {
+        ApplyError::InvalidSeqParticipantMermaidName {
+            mermaid_name: mermaid_name.to_owned(),
+            reason,
+        }
+    })?;
+
+    if let Some(other_participant_id) =
+        ast.participants().iter().find_map(|(candidate_id, candidate)| {
+            if participant_id.is_some_and(|current| current == candidate_id) {
+                return None;
+            }
+
+            (candidate.mermaid_name() == mermaid_name).then(|| candidate_id.clone())
+        })
+    {
+        return Err(ApplyError::DuplicateSeqParticipantMermaidName {
+            mermaid_name: mermaid_name.to_owned(),
+            participant_id: other_participant_id,
+        });
+    }
+
     Ok(())
 }
 
@@ -281,6 +317,43 @@ fn flow_node_mermaid_id_for_uniqueness<'a>(
 ) -> Option<&'a str> {
     node.mermaid_id()
         .or_else(|| node_id.as_str().strip_prefix("n:"))
+}
+
+fn validate_flow_node_mermaid_identity(
+    ast: &FlowchartAst,
+    node_id: &ObjectId,
+    node: &FlowNode,
+    current_node_id: Option<&ObjectId>,
+) -> Result<(), ApplyError> {
+    let mermaid_id = flow_node_mermaid_id_for_uniqueness(node_id, node).ok_or_else(|| {
+        ApplyError::InvalidFlowNodeMermaidId {
+            mermaid_id: node_id.to_string(),
+            reason: MermaidIdentError::Empty,
+        }
+    })?;
+
+    validate_mermaid_ident_for_ops(mermaid_id).map_err(|reason| {
+        ApplyError::InvalidFlowNodeMermaidId {
+            mermaid_id: mermaid_id.to_owned(),
+            reason,
+        }
+    })?;
+
+    if let Some(other_node_id) = ast.nodes().iter().find_map(|(candidate_id, candidate)| {
+        if current_node_id.is_some_and(|current| current == candidate_id) {
+            return None;
+        }
+
+        let candidate_mermaid_id = flow_node_mermaid_id_for_uniqueness(candidate_id, candidate)?;
+        (candidate_mermaid_id == mermaid_id).then(|| candidate_id.clone())
+    }) {
+        return Err(ApplyError::DuplicateFlowNodeMermaidId {
+            mermaid_id: mermaid_id.to_owned(),
+            node_id: other_node_id,
+        });
+    }
+
+    Ok(())
 }
 
 fn apply_flow_op(
@@ -305,6 +378,7 @@ fn apply_flow_op(
             if let Some(shape) = shape {
                 node.set_shape(shape.clone());
             }
+            validate_flow_node_mermaid_identity(ast, node_id, &node, None)?;
             ast.nodes_mut().insert(node_id.clone(), node);
             delta.record_added(flow_node_ref(diagram_id, node_id));
             Ok(())
@@ -329,38 +403,16 @@ fn apply_flow_op(
             node_id,
             mermaid_id,
         } => {
-            if !ast.nodes().contains_key(node_id) {
+            let Some(existing) = ast.nodes().get(node_id) else {
                 return Err(ApplyError::NotFound {
                     kind: ObjectKind::FlowNode,
                     object_id: node_id.clone(),
                 });
-            }
+            };
 
-            if let Some(mermaid_id) = mermaid_id.as_deref() {
-                validate_flow_node_mermaid_id(mermaid_id).map_err(|reason| {
-                    ApplyError::InvalidFlowNodeMermaidId {
-                        mermaid_id: mermaid_id.to_owned(),
-                        reason,
-                    }
-                })?;
-
-                if let Some(other_node_id) =
-                    ast.nodes().iter().find_map(|(candidate_id, candidate)| {
-                        if candidate_id == node_id {
-                            return None;
-                        }
-
-                        let candidate_mermaid_id =
-                            flow_node_mermaid_id_for_uniqueness(candidate_id, candidate)?;
-                        (candidate_mermaid_id == mermaid_id).then(|| candidate_id.clone())
-                    })
-                {
-                    return Err(ApplyError::DuplicateFlowNodeMermaidId {
-                        mermaid_id: mermaid_id.to_owned(),
-                        node_id: other_node_id,
-                    });
-                }
-            }
+            let mut candidate = existing.clone();
+            candidate.set_mermaid_id(mermaid_id.clone());
+            validate_flow_node_mermaid_identity(ast, node_id, &candidate, Some(node_id))?;
 
             let existing = ast
                 .nodes_mut()

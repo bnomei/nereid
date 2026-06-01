@@ -925,6 +925,29 @@ fn map_apply_error(err: ApplyError) -> ErrorData {
             "flow node not found",
             Some(serde_json::json!({ "node_id": node_id.to_string() })),
         ),
+        ApplyError::InvalidSeqParticipantMermaidName { mermaid_name, reason } => {
+            ErrorData::invalid_params(
+                "invalid sequence participant Mermaid name",
+                Some(
+                    serde_json::json!({
+                        "mermaid_name": mermaid_name,
+                        "reason": reason.to_string(),
+                    }),
+                ),
+            )
+        }
+        ApplyError::DuplicateSeqParticipantMermaidName {
+            mermaid_name,
+            participant_id,
+        } => ErrorData::invalid_params(
+            "sequence participant Mermaid name already in use",
+            Some(
+                serde_json::json!({
+                    "mermaid_name": mermaid_name,
+                    "participant_id": participant_id.to_string(),
+                }),
+            ),
+        ),
         ApplyError::InvalidFlowNodeMermaidId { mermaid_id, reason } => ErrorData::invalid_params(
             "invalid flow node Mermaid id",
             Some(serde_json::json!({ "mermaid_id": mermaid_id, "reason": reason.to_string() })),
