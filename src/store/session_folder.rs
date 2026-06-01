@@ -540,6 +540,20 @@ fn encode_persisted_id_segment(segment: &str) -> String {
     out
 }
 
+fn validate_legacy_persisted_id_segment(
+    field: &'static str,
+    segment: &str,
+) -> Result<(), StoreError> {
+    if segment.contains('/') || segment.contains('\\') {
+        return Err(StoreError::InvalidRelativePath {
+            field,
+            value: PathBuf::from(segment),
+        });
+    }
+
+    Ok(())
+}
+
 fn needs_windows_safe_filename_segment_encoding(segment: &str) -> bool {
     if segment.starts_with('~') {
         return true;
@@ -639,8 +653,12 @@ impl SessionFolder {
         self.root.join("walkthroughs").join(format!("{file_stem}.wt.json"))
     }
 
-    fn legacy_walkthrough_json_path(&self, walkthrough_id: &WalkthroughId) -> PathBuf {
-        self.root.join("walkthroughs").join(format!("{}.wt.json", walkthrough_id.as_str()))
+    fn legacy_walkthrough_json_path(
+        &self,
+        walkthrough_id: &WalkthroughId,
+    ) -> Result<PathBuf, StoreError> {
+        validate_legacy_persisted_id_segment("walkthrough_id", walkthrough_id.as_str())?;
+        Ok(self.root.join("walkthroughs").join(format!("{}.wt.json", walkthrough_id.as_str())))
     }
 
     /// Returns the path for the deterministic text render export.
@@ -890,6 +908,28 @@ impl SessionFolder {
         }
 
         let walkthroughs_dir = self.root.join("walkthroughs");
+        let walkthroughs_metadata = match fs::symlink_metadata(&walkthroughs_dir) {
+            Ok(metadata) => metadata,
+            Err(source) if source.kind() == io::ErrorKind::NotFound => return Ok(()),
+            Err(source) => {
+                return Err(StoreError::Io { path: walkthroughs_dir, source });
+            }
+        };
+        if walkthroughs_metadata.file_type().is_symlink() {
+            return Err(StoreError::SymlinkRefused { path: walkthroughs_dir });
+        }
+        if !walkthroughs_metadata.is_dir() {
+            return Err(StoreError::Io {
+                path: walkthroughs_dir,
+                source: io::Error::new(io::ErrorKind::AlreadyExists, "expected directory"),
+            });
+        }
+
+        let canonical_walkthroughs_dir =
+            fs::canonicalize(&walkthroughs_dir).map_err(|source| StoreError::Io {
+                path: walkthroughs_dir.clone(),
+                source,
+            })?;
         let entries = match fs::read_dir(&walkthroughs_dir) {
             Ok(entries) => entries,
             Err(source) if source.kind() == io::ErrorKind::NotFound => return Ok(()),
@@ -898,9 +938,17 @@ impl SessionFolder {
             }
         };
 
-        for entry in entries.filter_map(|entry| entry.ok()) {
+        for entry in entries {
+            let entry = entry.map_err(|source| StoreError::Io {
+                path: walkthroughs_dir.clone(),
+                source,
+            })?;
             let path = entry.path();
-            if !path.is_file() {
+            let file_type = entry.file_type().map_err(|source| StoreError::Io {
+                path: path.clone(),
+                source,
+            })?;
+            if !file_type.is_file() {
                 continue;
             }
             let Some(file_name) = path.file_name().and_then(|s| s.to_str()) else {
@@ -915,6 +963,17 @@ impl SessionFolder {
 
             if keep_stems.contains(walkthrough_id) {
                 continue;
+            }
+
+            let canonical_path = fs::canonicalize(&path).map_err(|source| StoreError::Io {
+                path: path.clone(),
+                source,
+            })?;
+            if !canonical_path.starts_with(&canonical_walkthroughs_dir) {
+                return Err(StoreError::PathOutsideSession {
+                    session_dir: canonical_walkthroughs_dir.clone(),
+                    path: canonical_path,
+                });
             }
 
             ascii_exports().cancel(&path);
@@ -1141,7 +1200,7 @@ impl SessionFolder {
         let (wt_path, wt_str) = match fs::read_to_string(&wt_path) {
             Ok(wt_str) => (wt_path, wt_str),
             Err(source) if source.kind() == io::ErrorKind::NotFound => {
-                let legacy_path = self.legacy_walkthrough_json_path(walkthrough_id);
+                let legacy_path = self.legacy_walkthrough_json_path(walkthrough_id)?;
                 let wt_str = fs::read_to_string(&legacy_path)
                     .map_err(|source| StoreError::Io { path: legacy_path.clone(), source })?;
                 (legacy_path, wt_str)

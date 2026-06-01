@@ -578,12 +578,28 @@ fn load_walkthrough_falls_back_to_legacy_filename_for_unsafe_ids(ctx: SessionFol
     folder.save_walkthrough(&walkthrough).unwrap();
 
     let encoded_path = folder.walkthrough_json_path(&walkthrough_id);
-    let legacy_path = folder.legacy_walkthrough_json_path(&walkthrough_id);
+    let legacy_path = folder.legacy_walkthrough_json_path(&walkthrough_id).unwrap();
     std::fs::create_dir_all(legacy_path.parent().unwrap()).unwrap();
     std::fs::rename(&encoded_path, &legacy_path).unwrap();
 
     let loaded = folder.load_walkthrough(&walkthrough_id).unwrap();
     assert_eq!(loaded, walkthrough);
+}
+
+#[rstest]
+fn load_walkthrough_rejects_legacy_fallback_with_path_separators(ctx: SessionFolderTestCtx) {
+    let folder = &ctx.folder;
+
+    let walkthrough_id = WalkthroughId::new(r"..\..\outside\loot").unwrap();
+    let err = folder.load_walkthrough(&walkthrough_id).unwrap_err();
+
+    match err {
+        StoreError::InvalidRelativePath { field, value } => {
+            assert_eq!(field, "walkthrough_id");
+            assert_eq!(value, std::path::PathBuf::from(walkthrough_id.as_str()));
+        }
+        other => panic!("expected InvalidRelativePath, got {other:?}"),
+    }
 }
 
 #[rstest]
@@ -622,6 +638,31 @@ fn removed_walkthrough_does_not_resurrect_after_save_load(ctx: SessionFolderTest
     let loaded = folder.load_session().unwrap();
     assert!(loaded.walkthroughs().contains_key(&w1));
     assert!(!loaded.walkthroughs().contains_key(&w2));
+}
+
+#[cfg(unix)]
+#[rstest]
+fn walkthrough_gc_refuses_symlinked_walkthroughs_dir(ctx: SessionFolderTestCtx) {
+    use std::os::unix::fs::symlink;
+
+    let session_dir = &ctx.session_dir;
+    let folder = &ctx.folder;
+
+    let outside = ctx.tmp.path().join("outside");
+    std::fs::create_dir_all(&outside).unwrap();
+    let victim = outside.join("stale.wt.json");
+    std::fs::write(&victim, "{}").unwrap();
+
+    let walkthroughs_dir = session_dir.join("walkthroughs");
+    symlink(&outside, &walkthroughs_dir).unwrap();
+
+    let err = folder.garbage_collect_walkthrough_files(&[]).unwrap_err();
+    match err {
+        StoreError::SymlinkRefused { path } => assert_eq!(path, walkthroughs_dir),
+        other => panic!("expected SymlinkRefused, got {other:?}"),
+    }
+
+    assert!(victim.is_file());
 }
 
 #[rstest]
