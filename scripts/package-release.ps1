@@ -22,8 +22,9 @@ $tempDir = Join-Path $env:TEMP ("nereid-" + [Guid]::NewGuid().ToString())
 New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
 try {
   Copy-Item -Path $binPath -Destination (Join-Path $tempDir "$BinName.exe") -Force
+  Copy-Item -Path "LICENSE" -Destination (Join-Path $tempDir "LICENSE") -Force
   Push-Location $tempDir
-  Compress-Archive -Path "$BinName.exe" -DestinationPath $archivePath -Force
+  Compress-Archive -Path "$BinName.exe", "LICENSE" -DestinationPath $archivePath -Force
 } finally {
   Pop-Location
   Remove-Item -Recurse -Force $tempDir
