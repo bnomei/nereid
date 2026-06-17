@@ -91,17 +91,11 @@ fn apply_seq_add_participant_rejects_invalid_mermaid_name() {
     let err = apply_ops(
         &mut diagram,
         0,
-        &[Op::Seq(SeqOp::AddParticipant {
-            participant_id,
-            mermaid_name: "Bad Name".to_owned(),
-        })],
+        &[Op::Seq(SeqOp::AddParticipant { participant_id, mermaid_name: "Bad Name".to_owned() })],
     )
     .unwrap_err();
 
-    assert!(matches!(
-        err,
-        super::ApplyError::InvalidSeqParticipantMermaidName { .. }
-    ));
+    assert!(matches!(err, super::ApplyError::InvalidSeqParticipantMermaidName { .. }));
     assert_eq!(diagram.rev(), 0);
     let DiagramAst::Sequence(ast) = diagram.ast() else {
         panic!("expected sequence ast");
@@ -136,10 +130,7 @@ fn apply_seq_add_participant_rejects_duplicate_mermaid_name() {
     )
     .unwrap_err();
 
-    assert!(matches!(
-        err,
-        super::ApplyError::DuplicateSeqParticipantMermaidName { .. }
-    ));
+    assert!(matches!(err, super::ApplyError::DuplicateSeqParticipantMermaidName { .. }));
     assert_eq!(diagram.rev(), 0);
     let DiagramAst::Sequence(ast) = diagram.ast() else {
         panic!("expected sequence ast");
@@ -184,10 +175,7 @@ fn apply_seq_update_participant_rejects_duplicate_mermaid_name() {
     )
     .unwrap_err();
 
-    assert!(matches!(
-        err,
-        super::ApplyError::DuplicateSeqParticipantMermaidName { .. }
-    ));
+    assert!(matches!(err, super::ApplyError::DuplicateSeqParticipantMermaidName { .. }));
     let DiagramAst::Sequence(ast) = diagram.ast() else {
         panic!("expected sequence ast");
     };
@@ -664,11 +652,7 @@ fn apply_flow_add_node_rejects_invalid_derived_mermaid_id() {
     let err = apply_ops(
         &mut diagram,
         0,
-        &[Op::Flow(FlowOp::AddNode {
-            node_id,
-            label: "Bad".to_owned(),
-            shape: None,
-        })],
+        &[Op::Flow(FlowOp::AddNode { node_id, label: "Bad".to_owned(), shape: None })],
     )
     .unwrap_err();
 
@@ -743,21 +727,14 @@ fn apply_flow_add_node_rejects_duplicate_derived_mermaid_id() {
     apply_ops(
         &mut diagram,
         1,
-        &[Op::Flow(FlowOp::SetNodeMermaidId {
-            node_id: node_a,
-            mermaid_id: Some("b".to_owned()),
-        })],
+        &[Op::Flow(FlowOp::SetNodeMermaidId { node_id: node_a, mermaid_id: Some("b".to_owned()) })],
     )
     .expect("setup mermaid id");
 
     let err = apply_ops(
         &mut diagram,
         2,
-        &[Op::Flow(FlowOp::AddNode {
-            node_id: node_b,
-            label: "B".to_owned(),
-            shape: None,
-        })],
+        &[Op::Flow(FlowOp::AddNode { node_id: node_b, label: "B".to_owned(), shape: None })],
     )
     .unwrap_err();
 
@@ -804,10 +781,7 @@ fn apply_flow_clear_node_mermaid_id_rejects_derived_duplicate() {
     apply_ops(
         &mut diagram,
         2,
-        &[Op::Flow(FlowOp::SetNodeMermaidId {
-            node_id: node_b,
-            mermaid_id: Some("a".to_owned()),
-        })],
+        &[Op::Flow(FlowOp::SetNodeMermaidId { node_id: node_b, mermaid_id: Some("a".to_owned()) })],
     )
     .expect("setup node b mermaid id");
 

@@ -284,14 +284,8 @@ pub enum ApplyError {
     AlreadyExists { kind: ObjectKind, object_id: ObjectId },
     NotFound { kind: ObjectKind, object_id: ObjectId },
     MissingFlowNode { node_id: ObjectId },
-    InvalidSeqParticipantMermaidName {
-        mermaid_name: String,
-        reason: MermaidIdentError,
-    },
-    DuplicateSeqParticipantMermaidName {
-        mermaid_name: String,
-        participant_id: ObjectId,
-    },
+    InvalidSeqParticipantMermaidName { mermaid_name: String, reason: MermaidIdentError },
+    DuplicateSeqParticipantMermaidName { mermaid_name: String, participant_id: ObjectId },
     InvalidFlowNodeMermaidId { mermaid_id: String, reason: MermaidIdentError },
     DuplicateFlowNodeMermaidId { mermaid_id: String, node_id: ObjectId },
 }
