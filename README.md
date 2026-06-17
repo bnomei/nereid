@@ -1,10 +1,8 @@
 # nereid
 
-[![Crates.io Version](https://img.shields.io/crates/v/nereid)](https://crates.io/crates/nereid)
-[![CI](https://img.shields.io/github/actions/workflow/status/bnomei/tmux-mcp/ci.yml?branch=main)](https://github.com/bnomei/tmux-mcp/actions/workflows/ci.yml)
-[![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json&style=flat)](https://codspeed.io/bnomei/nereid?utm_source=badge)
-[![Crates.io Downloads](https://img.shields.io/crates/d/nereid)](https://crates.io/crates/nereid)
-[![License](https://img.shields.io/crates/l/nereid)](https://crates.io/crates/nereid)
+[![CI](https://img.shields.io/github/actions/workflow/status/bnomei/nereid/ci.yml?branch=main&label=CI)](https://github.com/bnomei/nereid/actions/workflows/ci.yml)
+[![CodSpeed](https://img.shields.io/github/actions/workflow/status/bnomei/nereid/codspeed.yml?branch=main&label=CodSpeed)](https://github.com/bnomei/nereid/actions/workflows/codspeed.yml)
+[![License](https://img.shields.io/badge/license-free%20use%20%28no%20copying%2C%20no%20derivatives%29-blue)](LICENSE)
 [![Discord](https://flat.badgen.net/badge/discord/bnomei?color=7289da&icon=discord&label)](https://discordapp.com/users/bnomei)
 [![Buymecoffee](https://flat.badgen.net/badge/icon/donate?icon=buymeacoffee&color=FF813F&label)](https://www.buymeacoffee.com/bnomei)
 
@@ -24,18 +22,12 @@ Nereid is:
 
 ## Installation
 
-### Cargo (crates.io)
-```bash
-cargo install nereid
-```
-
-### Homebrew
-```bash
-brew install bnomei/nereid/nereid
-```
+Nereid is source-available under the Nereid Free Use License (No Copying, No Derivatives).
+You may compile, install, execute, and run unmodified copies on your own systems;
+redistribution and derivative works are not permitted.
 
 ### GitHub Releases
-Download a prebuilt archive from the GitHub Releases page, extract it, and place `nereid` on your `PATH`.
+Download a prebuilt archive from the [GitHub Releases page](https://github.com/bnomei/nereid/releases), extract it, and place `nereid` on your `PATH`.
 
 ### From source
 ```bash
