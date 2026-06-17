@@ -26,10 +26,25 @@ use tokio::sync::Mutex;
 
 const DEFAULT_MCP_HTTP_PORT: u16 = 27435;
 
-fn print_usage(program: &str) {
-    eprintln!(
+fn usage(program: &str) -> String {
+    format!(
         "Usage:\n  {program} [<session-dir>] [--durable-writes] [--mcp-http-port <port>]\n  {program} [--session <dir>] [--durable-writes] [--mcp-http-port <port>]\n  {program} --demo [--mcp-http-port <port>]\n  {program} [<session-dir>] [--durable-writes] --mcp\n  {program} [--session <dir>] [--durable-writes] --mcp\n  {program} --demo --mcp\n  {program} --dump-mcp-tool-schema\n\nTUI mode (default) serves MCP over streamable HTTP at `http://127.0.0.1:<port>/mcp`.\n--mcp-http-port selects the port (0 = ephemeral; default {DEFAULT_MCP_HTTP_PORT}).\n\nIf session-dir/--session is omitted, the current working directory is used.\n--demo uses a built-in demo session and cannot be combined with session-dir/--session.\n\n--dump-mcp-tool-schema prints the stable MCP tool schema snapshot and exits.\n--durable-writes opts into slower, best-effort durable persistence (fsync/sync where supported)."
-    );
+    )
+}
+
+fn print_usage(program: &str) {
+    eprintln!("{}", usage(program));
+}
+
+fn version() -> String {
+    format!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum CliCommand {
+    Run(CliOptions),
+    Help,
+    Version,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -42,54 +57,93 @@ struct CliOptions {
     dump_mcp_tool_schema: bool,
 }
 
-fn parse_options(mut args: impl Iterator<Item = String>) -> Result<CliOptions, ()> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum CliParseError {
+    DuplicateFlag(&'static str),
+    MissingValue(&'static str),
+    InvalidValue { flag: &'static str, value: String, expected: &'static str },
+    UnknownFlag(String),
+    UnexpectedArgument(String),
+    ConflictingOptions(&'static str),
+}
+
+impl std::fmt::Display for CliParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DuplicateFlag(flag) => write!(f, "duplicate option `{flag}`"),
+            Self::MissingValue(flag) => write!(f, "missing value for `{flag}`"),
+            Self::InvalidValue { flag, value, expected } => {
+                write!(f, "invalid value `{value}` for `{flag}` (expected {expected})")
+            }
+            Self::UnknownFlag(flag) => write!(f, "unknown option `{flag}`"),
+            Self::UnexpectedArgument(arg) => {
+                write!(f, "unexpected argument `{arg}`; only one session directory may be provided")
+            }
+            Self::ConflictingOptions(message) => f.write_str(message),
+        }
+    }
+}
+
+fn parse_options(mut args: impl Iterator<Item = String>) -> Result<CliCommand, CliParseError> {
     let mut options = CliOptions::default();
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--mcp" => {
                 if options.mcp {
-                    return Err(());
+                    return Err(CliParseError::DuplicateFlag("--mcp"));
                 }
                 options.mcp = true;
             }
             "--demo" => {
                 if options.demo {
-                    return Err(());
+                    return Err(CliParseError::DuplicateFlag("--demo"));
                 }
                 options.demo = true;
             }
             "--session" => {
                 if options.session_dir.is_some() {
-                    return Err(());
+                    return Err(CliParseError::DuplicateFlag("--session"));
                 }
-                let dir = args.next().ok_or(())?;
+                let dir = args
+                    .next()
+                    .filter(|value| !value.starts_with('-'))
+                    .ok_or(CliParseError::MissingValue("--session"))?;
                 options.session_dir = Some(dir);
             }
             "--mcp-http-port" => {
                 if options.mcp_http_port.is_some() {
-                    return Err(());
+                    return Err(CliParseError::DuplicateFlag("--mcp-http-port"));
                 }
-                let raw = args.next().ok_or(())?;
-                let port: u16 = raw.parse().map_err(|_| ())?;
+                let raw = args
+                    .next()
+                    .filter(|value| !value.starts_with('-'))
+                    .ok_or(CliParseError::MissingValue("--mcp-http-port"))?;
+                let port: u16 = raw.parse().map_err(|_| CliParseError::InvalidValue {
+                    flag: "--mcp-http-port",
+                    value: raw.clone(),
+                    expected: "a TCP port from 0 to 65535",
+                })?;
                 options.mcp_http_port = Some(port);
             }
             "--durable-writes" => {
                 if options.durable_writes {
-                    return Err(());
+                    return Err(CliParseError::DuplicateFlag("--durable-writes"));
                 }
                 options.durable_writes = true;
             }
             "--dump-mcp-tool-schema" => {
                 if options.dump_mcp_tool_schema {
-                    return Err(());
+                    return Err(CliParseError::DuplicateFlag("--dump-mcp-tool-schema"));
                 }
                 options.dump_mcp_tool_schema = true;
             }
-            _ if arg.starts_with('-') => return Err(()),
+            "--help" | "-h" => return Ok(CliCommand::Help),
+            "--version" | "-V" => return Ok(CliCommand::Version),
+            _ if arg.starts_with('-') => return Err(CliParseError::UnknownFlag(arg)),
             _ => {
                 if options.session_dir.is_some() {
-                    return Err(());
+                    return Err(CliParseError::UnexpectedArgument(arg));
                 }
                 options.session_dir = Some(arg);
             }
@@ -97,11 +151,15 @@ fn parse_options(mut args: impl Iterator<Item = String>) -> Result<CliOptions, (
     }
 
     if options.demo && options.session_dir.is_some() {
-        return Err(());
+        return Err(CliParseError::ConflictingOptions(
+            "`--demo` cannot be combined with a session directory or `--session`",
+        ));
     }
 
     if options.mcp && options.mcp_http_port.is_some() {
-        return Err(());
+        return Err(CliParseError::ConflictingOptions(
+            "`--mcp-http-port` cannot be combined with stdio MCP mode (`--mcp`)",
+        ));
     }
 
     if options.dump_mcp_tool_schema
@@ -111,10 +169,12 @@ fn parse_options(mut args: impl Iterator<Item = String>) -> Result<CliOptions, (
             || options.mcp_http_port.is_some()
             || options.durable_writes)
     {
-        return Err(());
+        return Err(CliParseError::ConflictingOptions(
+            "`--dump-mcp-tool-schema` cannot be combined with runtime options",
+        ));
     }
 
-    Ok(options)
+    Ok(CliCommand::Run(options))
 }
 
 fn main() {
@@ -123,8 +183,17 @@ fn main() {
         let program = args.next().unwrap_or_else(|| "nereid".to_owned());
 
         let options = match parse_options(args) {
-            Ok(options) => options,
-            Err(()) => {
+            Ok(CliCommand::Run(options)) => options,
+            Ok(CliCommand::Help) => {
+                println!("{}", usage(&program));
+                return Ok(());
+            }
+            Ok(CliCommand::Version) => {
+                println!("{}", version());
+                return Ok(());
+            }
+            Err(err) => {
+                eprintln!("nereid: {err}");
                 print_usage(&program);
                 std::process::exit(2);
             }
@@ -264,17 +333,25 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_options, CliOptions};
+    use super::{parse_options, usage, version, CliCommand, CliOptions, CliParseError};
+
+    fn unwrap_run(command: CliCommand) -> CliOptions {
+        match command {
+            CliCommand::Run(options) => options,
+            other => panic!("expected run command, got {other:?}"),
+        }
+    }
 
     #[test]
     fn parses_empty_args() {
-        let options = parse_options(std::iter::empty()).expect("parse options");
+        let options = unwrap_run(parse_options(std::iter::empty()).expect("parse options"));
         assert_eq!(options, CliOptions::default());
     }
 
     #[test]
     fn parses_demo_flag() {
-        let options = parse_options(["--demo".to_owned()].into_iter()).expect("parse options");
+        let options =
+            unwrap_run(parse_options(["--demo".to_owned()].into_iter()).expect("parse options"));
         assert!(options.demo);
         assert!(!options.mcp);
         assert!(options.session_dir.is_none());
@@ -283,8 +360,10 @@ mod tests {
 
     #[test]
     fn parses_dump_mcp_tool_schema_flag() {
-        let options = parse_options(["--dump-mcp-tool-schema".to_owned()].into_iter())
-            .expect("parse options");
+        let options = unwrap_run(
+            parse_options(["--dump-mcp-tool-schema".to_owned()].into_iter())
+                .expect("parse options"),
+        );
         assert!(options.dump_mcp_tool_schema);
         assert!(!options.mcp);
         assert!(!options.demo);
@@ -292,7 +371,8 @@ mod tests {
 
     #[test]
     fn parses_mcp_flag() {
-        let options = parse_options(["--mcp".to_owned()].into_iter()).expect("parse options");
+        let options =
+            unwrap_run(parse_options(["--mcp".to_owned()].into_iter()).expect("parse options"));
         assert!(options.mcp);
         assert!(!options.demo);
         assert!(options.session_dir.is_none());
@@ -301,8 +381,10 @@ mod tests {
 
     #[test]
     fn parses_session_dir() {
-        let options = parse_options(["--session".to_owned(), "some/dir".to_owned()].into_iter())
-            .expect("parse options");
+        let options = unwrap_run(
+            parse_options(["--session".to_owned(), "some/dir".to_owned()].into_iter())
+                .expect("parse options"),
+        );
         assert_eq!(options.session_dir.as_deref(), Some("some/dir"));
         assert!(!options.mcp);
         assert!(!options.demo);
@@ -311,8 +393,10 @@ mod tests {
 
     #[test]
     fn parses_mcp_http_port() {
-        let options = parse_options(["--mcp-http-port".to_owned(), "1234".to_owned()].into_iter())
-            .expect("parse options");
+        let options = unwrap_run(
+            parse_options(["--mcp-http-port".to_owned(), "1234".to_owned()].into_iter())
+                .expect("parse options"),
+        );
         assert_eq!(options.mcp_http_port, Some(1234));
         assert!(!options.mcp);
     }
@@ -327,13 +411,17 @@ mod tests {
 
     #[test]
     fn parses_demo_and_mcp_in_any_order() {
-        let options = parse_options(["--demo".to_owned(), "--mcp".to_owned()].into_iter())
-            .expect("parse options");
+        let options = unwrap_run(
+            parse_options(["--demo".to_owned(), "--mcp".to_owned()].into_iter())
+                .expect("parse options"),
+        );
         assert!(options.demo);
         assert!(options.mcp);
 
-        let options = parse_options(["--mcp".to_owned(), "--demo".to_owned()].into_iter())
-            .expect("parse options");
+        let options = unwrap_run(
+            parse_options(["--mcp".to_owned(), "--demo".to_owned()].into_iter())
+                .expect("parse options"),
+        );
         assert!(options.demo);
         assert!(options.mcp);
     }
@@ -346,7 +434,8 @@ mod tests {
 
     #[test]
     fn parses_positional_session_dir() {
-        let options = parse_options(["some/dir".to_owned()].into_iter()).expect("parse options");
+        let options =
+            unwrap_run(parse_options(["some/dir".to_owned()].into_iter()).expect("parse options"));
         assert_eq!(options.session_dir.as_deref(), Some("some/dir"));
         assert!(!options.mcp);
         assert!(!options.demo);
@@ -354,8 +443,10 @@ mod tests {
 
     #[test]
     fn parses_positional_session_dir_with_mcp() {
-        let options = parse_options(["some/dir".to_owned(), "--mcp".to_owned()].into_iter())
-            .expect("parse options");
+        let options = unwrap_run(
+            parse_options(["some/dir".to_owned(), "--mcp".to_owned()].into_iter())
+                .expect("parse options"),
+        );
         assert_eq!(options.session_dir.as_deref(), Some("some/dir"));
         assert!(options.mcp);
         assert!(!options.demo);
@@ -398,6 +489,49 @@ mod tests {
 
     #[test]
     fn rejects_missing_session_value() {
-        parse_options(["--session".to_owned()].into_iter()).unwrap_err();
+        assert_eq!(
+            parse_options(["--session".to_owned()].into_iter()).unwrap_err(),
+            CliParseError::MissingValue("--session")
+        );
+        assert_eq!(
+            parse_options(["--session".to_owned(), "--mcp".to_owned()].into_iter()).unwrap_err(),
+            CliParseError::MissingValue("--session")
+        );
+    }
+
+    #[test]
+    fn parses_help_and_version_commands() {
+        assert_eq!(
+            parse_options(["--help".to_owned()].into_iter()).expect("parse help"),
+            CliCommand::Help
+        );
+        assert_eq!(
+            parse_options(["--version".to_owned()].into_iter()).expect("parse version"),
+            CliCommand::Version
+        );
+    }
+
+    #[test]
+    fn formats_usage_and_version_output() {
+        let help = usage("nereid");
+        assert!(help.contains("Usage:"));
+        assert!(help.contains("--session <dir>"));
+        assert!(help.contains("--mcp-http-port <port>"));
+        assert!(help.contains("--dump-mcp-tool-schema"));
+        assert_eq!(version(), format!("nereid {}", env!("CARGO_PKG_VERSION")));
+    }
+
+    #[test]
+    fn reports_actionable_parse_errors() {
+        assert_eq!(
+            parse_options(["--nope".to_owned()].into_iter()).unwrap_err().to_string(),
+            "unknown option `--nope`"
+        );
+        assert_eq!(
+            parse_options(["--mcp-http-port".to_owned(), "abc".to_owned()].into_iter())
+                .unwrap_err()
+                .to_string(),
+            "invalid value `abc` for `--mcp-http-port` (expected a TCP port from 0 to 65535)"
+        );
     }
 }
