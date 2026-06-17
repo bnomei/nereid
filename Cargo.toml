@@ -4,13 +4,15 @@ version = "0.3.0"
 edition = "2021"
 license-file = "LICENSE"
 rust-version = "1.85"
-description = "Terminal-first diagram TUI and MCP server for Mermaid-backed sessions"
+description = "Source-available noncommercial terminal diagram TUI and MCP server for Mermaid-backed sessions"
 readme = "README.md"
 homepage = "https://github.com/bnomei/nereid"
 repository = "https://github.com/bnomei/nereid"
 documentation = "https://docs.rs/nereid"
 keywords = ["mcp", "tui", "diagram", "mermaid", "ascii"]
 categories = ["command-line-utilities", "development-tools"]
+# Usage restrictions: source-available for noncommercial use only.
+# Commercial or product use requires separate written permission; see LICENSE.
 exclude = [".DS_Store", "specs/**"]
 
 [dependencies]

@@ -1,14 +1,14 @@
 # nereid
 
 [![Crates.io Version](https://img.shields.io/crates/v/nereid)](https://crates.io/crates/nereid)
-[![CI](https://img.shields.io/github/actions/workflow/status/bnomei/tmux-mcp/ci.yml?branch=main)](https://github.com/bnomei/tmux-mcp/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/bnomei/nereid/ci.yml?branch=main)](https://github.com/bnomei/nereid/actions/workflows/ci.yml)
 [![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json&style=flat)](https://codspeed.io/bnomei/nereid?utm_source=badge)
 [![Crates.io Downloads](https://img.shields.io/crates/d/nereid)](https://crates.io/crates/nereid)
-[![License](https://img.shields.io/crates/l/nereid)](https://crates.io/crates/nereid)
+[![License](https://img.shields.io/badge/license-source--available%20noncommercial-blue)](LICENSE)
 [![Discord](https://flat.badgen.net/badge/discord/bnomei?color=7289da&icon=discord&label)](https://discordapp.com/users/bnomei)
 [![Buymecoffee](https://flat.badgen.net/badge/icon/donate?icon=buymeacoffee&color=FF813F&label)](https://www.buymeacoffee.com/bnomei)
 
-Create and explore Mermaid diagrams in collaboration with AI agents in a terminal-first workspace, including ASCII art export.
+Create and explore Mermaid diagrams in collaboration with AI agents in a terminal-first workspace, including ASCII art export. Nereid is source-available for noncommercial use only; commercial or product use requires separate written permission.
 
 Terminal-first diagram workspace with:
 - a ratatui TUI for browsing and editing Mermaid-backed diagrams,
@@ -24,20 +24,28 @@ Nereid is:
 
 ## Installation
 
+> **License notice:** Installing Nereid from crates.io, Homebrew, GitHub Releases, or source does not grant unrestricted use. Nereid is source-available for noncommercial use only. Commercial use, product use, redistribution, sublicensing, and modified distribution require separate written permission from the copyright holder. See [`LICENSE`](LICENSE).
+
 ### Cargo (crates.io)
+The crates.io package is provided under the same source-available noncommercial terms.
+
 ```bash
 cargo install nereid
 ```
 
 ### Homebrew
+The Homebrew formula installs the binary but does not change the noncommercial usage restrictions.
+
 ```bash
 brew install bnomei/nereid/nereid
 ```
 
 ### GitHub Releases
-Download a prebuilt archive from the GitHub Releases page, extract it, and place `nereid` on your `PATH`.
+Download a prebuilt archive from the GitHub Releases page, review the included license notice, extract it, and place `nereid` on your `PATH`.
 
 ### From source
+Building from source is allowed for noncommercial use under the license terms.
+
 ```bash
 git clone https://github.com/bnomei/nereid.git
 cd nereid
@@ -301,4 +309,4 @@ prek install
 
 ## License
 
-Nereid Free Use License (No Copying, No Derivatives) v1.0. See [`LICENSE`](LICENSE).
+Nereid Source-Available Noncommercial License v1.0. Noncommercial use is allowed under the license terms. Commercial use, product use, redistribution, sublicensing, or modified distribution require separate written permission. See [`LICENSE`](LICENSE).

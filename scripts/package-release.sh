@@ -21,7 +21,7 @@ fi
 
 ARCHIVE_NAME="${BIN_NAME}-v${VERSION}-${TARGET}.tar.gz"
 
-tar -C "target/${TARGET}/release" -czf "${OUT_DIR}/${ARCHIVE_NAME}" "$BIN_NAME"
+tar -czf "${OUT_DIR}/${ARCHIVE_NAME}" -C "target/${TARGET}/release" "$BIN_NAME" -C "${PWD}" LICENSE
 
 if command -v sha256sum >/dev/null 2>&1; then
   sha256sum "${OUT_DIR}/${ARCHIVE_NAME}" > "${OUT_DIR}/${ARCHIVE_NAME}.sha256"
