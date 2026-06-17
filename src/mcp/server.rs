@@ -141,6 +141,13 @@ impl NereidMcp {
         }
     }
 
+    pub fn tool_schema_snapshot() -> Result<String, serde_json::Error> {
+        let tools = Self::tool_router().list_all();
+        let mut snapshot = serde_json::to_string_pretty(&tools)?;
+        snapshot.push('\n');
+        Ok(snapshot)
+    }
+
     pub async fn serve_stdio(self) -> Result<(), rmcp::RmcpError> {
         let service = self.serve((tokio::io::stdin(), tokio::io::stdout())).await?;
         service.waiting().await?;

@@ -562,6 +562,16 @@ fn tools_advertise_descriptions_and_schemas() {
     );
 }
 
+#[test]
+fn mcp_tool_schema_snapshot_is_current() {
+    let expected = include_str!("tool_schema.snapshot.json");
+    let actual = NereidMcp::tool_schema_snapshot().expect("serialize MCP tool schema snapshot");
+    assert_eq!(
+        actual, expected,
+        "MCP tool schema snapshot is out of date; run `cargo run -- --dump-mcp-tool-schema > src/mcp/server/tool_schema.snapshot.json`"
+    );
+}
+
 #[tokio::test]
 async fn attention_human_and_follow_ai_read_return_stable_defaults_without_ui_state() {
     let server = NereidMcp::new(demo_session());

@@ -1,9 +1,9 @@
 # nereid
 
 [![Crates.io Version](https://img.shields.io/crates/v/nereid)](https://crates.io/crates/nereid)
-[![CI](https://img.shields.io/github/actions/workflow/status/bnomei/nereid/ci.yml?branch=main)](https://github.com/bnomei/nereid/actions/workflows/ci.yml)
-[![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json&style=flat)](https://codspeed.io/bnomei/nereid?utm_source=badge)
 [![Crates.io Downloads](https://img.shields.io/crates/d/nereid)](https://crates.io/crates/nereid)
+[![CI](https://img.shields.io/github/actions/workflow/status/bnomei/nereid/ci.yml?branch=main&label=CI)](https://github.com/bnomei/nereid/actions/workflows/ci.yml)
+[![CodSpeed](https://img.shields.io/github/actions/workflow/status/bnomei/nereid/codspeed.yml?branch=main&label=CodSpeed)](https://github.com/bnomei/nereid/actions/workflows/codspeed.yml)
 [![License](https://img.shields.io/badge/license-source--available%20noncommercial-blue)](LICENSE)
 [![Discord](https://flat.badgen.net/badge/discord/bnomei?color=7289da&icon=discord&label)](https://discordapp.com/users/bnomei)
 [![Buymecoffee](https://flat.badgen.net/badge/icon/donate?icon=buymeacoffee&color=FF813F&label)](https://www.buymeacoffee.com/bnomei)
@@ -41,7 +41,7 @@ brew install bnomei/nereid/nereid
 ```
 
 ### GitHub Releases
-Download a prebuilt archive from the GitHub Releases page, review the included license notice, extract it, and place `nereid` on your `PATH`.
+Download a prebuilt archive from the [GitHub Releases page](https://github.com/bnomei/nereid/releases), review the included license notice, extract it, and place `nereid` on your `PATH`.
 
 ### From source
 Building from source is allowed for noncommercial use under the license terms.
@@ -133,6 +133,21 @@ Tool groups:
 - `xref/object`: `xref.list`, `xref.neighbors`, `xref.add`, `xref.remove`, `object.read`
 - `queries`: `route.find`, `seq.messages`, `seq.search`, `seq.trace`, `flow.reachable`,
   `flow.paths`, `flow.cycles`, `flow.unreachable`, `flow.dead_ends`, `flow.degrees`
+
+### MCP schema snapshot
+
+The reviewable MCP tool schema snapshot lives at `src/mcp/server/tool_schema.snapshot.json`.
+Regenerate it after changing MCP tool names, descriptions, input schemas, or output schemas:
+
+```sh
+cargo run -- --dump-mcp-tool-schema > src/mcp/server/tool_schema.snapshot.json
+```
+
+The snapshot check runs as part of the MCP server tests and does not require external services:
+
+```sh
+cargo test mcp_tool_schema_snapshot_is_current
+```
 
 Tool schemas (Input/Output):
 

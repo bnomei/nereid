@@ -1,0 +1,4883 @@
+[
+  {
+    "name": "attention.agent.clear",
+    "description": "Clear agent-owned attention; use when done with a topic or before changing context.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "cleared": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cleared"
+      ],
+      "title": "AttentionClearResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "attention.agent.read",
+    "description": "Read agent-owned attention (single spotlight); call before `attention.agent.set`/`clear`\nto avoid unnecessary spotlight churn.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "ReadContext": {
+          "properties": {
+            "follow_ai": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "human_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "human_active_object_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "session_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ui_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "ui_session_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/ReadContext"
+        },
+        "diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "object_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "context"
+      ],
+      "title": "AttentionReadResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "attention.agent.set",
+    "description": "Set agent-owned attention to one object; call before explanations/edits so the user can\nfollow the agent in real time.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "object_ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "object_ref"
+      ],
+      "title": "AttentionAgentSetParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "diagram_id": {
+          "type": "string"
+        },
+        "object_ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "object_ref",
+        "diagram_id"
+      ],
+      "title": "AttentionSetResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "attention.human.read",
+    "description": "Read human-owned attention from live TUI state; call early in a turn, then localize with\n`diagram.get_slice` and `object.read`.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "ReadContext": {
+          "properties": {
+            "follow_ai": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "human_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "human_active_object_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "session_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ui_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "ui_session_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/ReadContext"
+        },
+        "diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "object_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "context"
+      ],
+      "title": "AttentionReadResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "diagram.apply_ops",
+    "description": "Apply structured diagram ops gated by `base_rev`; prefer `diagram.propose_ops` first, then\nrefresh with `diagram.diff`.",
+    "inputSchema": {
+      "$defs": {
+        "McpOp": {
+          "oneOf": [
+            {
+              "properties": {
+                "mermaid_name": {
+                  "type": "string"
+                },
+                "participant_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "seq_add_participant",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "participant_id",
+                "mermaid_name"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "mermaid_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "participant_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "seq_update_participant",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "participant_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "participant_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "seq_set_participant_note",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "participant_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "participant_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "seq_remove_participant",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "participant_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "arrow": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "from_participant_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "$ref": "#/$defs/MessageKind"
+                },
+                "message_id": {
+                  "type": "string"
+                },
+                "order_key": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "to_participant_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "seq_add_message",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "message_id",
+                "from_participant_id",
+                "to_participant_id",
+                "kind",
+                "text",
+                "order_key"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "arrow": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "from_participant_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "kind": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/MessageKind"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "message_id": {
+                  "type": "string"
+                },
+                "order_key": {
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "text": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "to_participant_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "seq_update_message",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "message_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "message_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "seq_remove_message",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "message_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "node_id": {
+                  "type": "string"
+                },
+                "shape": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "flow_add_node",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "node_id",
+                "label"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "node_id": {
+                  "type": "string"
+                },
+                "shape": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "flow_update_node",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "node_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "mermaid_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "node_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "flow_set_node_mermaid_id",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "node_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "node_id": {
+                  "type": "string"
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "flow_set_node_note",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "node_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "node_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "flow_remove_node",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "node_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "connector": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "edge_id": {
+                  "type": "string"
+                },
+                "from_node_id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "style": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "to_node_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "flow_add_edge",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "edge_id",
+                "from_node_id",
+                "to_node_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "connector": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "edge_id": {
+                  "type": "string"
+                },
+                "from_node_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "style": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "to_node_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "flow_update_edge",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "edge_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "edge_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "flow_remove_edge",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "edge_id"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "MessageKind": {
+          "enum": [
+            "sync",
+            "async",
+            "return"
+          ],
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "base_rev": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ops": {
+          "items": {
+            "$ref": "#/$defs/McpOp"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "base_rev",
+        "ops"
+      ],
+      "title": "ApplyOpsParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "DeltaSummary": {
+          "properties": {
+            "added": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "removed": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "updated": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "added",
+            "removed",
+            "updated"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "applied": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "delta": {
+          "$ref": "#/$defs/DeltaSummary"
+        },
+        "new_rev": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "new_rev",
+        "applied",
+        "delta"
+      ],
+      "title": "ApplyOpsResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "diagram.create_from_mermaid",
+    "description": "Create a diagram from raw Mermaid; use to bootstrap a session, then continue with\n`diagram.open`/`diagram.stat`.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "diagram_id": {
+          "description": "Optional explicit diagram id to use; when omitted a unique id is allocated.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "make_active": {
+          "description": "When true (default), sets the created diagram as active.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "mermaid": {
+          "description": "Raw Mermaid diagram source (`flowchart`/`graph` or `sequenceDiagram`).",
+          "type": "string"
+        },
+        "name": {
+          "description": "Optional display name; defaults to the chosen diagram id.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "mermaid"
+      ],
+      "title": "DiagramCreateFromMermaidParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "DiagramSummary": {
+          "properties": {
+            "diagram_id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "diagram_id",
+            "name",
+            "kind",
+            "rev"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "active_diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "diagram": {
+          "$ref": "#/$defs/DiagramSummary"
+        }
+      },
+      "required": [
+        "diagram"
+      ],
+      "title": "DiagramCreateFromMermaidResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "diagram.current",
+    "description": "Get the active diagram id (`null` when unset); check this before deciding whether to call\n`diagram.open`, then continue with `diagram.stat`/`diagram.get_slice`.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "ReadContext": {
+          "properties": {
+            "follow_ai": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "human_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "human_active_object_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "session_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ui_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "ui_session_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "active_diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "context": {
+          "$ref": "#/$defs/ReadContext"
+        }
+      },
+      "required": [
+        "context"
+      ],
+      "title": "DiagramCurrentResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "diagram.delete",
+    "description": "Remove a diagram by id and retarget active diagram when needed.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "diagram_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "diagram_id"
+      ],
+      "title": "DiagramDeleteParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "active_diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "deleted_diagram_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "deleted_diagram_id"
+      ],
+      "title": "DiagramDeleteResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "diagram.diff",
+    "description": "Get diagram delta since a revision; default refresh step after `diagram.apply_ops` or\nexternal changes.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "since_rev": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "since_rev"
+      ],
+      "title": "GetDeltaParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "DeltaChange": {
+          "properties": {
+            "kind": {
+              "$ref": "#/$defs/DeltaChangeKind"
+            },
+            "refs": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "refs"
+          ],
+          "type": "object"
+        },
+        "DeltaChangeKind": {
+          "enum": [
+            "added",
+            "removed",
+            "updated"
+          ],
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "changes": {
+          "items": {
+            "$ref": "#/$defs/DeltaChange"
+          },
+          "type": "array"
+        },
+        "from_rev": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "to_rev": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "from_rev",
+        "to_rev",
+        "changes"
+      ],
+      "title": "DiagramDeltaResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "diagram.get_ast",
+    "description": "Read full diagram AST for id/label resolution; prefer this over session-file reads.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "title": "DiagramTargetParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "McpDiagramAst": {
+          "oneOf": [
+            {
+              "properties": {
+                "blocks": {
+                  "items": {
+                    "$ref": "#/$defs/McpSeqBlockAst"
+                  },
+                  "type": "array"
+                },
+                "messages": {
+                  "items": {
+                    "$ref": "#/$defs/McpSeqMessageAst"
+                  },
+                  "type": "array"
+                },
+                "participants": {
+                  "items": {
+                    "$ref": "#/$defs/McpSeqParticipantAst"
+                  },
+                  "type": "array"
+                },
+                "type": {
+                  "const": "sequence",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "participants",
+                "messages",
+                "blocks"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "edges": {
+                  "items": {
+                    "$ref": "#/$defs/McpFlowEdgeAst"
+                  },
+                  "type": "array"
+                },
+                "nodes": {
+                  "items": {
+                    "$ref": "#/$defs/McpFlowNodeAst"
+                  },
+                  "type": "array"
+                },
+                "type": {
+                  "const": "flowchart",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "nodes",
+                "edges"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "McpFlowEdgeAst": {
+          "properties": {
+            "connector": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "edge_id": {
+              "type": "string"
+            },
+            "from_node_id": {
+              "type": "string"
+            },
+            "label": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "style": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "to_node_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "edge_id",
+            "from_node_id",
+            "to_node_id"
+          ],
+          "type": "object"
+        },
+        "McpFlowNodeAst": {
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "mermaid_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "node_id": {
+              "type": "string"
+            },
+            "note": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "shape": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "node_id",
+            "label",
+            "shape"
+          ],
+          "type": "object"
+        },
+        "McpSeqBlockAst": {
+          "properties": {
+            "block_id": {
+              "type": "string"
+            },
+            "blocks": {
+              "items": {
+                "$ref": "#/$defs/McpSeqBlockAst"
+              },
+              "type": "array"
+            },
+            "header": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "$ref": "#/$defs/McpSeqBlockKind"
+            },
+            "sections": {
+              "items": {
+                "$ref": "#/$defs/McpSeqSectionAst"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "block_id",
+            "kind",
+            "sections",
+            "blocks"
+          ],
+          "type": "object"
+        },
+        "McpSeqBlockKind": {
+          "enum": [
+            "alt",
+            "opt",
+            "loop",
+            "par"
+          ],
+          "type": "string"
+        },
+        "McpSeqMessageAst": {
+          "properties": {
+            "arrow": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "from_participant_id": {
+              "type": "string"
+            },
+            "kind": {
+              "$ref": "#/$defs/MessageKind"
+            },
+            "message_id": {
+              "type": "string"
+            },
+            "order_key": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "text": {
+              "type": "string"
+            },
+            "to_participant_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "message_id",
+            "from_participant_id",
+            "to_participant_id",
+            "kind",
+            "text",
+            "order_key"
+          ],
+          "type": "object"
+        },
+        "McpSeqParticipantAst": {
+          "properties": {
+            "mermaid_name": {
+              "type": "string"
+            },
+            "note": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "participant_id": {
+              "type": "string"
+            },
+            "role": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "participant_id",
+            "mermaid_name"
+          ],
+          "type": "object"
+        },
+        "McpSeqSectionAst": {
+          "properties": {
+            "header": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "$ref": "#/$defs/McpSeqSectionKind"
+            },
+            "message_ids": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "section_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "section_id",
+            "kind",
+            "message_ids"
+          ],
+          "type": "object"
+        },
+        "McpSeqSectionKind": {
+          "enum": [
+            "main",
+            "else",
+            "and"
+          ],
+          "type": "string"
+        },
+        "MessageKind": {
+          "enum": [
+            "sync",
+            "async",
+            "return"
+          ],
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "ast": {
+          "$ref": "#/$defs/McpDiagramAst"
+        },
+        "diagram_id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "rev": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "diagram_id",
+        "kind",
+        "rev",
+        "ast"
+      ],
+      "title": "DiagramGetAstResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "diagram.get_slice",
+    "description": "Get deterministic local neighborhood around an `object_ref`; primary probe tool after\nattention/selection or search hits.",
+    "inputSchema": {
+      "$defs": {
+        "DiagramSliceFilters": {
+          "properties": {
+            "exclude_categories": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "include_categories": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "center_ref": {
+          "type": "string"
+        },
+        "depth": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "filters": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DiagramSliceFilters"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "radius": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "center_ref"
+      ],
+      "title": "DiagramGetSliceParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "edges": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "objects": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "objects",
+        "edges"
+      ],
+      "title": "DiagramGetSliceResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "diagram.list",
+    "description": "List diagrams in the current session; start here, then call `diagram.current` or\n`diagram.open` (bootstrap with `diagram.create_from_mermaid` if empty).",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "DiagramSummary": {
+          "properties": {
+            "diagram_id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "diagram_id",
+            "name",
+            "kind",
+            "rev"
+          ],
+          "type": "object"
+        },
+        "ReadContext": {
+          "properties": {
+            "follow_ai": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "human_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "human_active_object_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "session_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ui_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "ui_session_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/ReadContext"
+        },
+        "diagrams": {
+          "items": {
+            "$ref": "#/$defs/DiagramSummary"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "diagrams",
+        "context"
+      ],
+      "title": "ListDiagramsResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "diagram.open",
+    "description": "Set the active diagram default for diagram-scoped tools; typically follows `diagram.list`\nor `diagram.create_from_mermaid`.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "diagram_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "diagram_id"
+      ],
+      "title": "DiagramOpenParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "active_diagram_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "active_diagram_id"
+      ],
+      "title": "DiagramOpenResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "diagram.propose_ops",
+    "description": "Validate ops against `base_rev` and return predicted delta without mutation; use immediately\nbefore `diagram.apply_ops` for safe human-agent collaboration.",
+    "inputSchema": {
+      "$defs": {
+        "McpOp": {
+          "oneOf": [
+            {
+              "properties": {
+                "mermaid_name": {
+                  "type": "string"
+                },
+                "participant_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "seq_add_participant",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "participant_id",
+                "mermaid_name"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "mermaid_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "participant_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "seq_update_participant",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "participant_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "participant_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "seq_set_participant_note",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "participant_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "participant_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "seq_remove_participant",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "participant_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "arrow": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "from_participant_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "$ref": "#/$defs/MessageKind"
+                },
+                "message_id": {
+                  "type": "string"
+                },
+                "order_key": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "to_participant_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "seq_add_message",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "message_id",
+                "from_participant_id",
+                "to_participant_id",
+                "kind",
+                "text",
+                "order_key"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "arrow": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "from_participant_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "kind": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/MessageKind"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "message_id": {
+                  "type": "string"
+                },
+                "order_key": {
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "text": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "to_participant_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "seq_update_message",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "message_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "message_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "seq_remove_message",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "message_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "node_id": {
+                  "type": "string"
+                },
+                "shape": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "flow_add_node",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "node_id",
+                "label"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "node_id": {
+                  "type": "string"
+                },
+                "shape": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "flow_update_node",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "node_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "mermaid_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "node_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "flow_set_node_mermaid_id",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "node_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "node_id": {
+                  "type": "string"
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "flow_set_node_note",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "node_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "node_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "flow_remove_node",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "node_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "connector": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "edge_id": {
+                  "type": "string"
+                },
+                "from_node_id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "style": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "to_node_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "flow_add_edge",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "edge_id",
+                "from_node_id",
+                "to_node_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "connector": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "edge_id": {
+                  "type": "string"
+                },
+                "from_node_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "style": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "to_node_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "flow_update_edge",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "edge_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "edge_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "flow_remove_edge",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "edge_id"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "MessageKind": {
+          "enum": [
+            "sync",
+            "async",
+            "return"
+          ],
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "base_rev": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ops": {
+          "items": {
+            "$ref": "#/$defs/McpOp"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "base_rev",
+        "ops"
+      ],
+      "title": "DiagramProposeOpsParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "DeltaSummary": {
+          "properties": {
+            "added": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "removed": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "updated": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "added",
+            "removed",
+            "updated"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "applied": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "delta": {
+          "$ref": "#/$defs/DeltaSummary"
+        },
+        "new_rev": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "new_rev",
+        "applied",
+        "delta"
+      ],
+      "title": "DiagramProposeOpsResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "diagram.read",
+    "description": "Read canonical Mermaid snapshot of current diagram AST; use for export/review and\ndebugging, not as the default probe.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "title": "DiagramTargetParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "ReadContext": {
+          "properties": {
+            "follow_ai": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "human_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "human_active_object_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "session_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ui_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "ui_session_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/ReadContext"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "mermaid": {
+          "type": "string"
+        },
+        "rev": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rev",
+        "kind",
+        "mermaid",
+        "context"
+      ],
+      "title": "DiagramSnapshot",
+      "type": "object"
+    }
+  },
+  {
+    "name": "diagram.render_text",
+    "description": "Render diagram as deterministic text (Unicode allowed); use for human-readable snapshots\nand review, then return to `diagram.stat`/`diagram.get_slice` for targeted reasoning.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "title": "DiagramTargetParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "ReadContext": {
+          "properties": {
+            "follow_ai": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "human_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "human_active_object_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "session_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ui_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "ui_session_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/ReadContext"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "context"
+      ],
+      "title": "DiagramRenderTextResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "diagram.stat",
+    "description": "Get a compact diagram digest (rev + counts + key names); use as the default first read\nbefore `diagram.get_slice`, typed queries, or mutation planning.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "title": "DiagramTargetParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "DiagramCounts": {
+          "properties": {
+            "edges": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "messages": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "nodes": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "participants": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "participants",
+            "messages",
+            "nodes",
+            "edges"
+          ],
+          "type": "object"
+        },
+        "ReadContext": {
+          "properties": {
+            "follow_ai": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "human_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "human_active_object_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "session_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ui_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "ui_session_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/ReadContext"
+        },
+        "counts": {
+          "$ref": "#/$defs/DiagramCounts"
+        },
+        "key_names": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "rev": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rev",
+        "counts",
+        "key_names",
+        "context"
+      ],
+      "title": "DiagramDigest",
+      "type": "object"
+    }
+  },
+  {
+    "name": "flow.cycles",
+    "description": "Detect flowchart cycles (returns node ref cycles); use for risk checks before edits.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "title": "DiagramTargetParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "cycles": {
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "cycles"
+      ],
+      "title": "FlowCyclesResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "flow.dead_ends",
+    "description": "List terminal flowchart nodes (returns refs); combine with `flow.unreachable` to identify\ndead routes.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "title": "DiagramTargetParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "nodes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "nodes"
+      ],
+      "title": "FlowDeadEndsResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "flow.degrees",
+    "description": "Compute flow fan-in/fan-out degrees (returns refs + counts); use to identify hubs and\nbottlenecks before refactoring.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sort_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "top": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "title": "FlowDegreesParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "FlowDegreeNode": {
+          "properties": {
+            "in_degree": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "label": {
+              "type": "string"
+            },
+            "node_ref": {
+              "type": "string"
+            },
+            "out_degree": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "node_ref",
+            "label",
+            "in_degree",
+            "out_degree"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/FlowDegreeNode"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "nodes"
+      ],
+      "title": "FlowDegreesResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "flow.paths",
+    "description": "Find bounded paths between two flow nodes (returns ref paths); use after\n`flow.reachable`/`object.read` to explain alternatives.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "from_node_id": {
+          "type": "string"
+        },
+        "limit": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "max_extra_hops": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "to_node_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "from_node_id",
+        "to_node_id"
+      ],
+      "title": "FlowPathsParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "paths": {
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "paths"
+      ],
+      "title": "FlowPathsResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "flow.reachable",
+    "description": "List flow nodes reachable from a node id (returns refs); pair with `flow.paths` and\n`diagram.get_slice` for local traversal.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "direction": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "from_node_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "from_node_id"
+      ],
+      "title": "FlowReachableParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "nodes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "nodes"
+      ],
+      "title": "FlowReachableResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "flow.unreachable",
+    "description": "List nodes unreachable from start nodes (returns refs); use for cleanup/TODO mapping and\nfollow with `diagram.get_slice`.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "start_node_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "title": "FlowUnreachableParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "nodes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "nodes"
+      ],
+      "title": "FlowUnreachableResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "follow_ai.read",
+    "description": "Read follow-AI mode (`true` means TUI tracks agent spotlight); check this before\nspotlight-heavy guidance, and pair with `follow_ai.set` when handing off control.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "ReadContext": {
+          "properties": {
+            "follow_ai": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "human_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "human_active_object_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "session_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ui_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "ui_session_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/ReadContext"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "context"
+      ],
+      "title": "FollowAiReadResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "follow_ai.set",
+    "description": "Set follow-AI mode (`true` to track agent spotlight in TUI); use with `attention.agent.set`\nfor guided handoff.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "title": "FollowAiSetParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "title": "FollowAiSetResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "object.read",
+    "description": "Read concrete object fields by ref; use this as evidence before answering.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "object_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "object_refs": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "title": "ObjectGetParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "McpObject": {
+          "oneOf": [
+            {
+              "properties": {
+                "mermaid_name": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "seq_participant",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "mermaid_name"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "child_block_ids": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "header": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "kind": {
+                  "$ref": "#/$defs/McpSeqBlockKind"
+                },
+                "section_ids": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": {
+                  "const": "seq_block",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "kind",
+                "section_ids",
+                "child_block_ids"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "header": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "kind": {
+                  "$ref": "#/$defs/McpSeqSectionKind"
+                },
+                "message_ids": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": {
+                  "const": "seq_section",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "kind",
+                "message_ids"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "arrow": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "from_participant_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "$ref": "#/$defs/MessageKind"
+                },
+                "order_key": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "to_participant_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "seq_message",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "from_participant_id",
+                "to_participant_id",
+                "kind",
+                "text",
+                "order_key"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "mermaid_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "shape": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "flow_node",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "label",
+                "shape"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "connector": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "from_node_id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "style": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "to_node_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "flow_edge",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "from_node_id",
+                "to_node_id"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "McpSeqBlockKind": {
+          "enum": [
+            "alt",
+            "opt",
+            "loop",
+            "par"
+          ],
+          "type": "string"
+        },
+        "McpSeqSectionKind": {
+          "enum": [
+            "main",
+            "else",
+            "and"
+          ],
+          "type": "string"
+        },
+        "MessageKind": {
+          "enum": [
+            "sync",
+            "async",
+            "return"
+          ],
+          "type": "string"
+        },
+        "ObjectGetItem": {
+          "properties": {
+            "object": {
+              "$ref": "#/$defs/McpObject"
+            },
+            "object_ref": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "object_ref",
+            "object"
+          ],
+          "type": "object"
+        },
+        "ReadContext": {
+          "properties": {
+            "follow_ai": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "human_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "human_active_object_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "session_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ui_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "ui_session_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/ReadContext"
+        },
+        "objects": {
+          "items": {
+            "$ref": "#/$defs/ObjectGetItem"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "objects",
+        "context"
+      ],
+      "title": "ObjectGetResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "route.find",
+    "description": "Find cross-diagram routes between two object refs; combine with `xref.neighbors` and\n`diagram.get_slice` for explain-and-refine flows.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "from_ref": {
+          "type": "string"
+        },
+        "limit": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "max_hops": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "ordering": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "to_ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "from_ref",
+        "to_ref"
+      ],
+      "title": "RouteFindParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "routes": {
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "routes"
+      ],
+      "title": "RouteFindResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "selection.read",
+    "description": "Read the shared multi-selection working set as canonical `object_ref`s; call after\n`attention.human.read` and before `object.read` or `selection.update`.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "ReadContext": {
+          "properties": {
+            "follow_ai": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "human_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "human_active_object_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "session_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ui_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "ui_session_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/ReadContext"
+        },
+        "object_refs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "object_refs",
+        "context"
+      ],
+      "title": "SelectionGetResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "selection.update",
+    "description": "Update shared multi-selection (`replace`/`add`/`remove`); use to mark a temporary working\nset for discussion or edits.",
+    "inputSchema": {
+      "$defs": {
+        "UpdateMode": {
+          "enum": [
+            "replace",
+            "add",
+            "remove"
+          ],
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/UpdateMode",
+          "default": "replace"
+        },
+        "object_refs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "object_refs"
+      ],
+      "title": "SelectionUpdateParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "applied": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "ignored": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "applied",
+        "ignored"
+      ],
+      "title": "SelectionUpdateResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "seq.messages",
+    "description": "List sequence messages (returns refs) with optional filters; good starting point before\n`seq.trace` or targeted mutation planning.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "from_participant_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "to_participant_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "title": "SeqMessagesParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "messages": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "messages"
+      ],
+      "title": "SeqMessagesResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "seq.search",
+    "description": "Search sequence messages by substring/regex (returns refs); typically feed results into\n`object.read`, `seq.trace`, or attention/selection updates.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "case_insensitive": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "needle": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "needle"
+      ],
+      "title": "SeqSearchParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "messages": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "messages"
+      ],
+      "title": "SeqSearchResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "seq.trace",
+    "description": "Trace sequence message order before/after a message id (returns refs); use for timeline\nexplanations and local impact checks.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "direction": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "from_message_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "limit": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "title": "SeqTraceParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "messages": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "messages"
+      ],
+      "title": "SeqTraceResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "view.read_state",
+    "description": "Read UI view state (active diagram, scroll, panes); use with\n`attention.human.read`/`attention.agent.read` for orientation without mutating focus.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "ReadContext": {
+          "properties": {
+            "follow_ai": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "human_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "human_active_object_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "session_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ui_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "ui_session_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "ViewScroll": {
+          "properties": {
+            "x": {
+              "format": "double",
+              "type": "number"
+            },
+            "y": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "x",
+            "y"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "active_diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "context": {
+          "$ref": "#/$defs/ReadContext"
+        },
+        "panes": {
+          "additionalProperties": {
+            "type": "boolean"
+          },
+          "type": "object"
+        },
+        "scroll": {
+          "$ref": "#/$defs/ViewScroll"
+        }
+      },
+      "required": [
+        "scroll",
+        "panes",
+        "context"
+      ],
+      "title": "ViewGetStateResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "walkthrough.apply_ops",
+    "description": "Apply walkthrough ops using `base_rev` from `walkthrough.stat`; on conflict, refresh and retry.",
+    "inputSchema": {
+      "$defs": {
+        "McpWalkthroughOp": {
+          "oneOf": [
+            {
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "set_title",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "title"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "body_md": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "node_id": {
+                  "type": "string"
+                },
+                "refs": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "tags": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "add_node",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "node_id",
+                "title"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "body_md": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "node_id": {
+                  "type": "string"
+                },
+                "refs": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "tags": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "update_node",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "node_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "node_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "remove_node",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "node_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "from_node_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "to_node_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "add_edge",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "from_node_id",
+                "to_node_id",
+                "kind"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "from_node_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "to_node_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "update_edge",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "from_node_id",
+                "to_node_id",
+                "kind"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "from_node_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "to_node_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "remove_edge",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "from_node_id",
+                "to_node_id",
+                "kind"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "base_rev": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ops": {
+          "items": {
+            "$ref": "#/$defs/McpWalkthroughOp"
+          },
+          "type": "array"
+        },
+        "walkthrough_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "walkthrough_id",
+        "base_rev",
+        "ops"
+      ],
+      "title": "WalkthroughApplyOpsParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "DeltaSummary": {
+          "properties": {
+            "added": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "removed": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "updated": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "added",
+            "removed",
+            "updated"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "applied": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "delta": {
+          "$ref": "#/$defs/DeltaSummary"
+        },
+        "new_rev": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "new_rev",
+        "applied",
+        "delta"
+      ],
+      "title": "ApplyOpsResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "walkthrough.current",
+    "description": "Get the active walkthrough id (`null` when unset); call after `walkthrough.list` and\nbefore `walkthrough.open`/`walkthrough.read`.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "ReadContext": {
+          "properties": {
+            "follow_ai": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "human_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "human_active_object_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "session_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ui_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "ui_session_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "active_walkthrough_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "context": {
+          "$ref": "#/$defs/ReadContext"
+        }
+      },
+      "required": [
+        "context"
+      ],
+      "title": "WalkthroughCurrentResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "walkthrough.diff",
+    "description": "Read walkthrough delta since a revision; call after mutations to verify applied changes.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "since_rev": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "walkthrough_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "walkthrough_id",
+        "since_rev"
+      ],
+      "title": "WalkthroughGetDeltaParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "DeltaChange": {
+          "properties": {
+            "kind": {
+              "$ref": "#/$defs/DeltaChangeKind"
+            },
+            "refs": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "refs"
+          ],
+          "type": "object"
+        },
+        "DeltaChangeKind": {
+          "enum": [
+            "added",
+            "removed",
+            "updated"
+          ],
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "changes": {
+          "items": {
+            "$ref": "#/$defs/DeltaChange"
+          },
+          "type": "array"
+        },
+        "from_rev": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "to_rev": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "from_rev",
+        "to_rev",
+        "changes"
+      ],
+      "title": "WalkthroughDeltaResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "walkthrough.get_node",
+    "description": "Get one walkthrough node by id; use for drill-down after `walkthrough.list` or\n`walkthrough.read`.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "node_id": {
+          "type": "string"
+        },
+        "walkthrough_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "walkthrough_id",
+        "node_id"
+      ],
+      "title": "WalkthroughGetNodeParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "McpWalkthroughNode": {
+          "properties": {
+            "body_md": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "node_id": {
+              "type": "string"
+            },
+            "refs": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "status": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "tags": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "node_id",
+            "title",
+            "refs",
+            "tags"
+          ],
+          "type": "object"
+        },
+        "ReadContext": {
+          "properties": {
+            "follow_ai": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "human_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "human_active_object_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "session_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ui_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "ui_session_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/ReadContext"
+        },
+        "node": {
+          "$ref": "#/$defs/McpWalkthroughNode"
+        }
+      },
+      "required": [
+        "node",
+        "context"
+      ],
+      "title": "WalkthroughGetNodeResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "walkthrough.list",
+    "description": "List walkthroughs in the current session; start here, then `walkthrough.open`,\n`walkthrough.stat`, or `walkthrough.read`.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "ReadContext": {
+          "properties": {
+            "follow_ai": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "human_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "human_active_object_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "session_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ui_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "ui_session_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "WalkthroughSummary": {
+          "properties": {
+            "edges": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "nodes": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "title": {
+              "type": "string"
+            },
+            "walkthrough_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "walkthrough_id",
+            "title",
+            "rev",
+            "nodes",
+            "edges"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/ReadContext"
+        },
+        "walkthroughs": {
+          "items": {
+            "$ref": "#/$defs/WalkthroughSummary"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "walkthroughs",
+        "context"
+      ],
+      "title": "ListWalkthroughsResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "walkthrough.open",
+    "description": "Set the active walkthrough default for walkthrough-scoped tools; usually after\n`walkthrough.list`.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "walkthrough_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "walkthrough_id"
+      ],
+      "title": "WalkthroughOpenParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "active_walkthrough_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "active_walkthrough_id"
+      ],
+      "title": "WalkthroughOpenResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "walkthrough.read",
+    "description": "Read a full walkthrough (nodes/edges/refs); call after `walkthrough.stat` when you need\ncomplete node/edge detail, and before targeted `walkthrough.get_node`.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "walkthrough_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "walkthrough_id"
+      ],
+      "title": "WalkthroughGetParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "McpWalkthrough": {
+          "properties": {
+            "edges": {
+              "items": {
+                "$ref": "#/$defs/McpWalkthroughEdge"
+              },
+              "type": "array"
+            },
+            "nodes": {
+              "items": {
+                "$ref": "#/$defs/McpWalkthroughNode"
+              },
+              "type": "array"
+            },
+            "rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "title": {
+              "type": "string"
+            },
+            "walkthrough_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "walkthrough_id",
+            "title",
+            "rev",
+            "nodes",
+            "edges"
+          ],
+          "type": "object"
+        },
+        "McpWalkthroughEdge": {
+          "properties": {
+            "from_node_id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "label": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "to_node_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "from_node_id",
+            "to_node_id",
+            "kind"
+          ],
+          "type": "object"
+        },
+        "McpWalkthroughNode": {
+          "properties": {
+            "body_md": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "node_id": {
+              "type": "string"
+            },
+            "refs": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "status": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "tags": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "node_id",
+            "title",
+            "refs",
+            "tags"
+          ],
+          "type": "object"
+        },
+        "ReadContext": {
+          "properties": {
+            "follow_ai": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "human_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "human_active_object_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "session_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ui_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "ui_session_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/ReadContext"
+        },
+        "walkthrough": {
+          "$ref": "#/$defs/McpWalkthrough"
+        }
+      },
+      "required": [
+        "walkthrough",
+        "context"
+      ],
+      "title": "WalkthroughGetResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "walkthrough.render_text",
+    "description": "Render walkthrough text for human-readable sharing/export; prefer\n`walkthrough.stat`/`walkthrough.read` for machine reasoning and follow-up edits.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "walkthrough_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "walkthrough_id"
+      ],
+      "title": "WalkthroughGetParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "ReadContext": {
+          "properties": {
+            "follow_ai": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "human_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "human_active_object_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "session_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ui_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "ui_session_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/ReadContext"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "context"
+      ],
+      "title": "WalkthroughRenderTextResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "walkthrough.stat",
+    "description": "Read current walkthrough revision and counts; call before walkthrough mutations.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "walkthrough_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "walkthrough_id"
+      ],
+      "title": "WalkthroughGetParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "ReadContext": {
+          "properties": {
+            "follow_ai": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "human_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "human_active_object_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "session_active_diagram_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ui_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "ui_session_rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "WalkthroughDigest": {
+          "properties": {
+            "counts": {
+              "$ref": "#/$defs/WalkthroughDigestCounts"
+            },
+            "rev": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "rev",
+            "counts"
+          ],
+          "type": "object"
+        },
+        "WalkthroughDigestCounts": {
+          "properties": {
+            "edges": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "nodes": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "nodes",
+            "edges"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/ReadContext"
+        },
+        "digest": {
+          "$ref": "#/$defs/WalkthroughDigest"
+        }
+      },
+      "required": [
+        "digest",
+        "context"
+      ],
+      "title": "WalkthroughGetDigestResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "xref.add",
+    "description": "Add a cross-diagram xref; use to persist discovered relationships from route/trace analysis\nand walkthrough work.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "to": {
+          "type": "string"
+        },
+        "xref_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "xref_id",
+        "from",
+        "to",
+        "kind"
+      ],
+      "title": "XRefAddParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "xref_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "xref_id",
+        "status"
+      ],
+      "title": "XRefAddResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "xref.list",
+    "description": "List session xrefs (including dangling filters); use to audit mappings before route/search\nexploration or cleanup.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "dangling_only": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "from_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "involves_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "label_contains": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "limit": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "to_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "title": "XRefListParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "XRefSummary": {
+          "properties": {
+            "from": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "label": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string"
+            },
+            "to": {
+              "type": "string"
+            },
+            "xref_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "xref_id",
+            "from",
+            "to",
+            "kind",
+            "status"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "xrefs": {
+          "items": {
+            "$ref": "#/$defs/XRefSummary"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "xrefs"
+      ],
+      "title": "XRefListResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "xref.neighbors",
+    "description": "List xref-neighbor objects connected to an `object_ref`; useful probe step after\n`attention.human.read` or `route.find`.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "direction": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "object_ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "object_ref"
+      ],
+      "title": "XRefNeighborsParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "neighbors": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "neighbors"
+      ],
+      "title": "XRefNeighborsResponse",
+      "type": "object"
+    }
+  },
+  {
+    "name": "xref.remove",
+    "description": "Remove an xref by id; typically follows `xref.list` review or dangling cleanup.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "xref_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "xref_id"
+      ],
+      "title": "XRefRemoveParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "removed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "removed"
+      ],
+      "title": "XRefRemoveResponse",
+      "type": "object"
+    }
+  }
+]
