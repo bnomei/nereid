@@ -28,7 +28,7 @@ const DEFAULT_MCP_HTTP_PORT: u16 = 27435;
 
 fn print_usage(program: &str) {
     eprintln!(
-        "Usage:\n  {program} [<session-dir>] [--durable-writes] [--mcp-http-port <port>]\n  {program} [--session <dir>] [--durable-writes] [--mcp-http-port <port>]\n  {program} --demo [--mcp-http-port <port>]\n  {program} [<session-dir>] [--durable-writes] --mcp\n  {program} [--session <dir>] [--durable-writes] --mcp\n  {program} --demo --mcp\n\nTUI mode (default) serves MCP over streamable HTTP at `http://127.0.0.1:<port>/mcp`.\n--mcp-http-port selects the port (0 = ephemeral; default {DEFAULT_MCP_HTTP_PORT}).\n\nIf session-dir/--session is omitted, the current working directory is used.\n--demo uses a built-in demo session and cannot be combined with session-dir/--session.\n\n--durable-writes opts into slower, best-effort durable persistence (fsync/sync where supported)."
+        "Usage:\n  {program} [<session-dir>] [--durable-writes] [--mcp-http-port <port>]\n  {program} [--session <dir>] [--durable-writes] [--mcp-http-port <port>]\n  {program} --demo [--mcp-http-port <port>]\n  {program} [<session-dir>] [--durable-writes] --mcp\n  {program} [--session <dir>] [--durable-writes] --mcp\n  {program} --demo --mcp\n  {program} --dump-mcp-tool-schema\n\nTUI mode (default) serves MCP over streamable HTTP at `http://127.0.0.1:<port>/mcp`.\n--mcp-http-port selects the port (0 = ephemeral; default {DEFAULT_MCP_HTTP_PORT}).\n\nIf session-dir/--session is omitted, the current working directory is used.\n--demo uses a built-in demo session and cannot be combined with session-dir/--session.\n\n--dump-mcp-tool-schema prints the stable MCP tool schema snapshot and exits.\n--durable-writes opts into slower, best-effort durable persistence (fsync/sync where supported)."
     );
 }
 
@@ -39,6 +39,7 @@ struct CliOptions {
     session_dir: Option<String>,
     mcp_http_port: Option<u16>,
     durable_writes: bool,
+    dump_mcp_tool_schema: bool,
 }
 
 fn parse_options(mut args: impl Iterator<Item = String>) -> Result<CliOptions, ()> {
@@ -79,6 +80,12 @@ fn parse_options(mut args: impl Iterator<Item = String>) -> Result<CliOptions, (
                 }
                 options.durable_writes = true;
             }
+            "--dump-mcp-tool-schema" => {
+                if options.dump_mcp_tool_schema {
+                    return Err(());
+                }
+                options.dump_mcp_tool_schema = true;
+            }
             _ if arg.starts_with('-') => return Err(()),
             _ => {
                 if options.session_dir.is_some() {
@@ -97,6 +104,16 @@ fn parse_options(mut args: impl Iterator<Item = String>) -> Result<CliOptions, (
         return Err(());
     }
 
+    if options.dump_mcp_tool_schema
+        && (options.mcp
+            || options.demo
+            || options.session_dir.is_some()
+            || options.mcp_http_port.is_some()
+            || options.durable_writes)
+    {
+        return Err(());
+    }
+
     Ok(options)
 }
 
@@ -112,6 +129,11 @@ fn main() {
                 std::process::exit(2);
             }
         };
+
+        if options.dump_mcp_tool_schema {
+            print!("{}", nereid::mcp::NereidMcp::tool_schema_snapshot()?);
+            return Ok(());
+        }
 
         if options.mcp {
             let mcp = if options.demo {
@@ -260,6 +282,15 @@ mod tests {
     }
 
     #[test]
+    fn parses_dump_mcp_tool_schema_flag() {
+        let options = parse_options(["--dump-mcp-tool-schema".to_owned()].into_iter())
+            .expect("parse options");
+        assert!(options.dump_mcp_tool_schema);
+        assert!(!options.mcp);
+        assert!(!options.demo);
+    }
+
+    #[test]
     fn parses_mcp_flag() {
         let options = parse_options(["--mcp".to_owned()].into_iter()).expect("parse options");
         assert!(options.mcp);
@@ -333,6 +364,12 @@ mod tests {
     #[test]
     fn rejects_unknown_args() {
         parse_options(["--nope".to_owned()].into_iter()).unwrap_err();
+    }
+
+    #[test]
+    fn rejects_dump_mcp_tool_schema_with_runtime_options() {
+        parse_options(["--dump-mcp-tool-schema".to_owned(), "--mcp".to_owned()].into_iter())
+            .unwrap_err();
     }
 
     #[test]

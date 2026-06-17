@@ -126,6 +126,21 @@ Tool groups:
 - `queries`: `route.find`, `seq.messages`, `seq.search`, `seq.trace`, `flow.reachable`,
   `flow.paths`, `flow.cycles`, `flow.unreachable`, `flow.dead_ends`, `flow.degrees`
 
+### MCP schema snapshot
+
+The reviewable MCP tool schema snapshot lives at `src/mcp/server/tool_schema.snapshot.json`.
+Regenerate it after changing MCP tool names, descriptions, input schemas, or output schemas:
+
+```sh
+cargo run -- --dump-mcp-tool-schema > src/mcp/server/tool_schema.snapshot.json
+```
+
+The snapshot check runs as part of the MCP server tests and does not require external services:
+
+```sh
+cargo test mcp_tool_schema_snapshot_is_current
+```
+
 Tool schemas (Input/Output):
 
 ### `diagram.get_slice`
