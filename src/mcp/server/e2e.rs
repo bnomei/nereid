@@ -7,6 +7,7 @@
 // Unauthorized copying, modification, or distribution is prohibited.
 
 use super::*;
+use rmcp::handler::server::wrapper::{Json, Parameters};
 
 use crate::model::SessionId;
 use crate::store::SessionFolder;

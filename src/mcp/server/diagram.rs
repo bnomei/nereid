@@ -1,0 +1,1128 @@
+// SPDX-FileCopyrightText: 2026 Bruno Meilick
+// SPDX-License-Identifier: LicenseRef-Nereid-FreeUse-NoCopy-NoDerivatives
+//
+// All rights reserved.
+//
+// This file is part of Nereid and is proprietary software.
+// Unauthorized copying, modification, or distribution is prohibited.
+
+use rmcp::handler::server::wrapper::{Json, Parameters};
+use rmcp::{tool, tool_router};
+
+use crate::format::mermaid::{parse_flowchart, parse_sequence_diagram};
+use crate::model::CategoryPath;
+use crate::ops::apply_ops;
+use crate::render::render_diagram_unicode;
+
+use super::*;
+
+#[tool_router(router = diagram_tool_router, vis = "pub(super)")]
+impl NereidMcp {
+    /// List diagrams in the current session; start here, then call `diagram.current` or
+    /// `diagram.open` (bootstrap with `diagram.create_from_mermaid` if empty).
+    #[tool(name = "diagram.list")]
+    pub(super) async fn diagram_list(&self) -> Result<Json<ListDiagramsResponse>, ErrorData> {
+        let state = self.lock_state_synced().await?;
+        let session_active_diagram_id =
+            state.session.active_diagram_id().map(|diagram_id| diagram_id.as_str().to_owned());
+        let diagrams = state
+            .session
+            .diagrams()
+            .iter()
+            .map(|(diagram_id, diagram)| DiagramSummary {
+                diagram_id: diagram_id.as_str().to_owned(),
+                name: diagram.name().to_owned(),
+                kind: diagram_kind_label(diagram.kind()).to_owned(),
+                rev: diagram.rev(),
+            })
+            .collect::<Vec<_>>();
+        drop(state);
+        let context = self.read_context(session_active_diagram_id).await;
+
+        Ok(Json(ListDiagramsResponse { diagrams, context }))
+    }
+
+    /// Create a diagram from raw Mermaid; use to bootstrap a session, then continue with
+    /// `diagram.open`/`diagram.stat`.
+    #[tool(name = "diagram.create_from_mermaid")]
+    pub(super) async fn diagram_create_from_mermaid(
+        &self,
+        params: Parameters<DiagramCreateFromMermaidParams>,
+    ) -> Result<Json<DiagramCreateFromMermaidResponse>, ErrorData> {
+        let DiagramCreateFromMermaidParams { mermaid, diagram_id, name, make_active } = params.0;
+
+        let Some(kind) = detect_mermaid_kind(&mermaid) else {
+            return Err(ErrorData::invalid_params(
+                "expected 'flowchart'/'graph' or 'sequenceDiagram' as the first non-empty line",
+                None,
+            ));
+        };
+
+        let ast = match kind {
+            DiagramKind::Sequence => {
+                DiagramAst::Sequence(parse_sequence_diagram(&mermaid).map_err(|err| {
+                    ErrorData::invalid_params(
+                        format!("cannot parse Mermaid sequence diagram: {err}"),
+                        None,
+                    )
+                })?)
+            }
+            DiagramKind::Flowchart => {
+                DiagramAst::Flowchart(parse_flowchart(&mermaid).map_err(|err| {
+                    ErrorData::invalid_params(
+                        format!("cannot parse Mermaid flowchart diagram: {err}"),
+                        None,
+                    )
+                })?)
+            }
+        };
+
+        let kind_label = diagram_kind_label(kind).to_owned();
+        let make_active = make_active.unwrap_or(true);
+
+        let mut state = self.lock_state_synced().await?;
+        let diagram_id = match diagram_id {
+            Some(diagram_id) => {
+                let parsed = DiagramId::new(diagram_id.clone()).map_err(|err| {
+                    ErrorData::invalid_params(
+                        format!("invalid diagram_id: {err}"),
+                        Some(serde_json::json!({ "diagram_id": diagram_id })),
+                    )
+                })?;
+                if state.session.diagrams().contains_key(&parsed) {
+                    return Err(ErrorData::invalid_params(
+                        "diagram_id already exists",
+                        Some(serde_json::json!({ "diagram_id": parsed.as_str() })),
+                    ));
+                }
+                parsed
+            }
+            None => allocate_diagram_id(&state.session, kind),
+        };
+
+        let name = name.unwrap_or_else(|| diagram_id.as_str().to_owned());
+        let diagram = Diagram::new(diagram_id.clone(), name.clone(), ast);
+        render_diagram_unicode(&diagram).map_err(|err| {
+            ErrorData::invalid_params(
+                format!("cannot render Mermaid diagram: {err}"),
+                Some(serde_json::json!({
+                    "diagram_id": diagram_id.as_str(),
+                    "kind": kind_label.clone(),
+                    "render_error": err.to_string(),
+                })),
+            )
+        })?;
+
+        if let Some(session_folder) = &self.session_folder {
+            let mut candidate = state.session.clone();
+            candidate.diagrams_mut().insert(diagram_id.clone(), diagram);
+            if make_active {
+                candidate.set_active_diagram_id(Some(diagram_id.clone()));
+            }
+
+            let meta = session_folder.load_meta().map_err(|err| {
+                ErrorData::internal_error(
+                    format!("failed to load session meta: {err}"),
+                    Some(serde_json::json!({ "diagram_id": diagram_id.as_str() })),
+                )
+            })?;
+            candidate.set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
+            session_folder.save_session(&candidate).map_err(|err| {
+                ErrorData::internal_error(
+                    format!("failed to persist session: {err}"),
+                    Some(serde_json::json!({ "diagram_id": diagram_id.as_str() })),
+                )
+            })?;
+
+            state.session = candidate;
+        } else {
+            state.session.diagrams_mut().insert(diagram_id.clone(), diagram);
+            if make_active {
+                state.session.set_active_diagram_id(Some(diagram_id.clone()));
+            }
+        }
+
+        let response = Json(DiagramCreateFromMermaidResponse {
+            diagram: DiagramSummary {
+                diagram_id: diagram_id.as_str().to_owned(),
+                name,
+                kind: kind_label,
+                rev: 0,
+            },
+            active_diagram_id: state
+                .session
+                .active_diagram_id()
+                .map(|diagram_id| diagram_id.as_str().to_owned()),
+        });
+        drop(state);
+        self.notify_ui_session_changed().await;
+        Ok(response)
+    }
+
+    /// Set the active diagram default for diagram-scoped tools; typically follows `diagram.list`
+    /// or `diagram.create_from_mermaid`.
+    #[tool(name = "diagram.open")]
+    pub(super) async fn diagram_open(
+        &self,
+        params: Parameters<DiagramOpenParams>,
+    ) -> Result<Json<DiagramOpenResponse>, ErrorData> {
+        let diagram_id = params.0.diagram_id;
+        let parsed = DiagramId::new(diagram_id.clone()).map_err(|err| {
+            ErrorData::invalid_params(
+                format!("invalid diagram_id: {err}"),
+                Some(serde_json::json!({ "diagram_id": diagram_id })),
+            )
+        })?;
+
+        let mut state = self.lock_state_synced().await?;
+        if !state.session.diagrams().contains_key(&parsed) {
+            return Err(ErrorData::resource_not_found(
+                "diagram not found",
+                Some(serde_json::json!({ "diagram_id": diagram_id })),
+            ));
+        }
+
+        if let Some(session_folder) = &self.session_folder {
+            let mut candidate = state.session.clone();
+            candidate.set_active_diagram_id(Some(parsed.clone()));
+            let meta = session_folder.load_meta().map_err(|err| {
+                ErrorData::internal_error(
+                    format!("failed to load session meta: {err}"),
+                    Some(serde_json::json!({ "diagram_id": diagram_id })),
+                )
+            })?;
+            candidate.set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
+            session_folder.save_session(&candidate).map_err(|err| {
+                ErrorData::internal_error(
+                    format!("failed to persist session: {err}"),
+                    Some(serde_json::json!({ "diagram_id": diagram_id })),
+                )
+            })?;
+            state.session = candidate;
+        } else {
+            state.session.set_active_diagram_id(Some(parsed.clone()));
+        }
+
+        let response = Json(DiagramOpenResponse { active_diagram_id: parsed.as_str().to_owned() });
+        drop(state);
+        self.notify_ui_session_changed().await;
+        Ok(response)
+    }
+
+    /// Remove a diagram by id and retarget active diagram when needed.
+    #[tool(name = "diagram.delete")]
+    pub(super) async fn diagram_delete(
+        &self,
+        params: Parameters<DiagramDeleteParams>,
+    ) -> Result<Json<DiagramDeleteResponse>, ErrorData> {
+        let diagram_id = params.0.diagram_id;
+        let parsed = DiagramId::new(diagram_id.clone()).map_err(|err| {
+            ErrorData::invalid_params(
+                format!("invalid diagram_id: {err}"),
+                Some(serde_json::json!({ "diagram_id": diagram_id })),
+            )
+        })?;
+
+        let mut state = self.lock_state_synced().await?;
+        if !state.session.diagrams().contains_key(&parsed) {
+            return Err(ErrorData::resource_not_found(
+                "diagram not found",
+                Some(serde_json::json!({ "diagram_id": diagram_id })),
+            ));
+        }
+
+        if let Some(session_folder) = &self.session_folder {
+            let mut candidate = state.session.clone();
+            candidate.diagrams_mut().remove(&parsed);
+
+            if candidate.active_diagram_id().is_some_and(|active| active == &parsed) {
+                let next_active = candidate.diagrams().keys().next().cloned();
+                candidate.set_active_diagram_id(next_active);
+            }
+
+            let meta = session_folder.load_meta().map_err(|err| {
+                ErrorData::internal_error(
+                    format!("failed to load session meta: {err}"),
+                    Some(serde_json::json!({ "diagram_id": diagram_id })),
+                )
+            })?;
+            candidate.set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
+            retain_existing_selected_object_refs(&mut candidate);
+            refresh_xref_statuses(&mut candidate);
+
+            session_folder.save_session(&candidate).map_err(|err| {
+                ErrorData::internal_error(
+                    format!("failed to persist session: {err}"),
+                    Some(serde_json::json!({ "diagram_id": diagram_id })),
+                )
+            })?;
+            state.session = candidate;
+        } else {
+            state.session.diagrams_mut().remove(&parsed);
+            if state.session.active_diagram_id().is_some_and(|active| active == &parsed) {
+                let next_active = state.session.diagrams().keys().next().cloned();
+                state.session.set_active_diagram_id(next_active);
+            }
+
+            retain_existing_selected_object_refs(&mut state.session);
+            refresh_xref_statuses(&mut state.session);
+        }
+
+        state.delta_history.remove(&parsed);
+        let active_diagram_id =
+            state.session.active_diagram_id().map(|active| active.as_str().to_owned());
+        drop(state);
+
+        let mut agent_highlights = self.agent_highlights.lock().await;
+        agent_highlights.retain(|object_ref| object_ref.diagram_id() != &parsed);
+
+        let response = Json(DiagramDeleteResponse {
+            deleted_diagram_id: parsed.as_str().to_owned(),
+            active_diagram_id,
+        });
+        self.notify_ui_session_changed().await;
+        Ok(response)
+    }
+
+    /// Get the active diagram id (`null` when unset); check this before deciding whether to call
+    /// `diagram.open`, then continue with `diagram.stat`/`diagram.get_slice`.
+    #[tool(name = "diagram.current")]
+    pub(super) async fn diagram_current(&self) -> Result<Json<DiagramCurrentResponse>, ErrorData> {
+        let state = self.lock_state_synced().await?;
+        let active_diagram_id =
+            state.session.active_diagram_id().map(|diagram_id| diagram_id.as_str().to_owned());
+        drop(state);
+        let context = self.read_context(active_diagram_id.clone()).await;
+
+        Ok(Json(DiagramCurrentResponse { active_diagram_id, context }))
+    }
+    /// Get a compact diagram digest (rev + counts + key names); use as the default first read
+    /// before `diagram.get_slice`, typed queries, or mutation planning.
+    #[tool(name = "diagram.stat")]
+    pub(super) async fn diagram_stat(
+        &self,
+        params: Parameters<DiagramTargetParams>,
+    ) -> Result<Json<DiagramDigest>, ErrorData> {
+        let state = self.lock_state_synced().await?;
+        let session_active_diagram_id =
+            state.session.active_diagram_id().map(|diagram_id| diagram_id.as_str().to_owned());
+        let diagram_id = resolve_diagram_id(&state.session, params.0.diagram_id.as_deref())?;
+        let diagram = state
+            .session
+            .diagrams()
+            .get(&diagram_id)
+            .ok_or_else(|| ErrorData::resource_not_found("diagram not found", None))?;
+        let mut digest = digest_for_diagram(diagram);
+        drop(state);
+        digest.context = self.read_context(session_active_diagram_id).await;
+
+        Ok(Json(digest))
+    }
+
+    /// Read canonical Mermaid snapshot of current diagram AST; use for export/review and
+    /// debugging, not as the default probe.
+    #[tool(name = "diagram.read")]
+    pub(super) async fn diagram_read(
+        &self,
+        params: Parameters<DiagramTargetParams>,
+    ) -> Result<Json<DiagramSnapshot>, ErrorData> {
+        let state = self.lock_state_synced().await?;
+        let session_active_diagram_id =
+            state.session.active_diagram_id().map(|diagram_id| diagram_id.as_str().to_owned());
+        let diagram_id = resolve_diagram_id(&state.session, params.0.diagram_id.as_deref())?;
+        let diagram = state
+            .session
+            .diagrams()
+            .get(&diagram_id)
+            .ok_or_else(|| ErrorData::resource_not_found("diagram not found", None))?;
+        let response = DiagramSnapshot {
+            rev: diagram.rev(),
+            kind: diagram_kind_label(diagram.kind()).to_owned(),
+            mermaid: mermaid_for_diagram(diagram),
+            context: ReadContext::default(),
+        };
+        drop(state);
+        let mut response = response;
+        response.context = self.read_context(session_active_diagram_id).await;
+
+        Ok(Json(response))
+    }
+
+    /// Read full diagram AST for id/label resolution; prefer this over session-file reads.
+    #[tool(name = "diagram.get_ast")]
+    pub(super) async fn diagram_get_ast(
+        &self,
+        params: Parameters<DiagramTargetParams>,
+    ) -> Result<Json<DiagramGetAstResponse>, ErrorData> {
+        let state = self.lock_state_synced().await?;
+        let diagram_id = resolve_diagram_id(&state.session, params.0.diagram_id.as_deref())?;
+        let diagram = state.session.diagrams().get(&diagram_id).ok_or_else(|| {
+            ErrorData::resource_not_found(
+                "diagram not found",
+                Some(serde_json::json!({ "diagram_id": diagram_id.as_str() })),
+            )
+        })?;
+
+        Ok(Json(DiagramGetAstResponse {
+            diagram_id: diagram_id.as_str().to_owned(),
+            kind: diagram_kind_label(diagram.kind()).to_owned(),
+            rev: diagram.rev(),
+            ast: mcp_ast_for_diagram(diagram),
+        }))
+    }
+
+    /// Get deterministic local neighborhood around an `object_ref`; primary probe tool after
+    /// attention/selection or search hits.
+    #[tool(name = "diagram.get_slice")]
+    pub(super) async fn diagram_get_slice(
+        &self,
+        params: Parameters<DiagramGetSliceParams>,
+    ) -> Result<Json<DiagramGetSliceResponse>, ErrorData> {
+        let DiagramGetSliceParams { diagram_id, center_ref, radius, depth, filters } = params.0;
+
+        let requested_diagram_id = diagram_id
+            .as_deref()
+            .map(|diagram_id| {
+                DiagramId::new(diagram_id.to_owned()).map_err(|err| {
+                    ErrorData::invalid_params(
+                        format!("invalid diagram_id: {err}"),
+                        Some(serde_json::json!({ "diagram_id": diagram_id })),
+                    )
+                })
+            })
+            .transpose()?;
+
+        let center_ref_parsed = ObjectRef::parse(&center_ref).map_err(|err| {
+            ErrorData::invalid_params(
+                format!("invalid center_ref: {err}"),
+                Some(serde_json::json!({ "center_ref": center_ref })),
+            )
+        })?;
+
+        if let Some(requested_diagram_id) = requested_diagram_id.as_ref() {
+            if requested_diagram_id != center_ref_parsed.diagram_id() {
+                return Err(ErrorData::invalid_params(
+                    "center_ref diagram_id does not match diagram_id",
+                    Some(serde_json::json!({
+                        "diagram_id": requested_diagram_id.as_str(),
+                        "center_ref_diagram_id": center_ref_parsed.diagram_id().as_str(),
+                    })),
+                ));
+            }
+        }
+
+        let diagram_id =
+            requested_diagram_id.unwrap_or_else(|| center_ref_parsed.diagram_id().clone());
+
+        let depth_u64 = depth.or(radius).unwrap_or(1);
+        let max_hops = usize::try_from(depth_u64).map_err(|_| {
+            ErrorData::invalid_params(
+                "depth is too large",
+                Some(serde_json::json!({ "depth": depth_u64 })),
+            )
+        })?;
+
+        let (include_categories, exclude_categories) = if let Some(filters) = filters.as_ref() {
+            let mut include = BTreeSet::new();
+            if let Some(values) = filters.include_categories.as_ref() {
+                for value in values {
+                    let trimmed = value.trim();
+                    if !trimmed.is_empty() {
+                        include.insert(trimmed.to_owned());
+                    }
+                }
+            }
+            let mut exclude = BTreeSet::new();
+            if let Some(values) = filters.exclude_categories.as_ref() {
+                for value in values {
+                    let trimmed = value.trim();
+                    if !trimmed.is_empty() {
+                        exclude.insert(trimmed.to_owned());
+                    }
+                }
+            }
+            (Some(include), Some(exclude))
+        } else {
+            (None, None)
+        };
+
+        fn bfs_within_radius(
+            adjacency: &BTreeMap<ObjectId, BTreeSet<ObjectId>>,
+            starts: impl IntoIterator<Item = ObjectId>,
+            max_hops: usize,
+        ) -> BTreeSet<ObjectId> {
+            let mut visited: BTreeSet<ObjectId> = BTreeSet::new();
+            let mut queue: VecDeque<(ObjectId, usize)> = VecDeque::new();
+
+            for start in starts {
+                if !adjacency.contains_key(&start) {
+                    continue;
+                }
+                if visited.insert(start.clone()) {
+                    queue.push_back((start, 0));
+                }
+            }
+
+            while let Some((node_id, hops)) = queue.pop_front() {
+                if hops >= max_hops {
+                    continue;
+                }
+                let next_hops = hops.saturating_add(1);
+                for next_id in adjacency.get(&node_id).into_iter().flatten() {
+                    if visited.insert(next_id.clone()) {
+                        queue.push_back((next_id.clone(), next_hops));
+                    }
+                }
+            }
+
+            visited
+        }
+
+        let state = self.lock_state_synced().await?;
+        let diagram = state.session.diagrams().get(&diagram_id).ok_or_else(|| {
+            ErrorData::resource_not_found(
+                "diagram not found",
+                Some(serde_json::json!({ "diagram_id": diagram_id.as_str() })),
+            )
+        })?;
+        let (mut objects, mut edges) = match diagram.ast() {
+            DiagramAst::Flowchart(ast) => {
+                let segments = center_ref_parsed.category().segments();
+                let mut adjacency: BTreeMap<ObjectId, BTreeSet<ObjectId>> = BTreeMap::new();
+                for node_id in ast.nodes().keys() {
+                    adjacency.insert(node_id.clone(), BTreeSet::new());
+                }
+                for edge in ast.edges().values() {
+                    let from = edge.from_node_id();
+                    let to = edge.to_node_id();
+                    if adjacency.contains_key(from) && adjacency.contains_key(to) {
+                        adjacency.get_mut(from).expect("from node exists").insert(to.clone());
+                        adjacency.get_mut(to).expect("to node exists").insert(from.clone());
+                    }
+                }
+
+                let starts: Vec<ObjectId> = match segments {
+                    [a, b] if a.as_str() == "flow" && b.as_str() == "node" => {
+                        let node_id = center_ref_parsed.object_id().clone();
+                        if !ast.nodes().contains_key(&node_id) {
+                            return Err(ErrorData::resource_not_found(
+                                "flow node not found",
+                                Some(serde_json::json!({
+                                    "diagram_id": diagram_id.as_str(),
+                                    "node_id": node_id.as_str(),
+                                })),
+                            ));
+                        }
+                        vec![node_id]
+                    }
+                    [a, b] if a.as_str() == "flow" && b.as_str() == "edge" => {
+                        let edge_id = center_ref_parsed.object_id().clone();
+                        let edge = ast.edges().get(&edge_id).ok_or_else(|| {
+                            ErrorData::resource_not_found(
+                                "flow edge not found",
+                                Some(serde_json::json!({
+                                    "diagram_id": diagram_id.as_str(),
+                                    "edge_id": edge_id.as_str(),
+                                })),
+                            )
+                        })?;
+                        vec![edge.from_node_id().clone(), edge.to_node_id().clone()]
+                    }
+                    _ => {
+                        return Err(ErrorData::invalid_params(
+                            "center_ref is not a flowchart object",
+                            Some(serde_json::json!({ "center_ref": center_ref })),
+                        ));
+                    }
+                };
+
+                let nodes = bfs_within_radius(&adjacency, starts, max_hops);
+                let mut edge_ids: BTreeSet<ObjectId> = BTreeSet::new();
+                for (edge_id, edge) in ast.edges() {
+                    if nodes.contains(edge.from_node_id()) && nodes.contains(edge.to_node_id()) {
+                        edge_ids.insert(edge_id.clone());
+                    }
+                }
+
+                let objects = nodes
+                    .into_iter()
+                    .map(|node_id| format!("d:{}/flow/node/{}", diagram_id.as_str(), node_id))
+                    .collect::<Vec<_>>();
+                let edges = edge_ids
+                    .into_iter()
+                    .map(|edge_id| format!("d:{}/flow/edge/{}", diagram_id.as_str(), edge_id))
+                    .collect::<Vec<_>>();
+                (objects, edges)
+            }
+            DiagramAst::Sequence(ast) => {
+                fn insert_node(
+                    adjacency: &mut BTreeMap<ObjectRef, BTreeSet<ObjectRef>>,
+                    node: ObjectRef,
+                ) {
+                    adjacency.entry(node).or_default();
+                }
+
+                fn insert_edge(
+                    adjacency: &mut BTreeMap<ObjectRef, BTreeSet<ObjectRef>>,
+                    from: ObjectRef,
+                    to: ObjectRef,
+                ) {
+                    adjacency.entry(from).or_default().insert(to);
+                }
+
+                fn bfs_refs(
+                    adjacency: &BTreeMap<ObjectRef, BTreeSet<ObjectRef>>,
+                    starts: impl IntoIterator<Item = ObjectRef>,
+                    max_hops: usize,
+                ) -> BTreeSet<ObjectRef> {
+                    let mut visited: BTreeSet<ObjectRef> = BTreeSet::new();
+                    let mut queue: VecDeque<(ObjectRef, usize)> = VecDeque::new();
+
+                    for start in starts {
+                        if !adjacency.contains_key(&start) {
+                            continue;
+                        }
+                        if visited.insert(start.clone()) {
+                            queue.push_back((start, 0));
+                        }
+                    }
+
+                    while let Some((node, hops)) = queue.pop_front() {
+                        if hops >= max_hops {
+                            continue;
+                        }
+                        let next_hops = hops.saturating_add(1);
+                        for next in adjacency.get(&node).into_iter().flatten() {
+                            if visited.insert(next.clone()) {
+                                queue.push_back((next.clone(), next_hops));
+                            }
+                        }
+                    }
+
+                    visited
+                }
+
+                let seq_participant_category =
+                    CategoryPath::new(vec!["seq".to_owned(), "participant".to_owned()])
+                        .expect("seq participant category");
+                let seq_message_category =
+                    CategoryPath::new(vec!["seq".to_owned(), "message".to_owned()])
+                        .expect("seq message category");
+                let seq_block_category =
+                    CategoryPath::new(vec!["seq".to_owned(), "block".to_owned()])
+                        .expect("seq block category");
+                let seq_section_category =
+                    CategoryPath::new(vec!["seq".to_owned(), "section".to_owned()])
+                        .expect("seq section category");
+
+                let seq_participant_ref = |participant_id: &ObjectId| {
+                    ObjectRef::new(
+                        diagram_id.clone(),
+                        seq_participant_category.clone(),
+                        participant_id.clone(),
+                    )
+                };
+                let seq_message_ref = |message_id: &ObjectId| {
+                    ObjectRef::new(
+                        diagram_id.clone(),
+                        seq_message_category.clone(),
+                        message_id.clone(),
+                    )
+                };
+                let seq_block_ref = |block_id: &ObjectId| {
+                    ObjectRef::new(diagram_id.clone(), seq_block_category.clone(), block_id.clone())
+                };
+                let seq_section_ref = |section_id: &ObjectId| {
+                    ObjectRef::new(
+                        diagram_id.clone(),
+                        seq_section_category.clone(),
+                        section_id.clone(),
+                    )
+                };
+
+                let mut adjacency: BTreeMap<ObjectRef, BTreeSet<ObjectRef>> = BTreeMap::new();
+
+                for participant_id in ast.participants().keys() {
+                    insert_node(&mut adjacency, seq_participant_ref(participant_id));
+                }
+
+                for msg in ast.messages() {
+                    let msg_ref = seq_message_ref(msg.message_id());
+                    let from_ref = seq_participant_ref(msg.from_participant_id());
+                    let to_ref = seq_participant_ref(msg.to_participant_id());
+                    insert_node(&mut adjacency, msg_ref.clone());
+                    insert_node(&mut adjacency, from_ref.clone());
+                    insert_node(&mut adjacency, to_ref.clone());
+                    insert_edge(&mut adjacency, from_ref.clone(), msg_ref.clone());
+                    insert_edge(&mut adjacency, msg_ref.clone(), from_ref);
+                    insert_edge(&mut adjacency, to_ref.clone(), msg_ref.clone());
+                    insert_edge(&mut adjacency, msg_ref, to_ref);
+                }
+
+                fn add_block(
+                    diagram_id: &DiagramId,
+                    block: &crate::model::seq_ast::SequenceBlock,
+                    adjacency: &mut BTreeMap<ObjectRef, BTreeSet<ObjectRef>>,
+                    parent: Option<ObjectRef>,
+                ) {
+                    let seq_block_category =
+                        CategoryPath::new(vec!["seq".to_owned(), "block".to_owned()])
+                            .expect("seq block category");
+                    let seq_section_category =
+                        CategoryPath::new(vec!["seq".to_owned(), "section".to_owned()])
+                            .expect("seq section category");
+                    let seq_message_category =
+                        CategoryPath::new(vec!["seq".to_owned(), "message".to_owned()])
+                            .expect("seq message category");
+
+                    let block_ref = ObjectRef::new(
+                        diagram_id.clone(),
+                        seq_block_category,
+                        block.block_id().clone(),
+                    );
+                    adjacency.entry(block_ref.clone()).or_default();
+
+                    if let Some(parent_ref) = parent.as_ref() {
+                        adjacency.entry(parent_ref.clone()).or_default().insert(block_ref.clone());
+                        adjacency.entry(block_ref.clone()).or_default().insert(parent_ref.clone());
+                    }
+
+                    for section in block.sections() {
+                        let section_ref = ObjectRef::new(
+                            diagram_id.clone(),
+                            seq_section_category.clone(),
+                            section.section_id().clone(),
+                        );
+                        adjacency.entry(section_ref.clone()).or_default();
+                        adjacency.entry(block_ref.clone()).or_default().insert(section_ref.clone());
+                        adjacency.entry(section_ref.clone()).or_default().insert(block_ref.clone());
+
+                        for message_id in section.message_ids() {
+                            let message_ref = ObjectRef::new(
+                                diagram_id.clone(),
+                                seq_message_category.clone(),
+                                message_id.clone(),
+                            );
+                            adjacency.entry(message_ref.clone()).or_default();
+                            adjacency
+                                .entry(section_ref.clone())
+                                .or_default()
+                                .insert(message_ref.clone());
+                            adjacency.entry(message_ref).or_default().insert(section_ref.clone());
+                        }
+                    }
+
+                    for child in block.blocks() {
+                        add_block(diagram_id, child, adjacency, Some(block_ref.clone()));
+                    }
+                }
+
+                for block in ast.blocks() {
+                    add_block(&diagram_id, block, &mut adjacency, None);
+                }
+
+                let segments = center_ref_parsed.category().segments();
+                let starts: Vec<ObjectRef> = match segments {
+                    [a, b] if a.as_str() == "seq" && b.as_str() == "participant" => {
+                        let participant_id = center_ref_parsed.object_id().clone();
+                        if !ast.participants().contains_key(&participant_id) {
+                            return Err(ErrorData::resource_not_found(
+                                "seq participant not found",
+                                Some(serde_json::json!({
+                                    "diagram_id": diagram_id.as_str(),
+                                    "participant_id": participant_id.as_str(),
+                                })),
+                            ));
+                        }
+                        vec![seq_participant_ref(&participant_id)]
+                    }
+                    [a, b] if a.as_str() == "seq" && b.as_str() == "message" => {
+                        let message_id = center_ref_parsed.object_id().clone();
+                        let msg = ast
+                            .messages()
+                            .iter()
+                            .find(|msg| msg.message_id() == &message_id)
+                            .ok_or_else(|| {
+                                ErrorData::resource_not_found(
+                                    "seq message not found",
+                                    Some(serde_json::json!({
+                                        "diagram_id": diagram_id.as_str(),
+                                        "message_id": message_id.as_str(),
+                                    })),
+                                )
+                            })?;
+                        vec![
+                            seq_message_ref(&message_id),
+                            seq_participant_ref(msg.from_participant_id()),
+                            seq_participant_ref(msg.to_participant_id()),
+                        ]
+                    }
+                    [a, b] if a.as_str() == "seq" && b.as_str() == "block" => {
+                        let block_id = center_ref_parsed.object_id().clone();
+                        if ast.find_block(&block_id).is_none() {
+                            return Err(ErrorData::resource_not_found(
+                                "seq block not found",
+                                Some(serde_json::json!({
+                                    "diagram_id": diagram_id.as_str(),
+                                    "block_id": block_id.as_str(),
+                                })),
+                            ));
+                        }
+                        vec![seq_block_ref(&block_id)]
+                    }
+                    [a, b] if a.as_str() == "seq" && b.as_str() == "section" => {
+                        let section_id = center_ref_parsed.object_id().clone();
+                        if ast.find_section(&section_id).is_none() {
+                            return Err(ErrorData::resource_not_found(
+                                "seq section not found",
+                                Some(serde_json::json!({
+                                    "diagram_id": diagram_id.as_str(),
+                                    "section_id": section_id.as_str(),
+                                })),
+                            ));
+                        }
+                        vec![seq_section_ref(&section_id)]
+                    }
+                    _ => {
+                        return Err(ErrorData::invalid_params(
+                            "center_ref is not a sequence diagram object",
+                            Some(serde_json::json!({ "center_ref": center_ref })),
+                        ));
+                    }
+                };
+
+                let visited = bfs_refs(&adjacency, starts, max_hops);
+                let mut objects = Vec::new();
+                let mut edges = Vec::new();
+                for item in visited {
+                    let segments = item.category().segments();
+                    if segments.len() == 2 && segments[0] == "seq" && segments[1] == "message" {
+                        edges.push(item.to_string());
+                    } else {
+                        objects.push(item.to_string());
+                    }
+                }
+
+                (objects, edges)
+            }
+        };
+
+        objects.sort();
+        edges.sort();
+
+        if include_categories.is_some() || exclude_categories.is_some() {
+            fn category_of(ref_str: &str) -> Result<String, ErrorData> {
+                let parsed = ObjectRef::parse(ref_str).map_err(|err| {
+                    ErrorData::invalid_params(
+                        format!("invalid object ref: {err}"),
+                        Some(serde_json::json!({ "object_ref": ref_str })),
+                    )
+                })?;
+                Ok(parsed.category().segments().join("/"))
+            }
+
+            fn filter_refs(
+                refs: Vec<String>,
+                include: &Option<BTreeSet<String>>,
+                exclude: &Option<BTreeSet<String>>,
+            ) -> Result<Vec<String>, ErrorData> {
+                let mut filtered = Vec::with_capacity(refs.len());
+                for value in refs {
+                    let category = category_of(&value)?;
+                    if include
+                        .as_ref()
+                        .is_some_and(|set| !set.is_empty() && !set.contains(&category))
+                    {
+                        continue;
+                    }
+                    if exclude
+                        .as_ref()
+                        .is_some_and(|set| !set.is_empty() && set.contains(&category))
+                    {
+                        continue;
+                    }
+                    filtered.push(value);
+                }
+                Ok(filtered)
+            }
+
+            objects = filter_refs(objects, &include_categories, &exclude_categories)?;
+            edges = filter_refs(edges, &include_categories, &exclude_categories)?;
+        }
+
+        Ok(Json(DiagramGetSliceResponse { objects, edges }))
+    }
+
+    /// Render diagram as deterministic text (Unicode allowed); use for human-readable snapshots
+    /// and review, then return to `diagram.stat`/`diagram.get_slice` for targeted reasoning.
+    #[tool(name = "diagram.render_text")]
+    pub(super) async fn diagram_render_text(
+        &self,
+        params: Parameters<DiagramTargetParams>,
+    ) -> Result<Json<DiagramRenderTextResponse>, ErrorData> {
+        let state = self.lock_state_synced().await?;
+        let session_active_diagram_id =
+            state.session.active_diagram_id().map(|active| active.as_str().to_owned());
+        let diagram_id = resolve_diagram_id(&state.session, params.0.diagram_id.as_deref())?;
+        let diagram = state
+            .session
+            .diagrams()
+            .get(&diagram_id)
+            .ok_or_else(|| ErrorData::resource_not_found("diagram not found", None))?;
+
+        let text = render_diagram_unicode(diagram).map_err(|err| {
+            ErrorData::internal_error(
+                format!("render error: {err}"),
+                Some(serde_json::json!({ "diagram_id": diagram_id.as_str() })),
+            )
+        })?;
+        drop(state);
+        let context = self.read_context(session_active_diagram_id).await;
+
+        Ok(Json(DiagramRenderTextResponse { text, context }))
+    }
+
+    /// Get diagram delta since a revision; default refresh step after `diagram.apply_ops` or
+    /// external changes.
+    #[tool(name = "diagram.diff")]
+    pub(super) async fn diagram_diff(
+        &self,
+        params: Parameters<GetDeltaParams>,
+    ) -> Result<Json<DiagramDeltaResponse>, ErrorData> {
+        let state = self.lock_state_synced().await?;
+        let diagram_id = resolve_diagram_id(&state.session, params.0.diagram_id.as_deref())?;
+        let diagram = state
+            .session
+            .diagrams()
+            .get(&diagram_id)
+            .ok_or_else(|| ErrorData::resource_not_found("diagram not found", None))?;
+
+        let current_rev = diagram.rev();
+        let since_rev = params.0.since_rev;
+        if since_rev > current_rev {
+            return Err(ErrorData::invalid_params(
+                "since_rev must be <= current rev",
+                Some(serde_json::json!({ "since_rev": since_rev, "current_rev": current_rev })),
+            ));
+        }
+
+        if since_rev == current_rev {
+            return Ok(Json(DiagramDeltaResponse {
+                from_rev: current_rev,
+                to_rev: current_rev,
+                changes: Vec::new(),
+            }));
+        }
+
+        let Some(history) = state.delta_history.get(&diagram_id) else {
+            return Err(delta_unavailable(since_rev, current_rev, current_rev));
+        };
+
+        let supported_since_rev = history.front().map(|d| d.from_rev).unwrap_or(current_rev);
+        if since_rev < supported_since_rev {
+            return Err(delta_unavailable(since_rev, current_rev, supported_since_rev));
+        }
+
+        let Some(delta) = delta_response_from_history(history, since_rev, current_rev) else {
+            return Err(delta_unavailable(since_rev, current_rev, supported_since_rev));
+        };
+
+        Ok(Json(delta))
+    }
+
+    /// Apply structured diagram ops gated by `base_rev`; prefer `diagram.propose_ops` first, then
+    /// refresh with `diagram.diff`.
+    #[tool(name = "diagram.apply_ops")]
+    pub(super) async fn diagram_apply_ops(
+        &self,
+        params: Parameters<ApplyOpsParams>,
+    ) -> Result<Json<ApplyOpsResponse>, ErrorData> {
+        let mut state = self.lock_state_synced().await?;
+        let diagram_id = resolve_diagram_id(&state.session, params.0.diagram_id.as_deref())?;
+        let diagram = state
+            .session
+            .diagrams()
+            .get(&diagram_id)
+            .ok_or_else(|| ErrorData::resource_not_found("diagram not found", None))?;
+
+        let ops = params.0.ops.iter().map(mcp_op_to_internal).collect::<Result<Vec<_>, _>>()?;
+
+        let base_rev = params.0.base_rev;
+        let current_rev = diagram.rev();
+        if base_rev != current_rev {
+            let digest = digest_for_diagram(diagram);
+            return Err(ErrorData::invalid_request(
+                "conflict: stale base_rev",
+                Some(serde_json::json!({
+                    "base_rev": base_rev,
+                    "current_rev": current_rev,
+                    "snapshot_tool": "diagram.stat",
+                    "digest": {
+                        "rev": digest.rev,
+                        "counts": {
+                            "participants": digest.counts.participants,
+                            "messages": digest.counts.messages,
+                            "nodes": digest.counts.nodes,
+                            "edges": digest.counts.edges,
+                        },
+                        "key_names": digest.key_names,
+                    },
+                })),
+            ));
+        }
+
+        if let Some(session_folder) = &self.session_folder {
+            let mut candidate_session = state.session.clone();
+            let mut candidate_diagram = candidate_session
+                .diagrams()
+                .get(&diagram_id)
+                .cloned()
+                .ok_or_else(|| ErrorData::resource_not_found("diagram not found", None))?;
+
+            let result =
+                apply_ops(&mut candidate_diagram, base_rev, &ops).map_err(map_apply_error)?;
+            render_diagram_unicode(&candidate_diagram).map_err(|err| {
+                ErrorData::invalid_request(
+                    format!("cannot render diagram after apply_ops: {err}"),
+                    Some(serde_json::json!({
+                        "diagram_id": diagram_id.as_str(),
+                        "base_rev": base_rev,
+                        "op_count": ops.len() as u64,
+                        "render_error": err.to_string(),
+                    })),
+                )
+            })?;
+            candidate_session.diagrams_mut().insert(diagram_id.clone(), candidate_diagram);
+
+            let mut history =
+                state.delta_history.get(&diagram_id).cloned().unwrap_or_else(VecDeque::new);
+            history.push_back(LastDelta {
+                from_rev: base_rev,
+                to_rev: result.new_rev,
+                delta: result.delta.clone(),
+            });
+            while history.len() > DELTA_HISTORY_LIMIT {
+                history.pop_front();
+            }
+
+            let meta = session_folder.load_meta().map_err(|err| {
+                ErrorData::internal_error(
+                    format!("failed to load session meta: {err}"),
+                    Some(serde_json::json!({ "diagram_id": diagram_id.as_str(), "base_rev": base_rev })),
+                )
+            })?;
+            candidate_session
+                .set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
+            session_folder.save_session(&candidate_session).map_err(|err| {
+                ErrorData::internal_error(
+                    format!("failed to persist session: {err}"),
+                    Some(serde_json::json!({ "diagram_id": diagram_id.as_str(), "base_rev": base_rev })),
+                )
+            })?;
+
+            state.session = candidate_session;
+            state.delta_history.insert(diagram_id, history);
+
+            let response = Json(ApplyOpsResponse {
+                new_rev: result.new_rev,
+                applied: result.applied as u64,
+                delta: DeltaSummary {
+                    added: result.delta.added.iter().map(ToString::to_string).collect(),
+                    removed: result.delta.removed.iter().map(ToString::to_string).collect(),
+                    updated: result.delta.updated.iter().map(ToString::to_string).collect(),
+                },
+            });
+            drop(state);
+            self.notify_ui_session_changed().await;
+            return Ok(response);
+        }
+
+        let mut candidate_diagram = state
+            .session
+            .diagrams()
+            .get(&diagram_id)
+            .cloned()
+            .ok_or_else(|| ErrorData::resource_not_found("diagram not found", None))?;
+
+        let result = apply_ops(&mut candidate_diagram, base_rev, &ops).map_err(map_apply_error)?;
+        render_diagram_unicode(&candidate_diagram).map_err(|err| {
+            ErrorData::invalid_request(
+                format!("cannot render diagram after apply_ops: {err}"),
+                Some(serde_json::json!({
+                    "diagram_id": diagram_id.as_str(),
+                    "base_rev": base_rev,
+                    "op_count": ops.len() as u64,
+                    "render_error": err.to_string(),
+                })),
+            )
+        })?;
+        state.session.diagrams_mut().insert(diagram_id.clone(), candidate_diagram);
+        let history = state.delta_history.entry(diagram_id).or_insert_with(VecDeque::new);
+        history.push_back(LastDelta {
+            from_rev: base_rev,
+            to_rev: result.new_rev,
+            delta: result.delta.clone(),
+        });
+        while history.len() > DELTA_HISTORY_LIMIT {
+            history.pop_front();
+        }
+
+        let response = Json(ApplyOpsResponse {
+            new_rev: result.new_rev,
+            applied: result.applied as u64,
+            delta: DeltaSummary {
+                added: result.delta.added.iter().map(ToString::to_string).collect(),
+                removed: result.delta.removed.iter().map(ToString::to_string).collect(),
+                updated: result.delta.updated.iter().map(ToString::to_string).collect(),
+            },
+        });
+        drop(state);
+        self.notify_ui_session_changed().await;
+        Ok(response)
+    }
+
+    /// Validate ops against `base_rev` and return predicted delta without mutation; use immediately
+    /// before `diagram.apply_ops` for safe human-agent collaboration.
+    #[tool(name = "diagram.propose_ops")]
+    pub(super) async fn diagram_propose_ops(
+        &self,
+        params: Parameters<DiagramProposeOpsParams>,
+    ) -> Result<Json<DiagramProposeOpsResponse>, ErrorData> {
+        let state = self.lock_state_synced().await?;
+        let diagram_id = resolve_diagram_id(&state.session, params.0.diagram_id.as_deref())?;
+
+        let diagram = state
+            .session
+            .diagrams()
+            .get(&diagram_id)
+            .ok_or_else(|| ErrorData::resource_not_found("diagram not found", None))?;
+
+        let ops = params.0.ops.iter().map(mcp_op_to_internal).collect::<Result<Vec<_>, _>>()?;
+
+        let base_rev = params.0.base_rev;
+
+        let mut candidate = diagram.clone();
+        let result = apply_ops(&mut candidate, base_rev, &ops).map_err(map_apply_error)?;
+        render_diagram_unicode(&candidate).map_err(|err| {
+            ErrorData::invalid_request(
+                format!("cannot render diagram after propose_ops: {err}"),
+                Some(serde_json::json!({
+                    "diagram_id": diagram_id.as_str(),
+                    "base_rev": base_rev,
+                    "op_count": ops.len() as u64,
+                    "render_error": err.to_string(),
+                })),
+            )
+        })?;
+
+        Ok(Json(DiagramProposeOpsResponse {
+            new_rev: result.new_rev,
+            applied: result.applied as u64,
+            delta: DeltaSummary {
+                added: result.delta.added.iter().map(ToString::to_string).collect(),
+                removed: result.delta.removed.iter().map(ToString::to_string).collect(),
+                updated: result.delta.updated.iter().map(ToString::to_string).collect(),
+            },
+        }))
+    }
+}

@@ -7,12 +7,15 @@
 // Unauthorized copying, modification, or distribution is prohibited.
 
 use super::*;
+use rmcp::handler::server::wrapper::{Json, Parameters};
+
 use crate::model::{
     seq_ast::{SequenceBlock, SequenceBlockKind, SequenceSection, SequenceSectionKind},
     DiagramAst, FlowEdge, FlowNode, FlowchartAst, ObjectRef, SequenceAst, SequenceMessage,
     SequenceMessageKind, SequenceParticipant, SessionId, Walkthrough, WalkthroughEdge,
     WalkthroughId, WalkthroughNode, WalkthroughNodeId, XRef, XRefId, XRefStatus,
 };
+use crate::render::render_diagram_unicode;
 use std::str::FromStr;
 
 fn temp_session_dir(test_name: &str) -> std::path::PathBuf {

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-06-17
+- Improved manual CLI parser help, version output, and actionable parse errors.
+- Added a reviewable MCP tool schema snapshot and snapshot freshness test.
+- Split the MCP server implementation into tool-group modules.
+- Refreshed README metadata badges, installation links, and license wording.
+- Clarified source-available noncommercial license terms in package metadata and release scripts.
+
 ## [0.3.0] - 2026-05-09
 - Added the dedicated Notes pane.
 - Updated Cargo dependencies.
