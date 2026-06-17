@@ -545,10 +545,7 @@ fn validate_legacy_persisted_id_segment(
     segment: &str,
 ) -> Result<(), StoreError> {
     if segment.contains('/') || segment.contains('\\') {
-        return Err(StoreError::InvalidRelativePath {
-            field,
-            value: PathBuf::from(segment),
-        });
+        return Err(StoreError::InvalidRelativePath { field, value: PathBuf::from(segment) });
     }
 
     Ok(())
@@ -925,11 +922,8 @@ impl SessionFolder {
             });
         }
 
-        let canonical_walkthroughs_dir =
-            fs::canonicalize(&walkthroughs_dir).map_err(|source| StoreError::Io {
-                path: walkthroughs_dir.clone(),
-                source,
-            })?;
+        let canonical_walkthroughs_dir = fs::canonicalize(&walkthroughs_dir)
+            .map_err(|source| StoreError::Io { path: walkthroughs_dir.clone(), source })?;
         let entries = match fs::read_dir(&walkthroughs_dir) {
             Ok(entries) => entries,
             Err(source) if source.kind() == io::ErrorKind::NotFound => return Ok(()),
@@ -939,15 +933,12 @@ impl SessionFolder {
         };
 
         for entry in entries {
-            let entry = entry.map_err(|source| StoreError::Io {
-                path: walkthroughs_dir.clone(),
-                source,
-            })?;
+            let entry = entry
+                .map_err(|source| StoreError::Io { path: walkthroughs_dir.clone(), source })?;
             let path = entry.path();
-            let file_type = entry.file_type().map_err(|source| StoreError::Io {
-                path: path.clone(),
-                source,
-            })?;
+            let file_type = entry
+                .file_type()
+                .map_err(|source| StoreError::Io { path: path.clone(), source })?;
             if !file_type.is_file() {
                 continue;
             }
@@ -965,10 +956,8 @@ impl SessionFolder {
                 continue;
             }
 
-            let canonical_path = fs::canonicalize(&path).map_err(|source| StoreError::Io {
-                path: path.clone(),
-                source,
-            })?;
+            let canonical_path = fs::canonicalize(&path)
+                .map_err(|source| StoreError::Io { path: path.clone(), source })?;
             if !canonical_path.starts_with(&canonical_walkthroughs_dir) {
                 return Err(StoreError::PathOutsideSession {
                     session_dir: canonical_walkthroughs_dir.clone(),
