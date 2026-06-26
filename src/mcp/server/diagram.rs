@@ -1019,8 +1019,11 @@ impl NereidMcp {
                 )
             })?;
             candidate_session.diagrams_mut().insert(diagram_id.clone(), candidate_diagram);
-            // Ops may remove objects that xrefs point at; recompute xref status so xref.list
-            // reflects dangling endpoints, matching diagram.delete and the disk-load path.
+            // Ops may remove objects that the selection or xrefs reference. Prune dangling
+            // selection entries and recompute xref status before persisting, so the saved meta
+            // never lists removed refs and xref.list reflects dangling endpoints. Matches
+            // diagram.delete and the disk-load path.
+            retain_existing_selected_object_refs(&mut candidate_session);
             refresh_xref_statuses(&mut candidate_session);
 
             let mut history =
@@ -1078,8 +1081,9 @@ impl NereidMcp {
             )
         })?;
         state.session.diagrams_mut().insert(diagram_id.clone(), candidate_diagram);
-        // Ops may remove objects that xrefs point at; recompute xref status so xref.list
-        // reflects dangling endpoints, matching diagram.delete and the disk-load path.
+        // Ops may remove objects that the selection or xrefs reference; prune dangling selection
+        // entries and recompute xref status, matching diagram.delete and the disk-load path.
+        retain_existing_selected_object_refs(&mut state.session);
         refresh_xref_statuses(&mut state.session);
         let history = state.delta_history.entry(diagram_id).or_insert_with(VecDeque::new);
         history.push_back(LastDelta {

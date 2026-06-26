@@ -4078,6 +4078,47 @@ async fn diagram_open_persists_to_session_folder() {
 }
 
 #[tokio::test]
+async fn diagram_apply_ops_prunes_dangling_selection_from_persisted_meta() {
+    let dir = temp_session_dir("mcp-apply-ops-prune-selection");
+    let dir_str = dir.to_string_lossy().to_string();
+    let folder = SessionFolder::new(dir_str.clone());
+
+    // Select two existing flow nodes, then persist.
+    let mut session = demo_session();
+    let ref_a = ObjectRef::from_str("d:d-flow/flow/node/n:a").expect("object ref");
+    let ref_b = ObjectRef::from_str("d:d-flow/flow/node/n:b").expect("object ref");
+    session.set_selected_object_refs([ref_a.clone(), ref_b.clone()].into_iter().collect());
+    folder.save_session(&session).expect("save session");
+
+    let server = NereidMcp::new_persistent(session, folder);
+
+    // Remove n:a; its selection ref now dangles while n:b remains valid.
+    server
+        .diagram_apply_ops(Parameters(ApplyOpsParams {
+            diagram_id: Some("d-flow".into()),
+            base_rev: 0,
+            ops: vec![McpOp::FlowRemoveNode { node_id: "n:a".into() }],
+        }))
+        .await
+        .expect("apply ops");
+
+    let loaded = SessionFolder::new(dir_str).load_session().expect("load session");
+    let refs = loaded
+        .selected_object_refs()
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>();
+    assert!(
+        refs.iter().any(|r| r == "d:d-flow/flow/node/n:b"),
+        "selection ref to surviving node must be retained: {refs:?}",
+    );
+    assert!(
+        !refs.iter().any(|r| r == "d:d-flow/flow/node/n:a"),
+        "dangling selection ref to removed node must be pruned from persisted meta: {refs:?}",
+    );
+}
+
+#[tokio::test]
 async fn diagram_current_refreshes_from_session_folder() {
     let dir = temp_session_dir("mcp-refresh-current-diagram");
     let dir_str = dir.to_string_lossy().to_string();
