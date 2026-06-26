@@ -906,13 +906,19 @@ impl SessionFolder {
             }
         }
 
+        // Commit the meta index (the record of truth) BEFORE deleting any walkthrough files.
+        // If meta write fails, no files have been removed yet, so the prior meta still matches
+        // on-disk files. If GC then fails, the orphaned file is no longer referenced by meta, so
+        // the session remains loadable. Deleting before the meta commit would instead leave meta
+        // pointing at files that no longer exist.
+        self.save_meta(&meta)?;
+
         if !skip_walkthrough_gc {
             if let Some(walkthrough_ids) = meta.walkthrough_ids.as_deref() {
                 self.garbage_collect_walkthrough_files(walkthrough_ids)?;
             }
         }
 
-        self.save_meta(&meta)?;
         Ok(())
     }
 

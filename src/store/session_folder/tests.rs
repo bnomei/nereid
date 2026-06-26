@@ -793,6 +793,52 @@ fn legacy_meta_without_walkthrough_ids_scans_directory(ctx: SessionFolderTestCtx
     assert!(loaded.walkthroughs().contains_key(&w1));
 }
 
+// Regression: walkthrough GC must run only after the meta index is committed. If the meta
+// write fails, the removed walkthrough's file must still exist so the prior meta stays loadable.
+// A symlinked meta file makes the atomic meta write fail (SymlinkRefused) while remaining
+// readable through the symlink, deterministically exercising the failure path.
+#[cfg(unix)]
+#[rstest]
+fn save_session_keeps_removed_walkthrough_loadable_when_meta_commit_fails(
+    ctx: SessionFolderTestCtx,
+) {
+    let folder = &ctx.folder;
+
+    let mut session = Session::new(SessionId::new("s1").unwrap());
+    let w1 = WalkthroughId::new("w:1").unwrap();
+    let w2 = WalkthroughId::new("w:2").unwrap();
+    session.walkthroughs_mut().insert(w1.clone(), Walkthrough::new(w1.clone(), "One"));
+    session.walkthroughs_mut().insert(w2.clone(), Walkthrough::new(w2.clone(), "Two"));
+    folder.save_session(&session).unwrap();
+
+    let w2_path = folder.walkthrough_json_path(&w2);
+    assert!(w2_path.is_file(), "precondition: w2 file written");
+
+    // Turn the meta file into a symlink: load_meta still reads through it, but the atomic
+    // meta write refuses to overwrite a symlink, so the upcoming save_meta will fail.
+    let meta_path = folder.meta_path();
+    let backing = folder.root().join("nereid-session.meta.json.backing");
+    std::fs::rename(&meta_path, &backing).unwrap();
+    std::os::unix::fs::symlink(&backing, &meta_path).unwrap();
+
+    // Remove w2 and save. The meta commit fails before GC, so w2's file must survive.
+    session.walkthroughs_mut().remove(&w2);
+    let err = folder.save_session(&session).unwrap_err();
+    match err {
+        StoreError::SymlinkRefused { .. } => {}
+        other => panic!("expected SymlinkRefused from meta write, got: {other:?}"),
+    }
+
+    assert!(
+        w2_path.is_file(),
+        "removed walkthrough file must not be deleted before the meta commit succeeds",
+    );
+
+    // The session still loads consistently from the prior (unchanged) meta.
+    let loaded = folder.load_session().unwrap();
+    assert!(loaded.walkthroughs().contains_key(&w2));
+}
+
 #[test]
 fn walkthrough_rev_is_capped_on_load() {
     let walkthrough = super::walkthrough_from_json(super::WalkthroughJson {
