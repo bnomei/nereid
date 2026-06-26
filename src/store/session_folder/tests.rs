@@ -267,8 +267,12 @@ fn save_active_diagram_id_does_not_drop_concurrent_save_session_additions(
 
     let writer_folder = ctx.folder.clone();
     let patcher_folder = ctx.folder.clone();
-    let barrier = Arc::new(Barrier::new(2));
+    let observer_folder = ctx.folder.clone();
+    let barrier = Arc::new(Barrier::new(3));
     let writer_barrier = barrier.clone();
+    let observer_barrier = barrier.clone();
+    let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let observer_done = done.clone();
 
     // Writer thread: cumulatively grows the session, adding one diagram per save_session.
     let writer = std::thread::spawn(move || {
@@ -292,8 +296,26 @@ fn save_active_diagram_id_does_not_drop_concurrent_save_session_additions(
         }
     });
 
+    // Observer thread: the writer only ever adds diagrams, so the indexed count must be
+    // monotonically non-decreasing. A stale partial write that drops a diagram is caught here
+    // as a transient decrease, making the regression deterministic rather than end-state only.
+    let observer = std::thread::spawn(move || {
+        observer_barrier.wait();
+        let mut high_water = 0usize;
+        while !observer_done.load(std::sync::atomic::Ordering::Relaxed) {
+            let count = observer_folder.load_meta().unwrap().diagrams.len();
+            assert!(
+                count >= high_water,
+                "meta diagram count dropped from {high_water} to {count} during concurrent saves",
+            );
+            high_water = count;
+        }
+    });
+
     writer.join().unwrap();
     patcher.join().unwrap();
+    done.store(true, std::sync::atomic::Ordering::Relaxed);
+    observer.join().unwrap();
 
     // Every diagram the writer added must still be indexed in meta (none orphaned).
     let meta = ctx.folder.load_meta().unwrap();
