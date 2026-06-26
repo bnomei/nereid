@@ -201,6 +201,14 @@ impl NereidMcp {
         Ok(state)
     }
 
+    /// Drop agent spotlight refs that no longer resolve to an object in `session`. Mirrors the
+    /// pruning `diagram.delete` performs, but for individual object removals (e.g. via
+    /// `diagram.apply_ops`), so `attention.agent.read` never returns refs to missing objects.
+    async fn prune_missing_agent_highlights(&self, session: &Session) {
+        let mut agent_highlights = self.agent_highlights.lock().await;
+        agent_highlights.retain(|object_ref| !object_ref_is_missing(session, object_ref));
+    }
+
     fn sync_state_with_session_folder(
         &self,
         state: &mut McpState,

@@ -1056,6 +1056,9 @@ impl NereidMcp {
                     updated: result.delta.updated.iter().map(ToString::to_string).collect(),
                 },
             });
+            // Ops may have removed an object the agent spotlight points at; drop stale highlights
+            // so attention.agent.read does not return missing refs, mirroring diagram.delete.
+            self.prune_missing_agent_highlights(&state.session).await;
             drop(state);
             self.notify_ui_session_changed().await;
             return Ok(response);
@@ -1104,6 +1107,9 @@ impl NereidMcp {
                 updated: result.delta.updated.iter().map(ToString::to_string).collect(),
             },
         });
+        // Ops may have removed an object the agent spotlight points at; drop stale highlights
+        // so attention.agent.read does not return missing refs, mirroring diagram.delete.
+        self.prune_missing_agent_highlights(&state.session).await;
         drop(state);
         self.notify_ui_session_changed().await;
         Ok(response)

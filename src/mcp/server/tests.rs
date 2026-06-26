@@ -782,6 +782,35 @@ async fn attention_agent_set_read_clear_validates_refs() {
 }
 
 #[tokio::test]
+async fn diagram_apply_ops_prunes_agent_spotlight_for_removed_object() {
+    // attention.agent.set validates existence on write; the spotlight must not survive as a
+    // dangling ref when apply_ops later removes its target object, mirroring diagram.delete.
+    let server = NereidMcp::new(demo_session());
+
+    server
+        .attention_agent_set(Parameters(AttentionAgentSetParams {
+            object_ref: "d:d-flow/flow/node/n:a".to_owned(),
+        }))
+        .await
+        .expect("set spotlight");
+
+    server
+        .diagram_apply_ops(Parameters(ApplyOpsParams {
+            diagram_id: Some("d-flow".into()),
+            base_rev: 0,
+            ops: vec![McpOp::FlowRemoveNode { node_id: "n:a".into() }],
+        }))
+        .await
+        .expect("apply ops");
+
+    let Json(read) = server.attention_agent_read().await.expect("attention.agent.read");
+    assert_eq!(
+        read.object_ref, None,
+        "agent spotlight must be pruned once apply_ops removes its target object",
+    );
+}
+
+#[tokio::test]
 async fn attention_agent_set_overwrites_previous_value() {
     let server = NereidMcp::new(demo_session());
 
