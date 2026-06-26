@@ -782,6 +782,39 @@ fn enabling_follow_ai_jumps_to_agent_highlight_diagram() {
     assert_eq!(app.selected_ref(), Some(&target));
 }
 
+// Regression: while follow-AI tracks the agent spotlight, the viewport shows the followed target,
+// so UiState human-attention fields (read by attention.human.read) must reflect it rather than
+// the stale pre-follow selection.
+#[test]
+fn follow_ai_publishes_followed_target_as_human_attention() {
+    use crate::ui::UiState;
+    use std::sync::Arc;
+    use tokio::sync::Mutex;
+
+    let ui_state = Arc::new(Mutex::new(UiState::default()));
+    let mut app = App::new(demo_session());
+    app.ui_state = Some(ui_state.clone());
+
+    let target: ObjectRef = "d:demo-seq/seq/participant/p:alice".parse().expect("object ref");
+    app.agent_highlights.blocking_lock().insert(target.clone());
+    app.follow_ai = true;
+
+    app.sync_from_ui_state();
+
+    assert_eq!(app.selected_ref(), Some(&target), "viewport should follow the agent target");
+
+    let ui = ui_state.blocking_lock();
+    assert_eq!(
+        ui.human_active_object_ref(),
+        Some(&target),
+        "human attention must reflect the followed target during follow-AI",
+    );
+    assert_eq!(
+        ui.human_active_diagram_id().map(ToString::to_string).as_deref(),
+        Some("demo-seq"),
+    );
+}
+
 #[test]
 fn sync_ignores_agent_highlight_when_follow_ai_is_disabled() {
     let mut app = App::new(demo_session());
