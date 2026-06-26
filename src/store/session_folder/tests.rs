@@ -238,6 +238,76 @@ fn save_active_diagram_id_updates_meta_and_loads_back(ctx: SessionFolderTestCtx)
     assert_eq!(loaded.active_diagram_id(), Some(&d2));
 }
 
+// Regression: a partial meta update (`save_active_diagram_id`) and a full `save_session` that
+// adds diagrams run concurrently against clones of the same folder. The meta index must never
+// list fewer diagrams than have `.mmd` files on disk — i.e. the partial update must not drop
+// additions made by a concurrent full save. Without serialization the load-modify-save in
+// `save_active_diagram_id` races `save_session` and orphans freshly written diagram files.
+#[rstest]
+fn save_active_diagram_id_does_not_drop_concurrent_save_session_additions(
+    ctx: SessionFolderTestCtx,
+) {
+    use std::sync::Arc;
+    use std::sync::Barrier;
+
+    const DIAGRAMS: usize = 60;
+
+    fn diagram(id: &DiagramId, node: &str) -> Diagram {
+        let mut ast = FlowchartAst::default();
+        ast.nodes_mut().insert(ObjectId::new(node).unwrap(), FlowNode::new("N"));
+        Diagram::new(id.clone(), "D", DiagramAst::Flowchart(ast))
+    }
+
+    // Seed an initial session containing the first diagram.
+    let mut session = Session::new(SessionId::new("s:concurrent").unwrap());
+    let first = DiagramId::new("d-000").unwrap();
+    session.diagrams_mut().insert(first.clone(), diagram(&first, "n:000"));
+    session.set_active_diagram_id(Some(first));
+    ctx.folder.save_session(&session).unwrap();
+
+    let writer_folder = ctx.folder.clone();
+    let patcher_folder = ctx.folder.clone();
+    let barrier = Arc::new(Barrier::new(2));
+    let writer_barrier = barrier.clone();
+
+    // Writer thread: cumulatively grows the session, adding one diagram per save_session.
+    let writer = std::thread::spawn(move || {
+        writer_barrier.wait();
+        let mut session = session;
+        for i in 1..DIAGRAMS {
+            let id = DiagramId::new(format!("d-{i:03}")).unwrap();
+            session.diagrams_mut().insert(id.clone(), diagram(&id, &format!("n:{i:03}")));
+            session.set_active_diagram_id(Some(id));
+            writer_folder.save_session(&session).unwrap();
+        }
+    });
+
+    // Patcher thread: repeatedly rewrites only the active-diagram field, reloading the on-disk
+    // session each time so it patches whatever meta currently exists.
+    let patcher = std::thread::spawn(move || {
+        barrier.wait();
+        for _ in 0..DIAGRAMS * 4 {
+            let on_disk = patcher_folder.load_session().unwrap();
+            patcher_folder.save_active_diagram_id(&on_disk).unwrap();
+        }
+    });
+
+    writer.join().unwrap();
+    patcher.join().unwrap();
+
+    // Every diagram the writer added must still be indexed in meta (none orphaned).
+    let meta = ctx.folder.load_meta().unwrap();
+    let indexed: std::collections::BTreeSet<_> =
+        meta.diagrams.iter().map(|d| d.diagram_id.clone()).collect();
+    for i in 0..DIAGRAMS {
+        let id = DiagramId::new(format!("d-{i:03}")).unwrap();
+        assert!(indexed.contains(&id), "diagram {id} missing from meta index after concurrent saves");
+    }
+    // And the session loads all of them back.
+    let loaded = ctx.folder.load_session().unwrap();
+    assert_eq!(loaded.diagrams().len(), DIAGRAMS);
+}
+
 #[rstest]
 fn save_diagram_meta_stores_relative_paths_and_load_resolves_them(ctx: SessionFolderTestCtx) {
     let session_dir = &ctx.session_dir;

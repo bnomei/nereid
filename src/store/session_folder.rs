@@ -507,6 +507,12 @@ pub enum XRefStatus {
 pub struct SessionFolder {
     root: PathBuf,
     durability: WriteDurability,
+    /// Serializes session-meta read-modify-write sequences so that a partial meta update
+    /// (`save_selected_object_refs`/`save_active_diagram_id`) cannot drop diagrams/walkthroughs
+    /// added by a concurrent `save_session`. Shared across clones of the same folder (e.g. the
+    /// TUI and MCP server holding clones of one `SessionFolder`), so it serializes the in-process
+    /// writers that actually race here.
+    meta_lock: Arc<Mutex<()>>,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -598,7 +604,17 @@ fn is_windows_device_name(base: &str) -> bool {
 
 impl SessionFolder {
     pub fn new(root: impl Into<PathBuf>) -> Self {
-        Self { root: root.into(), durability: WriteDurability::default() }
+        Self {
+            root: root.into(),
+            durability: WriteDurability::default(),
+            meta_lock: Arc::new(Mutex::new(())),
+        }
+    }
+
+    /// Acquire the session-meta write lock, recovering from poisoning (a panic in a prior
+    /// critical section leaves the `()` payload intact, so the lock is safe to keep using).
+    fn lock_meta(&self) -> std::sync::MutexGuard<'_, ()> {
+        self.meta_lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     pub fn with_durability(mut self, durability: WriteDurability) -> Self {
@@ -716,6 +732,12 @@ impl SessionFolder {
     }
 
     pub fn save_session(&self, session: &Session) -> Result<(), StoreError> {
+        let _guard = self.lock_meta();
+        self.save_session_locked(session)
+    }
+
+    /// Body of [`Self::save_session`], assuming the caller already holds the meta lock.
+    fn save_session_locked(&self, session: &Session) -> Result<(), StoreError> {
         #[derive(Debug, Deserialize)]
         struct WalkthroughRevJson {
             #[serde(default)]
@@ -1153,6 +1175,9 @@ impl SessionFolder {
     }
 
     pub fn save_selected_object_refs(&self, session: &Session) -> Result<(), StoreError> {
+        // Hold the meta lock across the load-modify-save so a concurrent `save_session`
+        // cannot interleave and have its diagram/walkthrough additions dropped here.
+        let _guard = self.lock_meta();
         match self.load_meta() {
             Ok(mut meta) => {
                 meta.selected_object_refs =
@@ -1161,13 +1186,16 @@ impl SessionFolder {
                 Ok(())
             }
             Err(StoreError::Io { source, .. }) if source.kind() == io::ErrorKind::NotFound => {
-                self.save_session(session)
+                self.save_session_locked(session)
             }
             Err(err) => Err(err),
         }
     }
 
     pub fn save_active_diagram_id(&self, session: &Session) -> Result<(), StoreError> {
+        // Hold the meta lock across the load-modify-save so a concurrent `save_session`
+        // cannot interleave and have its diagram/walkthrough additions dropped here.
+        let _guard = self.lock_meta();
         match self.load_meta() {
             Ok(mut meta) => {
                 meta.active_diagram_id = session.active_diagram_id().cloned();
@@ -1175,7 +1203,7 @@ impl SessionFolder {
                 Ok(())
             }
             Err(StoreError::Io { source, .. }) if source.kind() == io::ErrorKind::NotFound => {
-                self.save_session(session)
+                self.save_session_locked(session)
             }
             Err(err) => Err(err),
         }
