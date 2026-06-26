@@ -10,11 +10,12 @@ use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::fmt;
 use std::fs;
+use std::fs::OpenOptions;
 use std::io;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
@@ -37,6 +38,9 @@ use crate::render::{
 
 const SESSION_META_FILENAME: &str = "nereid-session.meta.json";
 const LEGACY_SESSION_META_FILENAME: &str = "session.meta.json";
+const SESSION_WRITE_LOCK_FILENAME: &str = ".nereid-session.write.lock";
+const SESSION_WRITE_LOCK_RETRY_DELAY: Duration = Duration::from_millis(10);
+const SESSION_WRITE_LOCK_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Debug)]
 enum AsciiExportTask {
@@ -293,6 +297,9 @@ pub enum StoreError {
     SymlinkRefused {
         path: PathBuf,
     },
+    SessionWriteLockTimeout {
+        path: PathBuf,
+    },
     /// The session meta index is missing but diagram artifacts already exist on disk. Seeding a
     /// fresh session would orphan them, so the caller must repair (restore meta) instead.
     MetaMissingWithExistingDiagrams {
@@ -398,6 +405,9 @@ impl fmt::Display for StoreError {
             Self::SymlinkRefused { path } => {
                 write!(f, "refusing to write through symlink at {path:?}")
             }
+            Self::SessionWriteLockTimeout { path } => {
+                write!(f, "timed out waiting for session write lock at {path:?}")
+            }
             Self::MetaMissingWithExistingDiagrams { meta_path, diagrams_dir } => write!(
                 f,
                 "session meta {meta_path:?} is missing but diagram files exist in {diagrams_dir:?}; \
@@ -426,6 +436,7 @@ impl std::error::Error for StoreError {
             Self::InvalidRelativePath { .. } => None,
             Self::PathOutsideSession { .. } => None,
             Self::SymlinkRefused { .. } => None,
+            Self::SessionWriteLockTimeout { .. } => None,
             Self::MetaMissingWithExistingDiagrams { .. } => None,
         }
     }
@@ -525,6 +536,22 @@ pub struct SessionFolder {
     /// TUI and MCP server holding clones of one `SessionFolder`), so it serializes the in-process
     /// writers that actually race here.
     meta_lock: Arc<Mutex<()>>,
+}
+
+#[derive(Debug)]
+struct SessionWriteGuard<'a> {
+    _meta_guard: std::sync::MutexGuard<'a, ()>,
+    lock_path: PathBuf,
+}
+
+impl Drop for SessionWriteGuard<'_> {
+    fn drop(&mut self) {
+        match fs::remove_file(&self.lock_path) {
+            Ok(()) => {}
+            Err(source) if source.kind() == io::ErrorKind::NotFound => {}
+            Err(_source) => {}
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -627,6 +654,44 @@ impl SessionFolder {
     /// critical section leaves the `()` payload intact, so the lock is safe to keep using).
     fn lock_meta(&self) -> std::sync::MutexGuard<'_, ()> {
         self.meta_lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    fn session_write_lock_path(&self) -> PathBuf {
+        self.root.join(SESSION_WRITE_LOCK_FILENAME)
+    }
+
+    fn lock_session_write(&self) -> Result<SessionWriteGuard<'_>, StoreError> {
+        let meta_guard = self.lock_meta();
+        fs::create_dir_all(&self.root)
+            .map_err(|source| StoreError::Io { path: self.root.clone(), source })?;
+
+        let lock_path = self.session_write_lock_path();
+        let started = Instant::now();
+        loop {
+            match OpenOptions::new().write(true).create_new(true).open(&lock_path) {
+                Ok(mut file) => {
+                    let _ = writeln!(
+                        file,
+                        "pid={} acquired_unix_ms={}",
+                        std::process::id(),
+                        SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .map(|d| d.as_millis())
+                            .unwrap_or(0)
+                    );
+                    return Ok(SessionWriteGuard { _meta_guard: meta_guard, lock_path });
+                }
+                Err(source) if source.kind() == io::ErrorKind::AlreadyExists => {
+                    if started.elapsed() >= SESSION_WRITE_LOCK_TIMEOUT {
+                        return Err(StoreError::SessionWriteLockTimeout { path: lock_path });
+                    }
+                    std::thread::sleep(SESSION_WRITE_LOCK_RETRY_DELAY);
+                }
+                Err(source) => {
+                    return Err(StoreError::Io { path: lock_path, source });
+                }
+            }
+        }
     }
 
     pub fn with_durability(mut self, durability: WriteDurability) -> Self {
@@ -763,12 +828,10 @@ impl SessionFolder {
             Err(source) => return Err(StoreError::Io { path: diagrams_dir, source }),
         };
         for entry in entries {
-            let entry = entry
-                .map_err(|source| StoreError::Io { path: diagrams_dir.clone(), source })?;
+            let entry =
+                entry.map_err(|source| StoreError::Io { path: diagrams_dir.clone(), source })?;
             let path = entry.path();
-            if path.extension().and_then(|ext| ext.to_str()) == Some("mmd")
-                && path.is_file()
-            {
+            if path.extension().and_then(|ext| ext.to_str()) == Some("mmd") && path.is_file() {
                 return Ok(true);
             }
         }
@@ -776,7 +839,7 @@ impl SessionFolder {
     }
 
     pub fn save_session(&self, session: &Session) -> Result<(), StoreError> {
-        let _guard = self.lock_meta();
+        let _guard = self.lock_session_write()?;
         self.save_session_locked(session)
     }
 
@@ -1234,9 +1297,10 @@ impl SessionFolder {
     }
 
     pub fn save_selected_object_refs(&self, session: &Session) -> Result<(), StoreError> {
-        // Hold the meta lock across the load-modify-save so a concurrent `save_session`
+        // Hold the session write lock across the load-modify-save so a concurrent
+        // `save_session`, even from an independently constructed SessionFolder for the same path,
         // cannot interleave and have its diagram/walkthrough additions dropped here.
-        let _guard = self.lock_meta();
+        let _guard = self.lock_session_write()?;
         match self.load_meta() {
             Ok(mut meta) => {
                 meta.selected_object_refs =
@@ -1252,9 +1316,10 @@ impl SessionFolder {
     }
 
     pub fn save_active_diagram_id(&self, session: &Session) -> Result<(), StoreError> {
-        // Hold the meta lock across the load-modify-save so a concurrent `save_session`
+        // Hold the session write lock across the load-modify-save so a concurrent
+        // `save_session`, even from an independently constructed SessionFolder for the same path,
         // cannot interleave and have its diagram/walkthrough additions dropped here.
-        let _guard = self.lock_meta();
+        let _guard = self.lock_session_write()?;
         match self.load_meta() {
             Ok(mut meta) => {
                 meta.active_diagram_id = session.active_diagram_id().cloned();

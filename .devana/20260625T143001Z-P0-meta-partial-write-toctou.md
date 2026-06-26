@@ -1,6 +1,6 @@
 DEVANA-FINDING: v1
-DEVANA-STATE: open
-Priority: P0 | Confidence: high | Security-sensitive: no | Status: open
+DEVANA-STATE: fixed
+Priority: P0 | Confidence: high | Security-sensitive: no | Status: fixed
 Location: src/store/session_folder.rs:1155-1181 | Slug: meta-partial-write-toctou
 
 # Partial meta updates use load-modify-save without concurrency guard
@@ -46,5 +46,7 @@ Add meta generation/version field and retry on conflict, or route all meta mutat
 
 2026-06-26: Still open after static validation, with a partial fix in place. `SessionFolder` clones now share an in-process `meta_lock`, and `save_session`, `save_selected_object_refs`, and `save_active_diagram_id` hold it across their meta write paths. That blocks the default shared-folder TUI+MCP clone race, but `SessionFolder::new` creates a fresh lock for the same path, so independent processes or independently constructed folders can still run the original load-modify-save interleaving and drop concurrent meta additions.
 
+2026-06-26: Marked fixed after adding a session write lock file shared by all `SessionFolder` instances for the same root. `save_session`, `save_selected_object_refs`, and `save_active_diagram_id` now hold both the in-process mutex and the session-local lock file across their meta read-modify-save or full meta commit path. The regression now uses independently constructed folders for the same directory, blocking the original TOCTOU path as well as the prior clone-only case.
+
 DEVANA-KEY: src/store/session_folder.rs:1155-1181 | P0 | meta-partial-write-toctou
-DEVANA-SUMMARY: open P0 high src/store/session_folder.rs:1155-1181 - save_active_diagram_id and save_selected_object_refs can erase concurrent save_session additions via unguarded load-modify-save on session meta.
+DEVANA-SUMMARY: fixed P0 high src/store/session_folder.rs:1155-1181 - save_active_diagram_id and save_selected_object_refs can erase concurrent save_session additions via unguarded load-modify-save on session meta.

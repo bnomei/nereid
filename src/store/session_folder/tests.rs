@@ -274,10 +274,11 @@ fn save_active_diagram_id_updates_meta_and_loads_back(ctx: SessionFolderTestCtx)
 }
 
 // Regression: a partial meta update (`save_active_diagram_id`) and a full `save_session` that
-// adds diagrams run concurrently against clones of the same folder. The meta index must never
-// list fewer diagrams than have `.mmd` files on disk — i.e. the partial update must not drop
-// additions made by a concurrent full save. Without serialization the load-modify-save in
-// `save_active_diagram_id` races `save_session` and orphans freshly written diagram files.
+// adds diagrams run concurrently against independently constructed folders for the same path. The
+// meta index must never list fewer diagrams than have `.mmd` files on disk — i.e. the partial
+// update must not drop additions made by a concurrent full save. Without path-level serialization
+// the load-modify-save in `save_active_diagram_id` races `save_session` and orphans freshly written
+// diagram files.
 #[rstest]
 fn save_active_diagram_id_does_not_drop_concurrent_save_session_additions(
     ctx: SessionFolderTestCtx,
@@ -300,9 +301,9 @@ fn save_active_diagram_id_does_not_drop_concurrent_save_session_additions(
     session.set_active_diagram_id(Some(first));
     ctx.folder.save_session(&session).unwrap();
 
-    let writer_folder = ctx.folder.clone();
-    let patcher_folder = ctx.folder.clone();
-    let observer_folder = ctx.folder.clone();
+    let writer_folder = SessionFolder::new(&ctx.session_dir);
+    let patcher_folder = SessionFolder::new(&ctx.session_dir);
+    let observer_folder = SessionFolder::new(&ctx.session_dir);
     let barrier = Arc::new(Barrier::new(3));
     let writer_barrier = barrier.clone();
     let observer_barrier = barrier.clone();
@@ -358,7 +359,10 @@ fn save_active_diagram_id_does_not_drop_concurrent_save_session_additions(
         meta.diagrams.iter().map(|d| d.diagram_id.clone()).collect();
     for i in 0..DIAGRAMS {
         let id = DiagramId::new(format!("d-{i:03}")).unwrap();
-        assert!(indexed.contains(&id), "diagram {id} missing from meta index after concurrent saves");
+        assert!(
+            indexed.contains(&id),
+            "diagram {id} missing from meta index after concurrent saves"
+        );
     }
     // And the session loads all of them back.
     let loaded = ctx.folder.load_session().unwrap();
