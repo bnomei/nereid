@@ -114,19 +114,26 @@ impl NereidMcp {
         })?;
 
         if let Some(session_folder) = &self.session_folder {
-            let mut candidate = state.session.clone();
+            // Reload the on-disk session immediately before persisting so concurrent edits
+            // to other diagrams/walkthroughs (e.g. from a TUI sharing this SessionFolder)
+            // are preserved instead of being overwritten by a stale full-session snapshot.
+            let mut candidate = session_folder.load_session().map_err(|err| {
+                ErrorData::internal_error(
+                    format!("failed to reload session before save: {err}"),
+                    Some(serde_json::json!({ "diagram_id": diagram_id.as_str() })),
+                )
+            })?;
+            if candidate.diagrams().contains_key(&diagram_id) {
+                return Err(ErrorData::invalid_params(
+                    "diagram_id already exists",
+                    Some(serde_json::json!({ "diagram_id": diagram_id.as_str() })),
+                ));
+            }
             candidate.diagrams_mut().insert(diagram_id.clone(), diagram);
             if make_active {
                 candidate.set_active_diagram_id(Some(diagram_id.clone()));
             }
 
-            let meta = session_folder.load_meta().map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to load session meta: {err}"),
-                    Some(serde_json::json!({ "diagram_id": diagram_id.as_str() })),
-                )
-            })?;
-            candidate.set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
             session_folder.save_session(&candidate).map_err(|err| {
                 ErrorData::internal_error(
                     format!("failed to persist session: {err}"),
@@ -183,15 +190,22 @@ impl NereidMcp {
         }
 
         if let Some(session_folder) = &self.session_folder {
-            let mut candidate = state.session.clone();
-            candidate.set_active_diagram_id(Some(parsed.clone()));
-            let meta = session_folder.load_meta().map_err(|err| {
+            // Reload the on-disk session immediately before persisting so concurrent edits
+            // to other diagrams/walkthroughs (e.g. from a TUI sharing this SessionFolder)
+            // are preserved instead of being overwritten by a stale full-session snapshot.
+            let mut candidate = session_folder.load_session().map_err(|err| {
                 ErrorData::internal_error(
-                    format!("failed to load session meta: {err}"),
+                    format!("failed to reload session before save: {err}"),
                     Some(serde_json::json!({ "diagram_id": diagram_id })),
                 )
             })?;
-            candidate.set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
+            if !candidate.diagrams().contains_key(&parsed) {
+                return Err(ErrorData::resource_not_found(
+                    "diagram not found",
+                    Some(serde_json::json!({ "diagram_id": diagram_id })),
+                ));
+            }
+            candidate.set_active_diagram_id(Some(parsed.clone()));
             session_folder.save_session(&candidate).map_err(|err| {
                 ErrorData::internal_error(
                     format!("failed to persist session: {err}"),
@@ -232,7 +246,15 @@ impl NereidMcp {
         }
 
         if let Some(session_folder) = &self.session_folder {
-            let mut candidate = state.session.clone();
+            // Reload the on-disk session immediately before persisting so concurrent edits
+            // to other diagrams/walkthroughs (e.g. from a TUI sharing this SessionFolder)
+            // are preserved instead of being overwritten by a stale full-session snapshot.
+            let mut candidate = session_folder.load_session().map_err(|err| {
+                ErrorData::internal_error(
+                    format!("failed to reload session before save: {err}"),
+                    Some(serde_json::json!({ "diagram_id": diagram_id })),
+                )
+            })?;
             candidate.diagrams_mut().remove(&parsed);
 
             if candidate.active_diagram_id().is_some_and(|active| active == &parsed) {
@@ -240,13 +262,6 @@ impl NereidMcp {
                 candidate.set_active_diagram_id(next_active);
             }
 
-            let meta = session_folder.load_meta().map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to load session meta: {err}"),
-                    Some(serde_json::json!({ "diagram_id": diagram_id })),
-                )
-            })?;
-            candidate.set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
             retain_existing_selected_object_refs(&mut candidate);
             refresh_xref_statuses(&mut candidate);
 
@@ -972,7 +987,18 @@ impl NereidMcp {
         }
 
         if let Some(session_folder) = &self.session_folder {
-            let mut candidate_session = state.session.clone();
+            // Reload the on-disk session immediately before persisting so concurrent edits
+            // to other diagrams/walkthroughs (e.g. from a TUI sharing this SessionFolder)
+            // are preserved instead of being overwritten by a stale full-session snapshot.
+            // This mirrors the TUI's `persist_pending_diagram_sync` merge-on-save pattern.
+            // Sourcing the edited diagram from the freshly loaded session also lets
+            // `apply_ops` reject the op when another writer advanced this diagram on disk.
+            let mut candidate_session = session_folder.load_session().map_err(|err| {
+                ErrorData::internal_error(
+                    format!("failed to reload session before save: {err}"),
+                    Some(serde_json::json!({ "diagram_id": diagram_id.as_str(), "base_rev": base_rev })),
+                )
+            })?;
             let mut candidate_diagram = candidate_session
                 .diagrams()
                 .get(&diagram_id)
@@ -1005,14 +1031,6 @@ impl NereidMcp {
                 history.pop_front();
             }
 
-            let meta = session_folder.load_meta().map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to load session meta: {err}"),
-                    Some(serde_json::json!({ "diagram_id": diagram_id.as_str(), "base_rev": base_rev })),
-                )
-            })?;
-            candidate_session
-                .set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
             session_folder.save_session(&candidate_session).map_err(|err| {
                 ErrorData::internal_error(
                     format!("failed to persist session: {err}"),

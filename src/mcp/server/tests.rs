@@ -3840,6 +3840,66 @@ async fn diagram_apply_ops_persists_new_rev_to_session_folder() {
 }
 
 #[tokio::test]
+async fn diagram_apply_ops_preserves_concurrent_edit_to_other_diagram() {
+    let dir = temp_session_dir("mcp-apply-ops-preserves-other-diagram");
+    let dir_str = dir.to_string_lossy().to_string();
+    let folder = SessionFolder::new(dir_str.clone());
+
+    let session = demo_session();
+    folder.save_session(&session).expect("save initial session");
+
+    // The server syncs the in-memory snapshot at construction (d-flow at rev 0).
+    let server = NereidMcp::new_persistent(session, folder);
+
+    // Simulate a concurrent TUI edit to a *different* diagram (d-flow) landing on disk
+    // after the server's last sync but before its next save.
+    let flow_id = DiagramId::new("d-flow").expect("diagram id");
+    let mut external =
+        SessionFolder::new(dir_str.clone()).load_session().expect("load session externally");
+    {
+        let mut diagram = external.diagrams().get(&flow_id).cloned().expect("d-flow");
+        let DiagramAst::Flowchart(mut ast) = diagram.ast().clone() else {
+            panic!("d-flow should be a flowchart");
+        };
+        ast.nodes_mut().insert(oid("n:external"), FlowNode::new("External"));
+        diagram.set_ast(DiagramAst::Flowchart(ast)).expect("set flowchart ast");
+        diagram.bump_rev();
+        external.diagrams_mut().insert(flow_id.clone(), diagram);
+    }
+    SessionFolder::new(dir_str.clone())
+        .save_session(&external)
+        .expect("persist external edit to d-flow");
+
+    // Mutating d-seq through MCP must not clobber the concurrent d-flow edit.
+    let Json(result) = server
+        .diagram_apply_ops(Parameters(ApplyOpsParams {
+            diagram_id: Some("d-seq".into()),
+            base_rev: 0,
+            ops: vec![McpOp::SeqAddParticipant {
+                participant_id: "p:new".into(),
+                mermaid_name: "New".into(),
+            }],
+        }))
+        .await
+        .expect("apply ops");
+    assert_eq!(result.new_rev, 1);
+
+    let loaded = SessionFolder::new(dir_str).load_session().expect("load session");
+    let seq = loaded.diagrams().get(&DiagramId::new("d-seq").unwrap()).expect("d-seq");
+    assert_eq!(seq.rev(), 1, "edited diagram persists its new rev");
+
+    let flow = loaded.diagrams().get(&flow_id).expect("d-flow");
+    assert_eq!(flow.rev(), 1, "concurrent d-flow rev must not be regressed");
+    let DiagramAst::Flowchart(ast) = flow.ast() else {
+        panic!("d-flow should be a flowchart");
+    };
+    assert!(
+        ast.nodes().contains_key(&oid("n:external")),
+        "concurrent d-flow edit must survive the MCP save",
+    );
+}
+
+#[tokio::test]
 async fn diagram_diff_history_survives_external_selection_only_updates() {
     let dir = temp_session_dir("mcp-delta-history-survives-selection-updates");
     let dir_str = dir.to_string_lossy().to_string();

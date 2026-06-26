@@ -34,15 +34,22 @@ impl NereidMcp {
         }
 
         if let Some(session_folder) = &self.session_folder {
-            let mut candidate = state.session.clone();
-            candidate.set_active_walkthrough_id(Some(parsed.clone()));
-            let meta = session_folder.load_meta().map_err(|err| {
+            // Reload the on-disk session immediately before persisting so concurrent edits
+            // to diagrams/walkthroughs (e.g. from a TUI sharing this SessionFolder) are
+            // preserved instead of being overwritten by a stale full-session snapshot.
+            let mut candidate = session_folder.load_session().map_err(|err| {
                 ErrorData::internal_error(
-                    format!("failed to load session meta: {err}"),
+                    format!("failed to reload session before save: {err}"),
                     Some(serde_json::json!({ "walkthrough_id": walkthrough_id })),
                 )
             })?;
-            candidate.set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
+            if !candidate.walkthroughs().contains_key(&parsed) {
+                return Err(ErrorData::resource_not_found(
+                    "walkthrough not found",
+                    Some(serde_json::json!({ "walkthrough_id": walkthrough_id })),
+                ));
+            }
+            candidate.set_active_walkthrough_id(Some(parsed.clone()));
             session_folder.save_session(&candidate).map_err(|err| {
                 ErrorData::internal_error(
                     format!("failed to persist session: {err}"),
@@ -333,7 +340,17 @@ impl NereidMcp {
         let mut state = self.lock_state_synced().await?;
 
         if let Some(session_folder) = &self.session_folder {
-            let mut candidate_session = state.session.clone();
+            // Reload the on-disk session immediately before persisting so concurrent edits
+            // to other diagrams/walkthroughs (e.g. from a TUI sharing this SessionFolder)
+            // are preserved instead of being overwritten by a stale full-session snapshot.
+            // The `base_rev` check below runs against this freshly loaded walkthrough, so a
+            // concurrent edit to this same walkthrough is reported as a conflict.
+            let mut candidate_session = session_folder.load_session().map_err(|err| {
+                ErrorData::internal_error(
+                    format!("failed to reload session before save: {err}"),
+                    Some(serde_json::json!({ "walkthrough_id": walkthrough_id, "base_rev": base_rev })),
+                )
+            })?;
             let walkthrough =
                 candidate_session.walkthroughs_mut().get_mut(&parsed).ok_or_else(|| {
                     ErrorData::resource_not_found(
@@ -389,14 +406,6 @@ impl NereidMcp {
                 history.pop_front();
             }
 
-            let meta = session_folder.load_meta().map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to load session meta: {err}"),
-                    Some(serde_json::json!({ "walkthrough_id": walkthrough_id, "base_rev": base_rev })),
-                )
-            })?;
-            candidate_session
-                .set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
             session_folder.save_session(&candidate_session).map_err(|err| {
                 ErrorData::internal_error(
                     format!("failed to persist session: {err}"),

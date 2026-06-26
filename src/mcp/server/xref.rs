@@ -193,7 +193,15 @@ impl NereidMcp {
 
         let mut state = self.lock_state_synced().await?;
         if let Some(session_folder) = &self.session_folder {
-            let mut candidate = state.session.clone();
+            // Reload the on-disk session immediately before persisting so concurrent edits
+            // to diagrams/walkthroughs (e.g. from a TUI sharing this SessionFolder) are
+            // preserved instead of being overwritten by a stale full-session snapshot.
+            let mut candidate = session_folder.load_session().map_err(|err| {
+                ErrorData::internal_error(
+                    format!("failed to reload session before save: {err}"),
+                    Some(serde_json::json!({ "xref_id": xref_id })),
+                )
+            })?;
             if candidate.xrefs().contains_key(&xref_id_parsed) {
                 return Err(ErrorData::invalid_params(
                     "xref_id already exists",
@@ -208,13 +216,6 @@ impl NereidMcp {
             let mut xref = XRef::new(from, to, kind, status);
             xref.set_label(label);
             candidate.xrefs_mut().insert(xref_id_parsed.clone(), xref);
-            let meta = session_folder.load_meta().map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to load session meta: {err}"),
-                    Some(serde_json::json!({ "xref_id": xref_id })),
-                )
-            })?;
-            candidate.set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
 
             session_folder.save_session(&candidate).map_err(|err| {
                 ErrorData::internal_error(
@@ -268,7 +269,15 @@ impl NereidMcp {
 
         let mut state = self.lock_state_synced().await?;
         if let Some(session_folder) = &self.session_folder {
-            let mut candidate = state.session.clone();
+            // Reload the on-disk session immediately before persisting so concurrent edits
+            // to diagrams/walkthroughs (e.g. from a TUI sharing this SessionFolder) are
+            // preserved instead of being overwritten by a stale full-session snapshot.
+            let mut candidate = session_folder.load_session().map_err(|err| {
+                ErrorData::internal_error(
+                    format!("failed to reload session before save: {err}"),
+                    Some(serde_json::json!({ "xref_id": xref_id })),
+                )
+            })?;
             let removed = candidate.xrefs_mut().remove(&xref_id_parsed).is_some();
             if !removed {
                 return Err(ErrorData::resource_not_found(
@@ -277,13 +286,6 @@ impl NereidMcp {
                 ));
             }
 
-            let meta = session_folder.load_meta().map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to load session meta: {err}"),
-                    Some(serde_json::json!({ "xref_id": xref_id })),
-                )
-            })?;
-            candidate.set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
             session_folder.save_session(&candidate).map_err(|err| {
                 ErrorData::internal_error(
                     format!("failed to persist session: {err}"),
