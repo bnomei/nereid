@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! MCP server unit tests for tool handlers, persistence, and error contracts.
+
 use super::*;
 use rmcp::handler::server::wrapper::{Json, Parameters};
 
@@ -783,8 +785,6 @@ async fn attention_agent_set_read_clear_validates_refs() {
 
 #[tokio::test]
 async fn diagram_apply_ops_prunes_agent_spotlight_for_removed_object() {
-    // attention.agent.set validates existence on write; the spotlight must not survive as a
-    // dangling ref when apply_ops later removes its target object, mirroring diagram.delete.
     let server = NereidMcp::new(demo_session());
 
     server
@@ -1241,9 +1241,6 @@ async fn walkthrough_apply_ops_bumps_rev_and_returns_delta_for_add_update_remove
 
 #[tokio::test]
 async fn walkthrough_apply_ops_rolls_back_partial_batch_on_failure_non_persistent() {
-    // Without a SessionFolder the handler mutates the in-memory walkthrough. A batch whose
-    // later op fails must leave the walkthrough fully unchanged (transactional), matching
-    // diagram.apply_ops and the persistent path.
     let server = NereidMcp::new(demo_session_with_walkthroughs());
 
     let add_new = || McpWalkthroughOp::AddNode {
@@ -1255,7 +1252,6 @@ async fn walkthrough_apply_ops_rolls_back_partial_batch_on_failure_non_persisten
         status: None,
     };
 
-    // First op adds wn:new and succeeds; the second reuses the id and fails the whole batch.
     let result = server
         .walkthrough_apply_ops(Parameters(WalkthroughApplyOpsParams {
             walkthrough_id: "w:1".into(),
@@ -1265,8 +1261,6 @@ async fn walkthrough_apply_ops_rolls_back_partial_batch_on_failure_non_persisten
         .await;
     assert!(result.is_err(), "duplicate node id in batch should error");
 
-    // The failed batch must not have committed the first op: rev stays 0 and the node count is
-    // unchanged (original wn:2 and wn:3 only).
     let Json(stat) = server
         .walkthrough_stat(Parameters(WalkthroughGetParams { walkthrough_id: "w:1".into() }))
         .await
@@ -1499,8 +1493,6 @@ async fn xref_list_returns_all_xrefs_ordered_by_id() {
 
 #[tokio::test]
 async fn diagram_apply_ops_refreshes_xref_status_after_removing_endpoint() {
-    // x:2 points to d-flow/n:a and starts "ok"; removing that node via apply_ops must refresh the
-    // xref status to dangling, matching diagram.delete (rather than reporting a stale "ok").
     let server = NereidMcp::new(demo_session_with_xrefs());
 
     let Json(before) = server.xref_list(Parameters(xref_list_params())).await.expect("xref list");
@@ -2239,9 +2231,6 @@ async fn flow_reachable_rejects_invalid_direction() {
 
 #[tokio::test]
 async fn flow_reachable_returns_not_found_for_missing_from_node() {
-    // Matches sibling flow tools (flow.paths, flow.unreachable): a missing from_node_id is a
-    // resource_not_found error, not an empty success (which is indistinguishable from a valid
-    // node that reaches nothing).
     let server = NereidMcp::new(demo_session_for_flow_reachable());
     let err = match server
         .flow_reachable(Parameters(FlowReachableParams {
@@ -3962,11 +3951,8 @@ async fn diagram_apply_ops_preserves_concurrent_edit_to_other_diagram() {
     let session = demo_session();
     folder.save_session(&session).expect("save initial session");
 
-    // The server syncs the in-memory snapshot at construction (d-flow at rev 0).
     let server = NereidMcp::new_persistent(session, folder);
 
-    // Simulate a concurrent TUI edit to a *different* diagram (d-flow) landing on disk
-    // after the server's last sync but before its next save.
     let flow_id = DiagramId::new("d-flow").expect("diagram id");
     let mut external =
         SessionFolder::new(dir_str.clone()).load_session().expect("load session externally");
@@ -3984,7 +3970,6 @@ async fn diagram_apply_ops_preserves_concurrent_edit_to_other_diagram() {
         .save_session(&external)
         .expect("persist external edit to d-flow");
 
-    // Mutating d-seq through MCP must not clobber the concurrent d-flow edit.
     let Json(result) = server
         .diagram_apply_ops(Parameters(ApplyOpsParams {
             diagram_id: Some("d-seq".into()),
@@ -4111,7 +4096,6 @@ async fn diagram_apply_ops_prunes_dangling_selection_from_persisted_meta() {
     let dir_str = dir.to_string_lossy().to_string();
     let folder = SessionFolder::new(dir_str.clone());
 
-    // Select two existing flow nodes, then persist.
     let mut session = demo_session();
     let ref_a = ObjectRef::from_str("d:d-flow/flow/node/n:a").expect("object ref");
     let ref_b = ObjectRef::from_str("d:d-flow/flow/node/n:b").expect("object ref");
@@ -4120,7 +4104,6 @@ async fn diagram_apply_ops_prunes_dangling_selection_from_persisted_meta() {
 
     let server = NereidMcp::new_persistent(session, folder);
 
-    // Remove n:a; its selection ref now dangles while n:b remains valid.
     server
         .diagram_apply_ops(Parameters(ApplyOpsParams {
             diagram_id: Some("d-flow".into()),

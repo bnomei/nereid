@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Mermaid-ish sequence-diagram parser and exporter for the internal sequence AST.
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
@@ -404,7 +406,7 @@ fn keyword_header(trimmed: &str, keyword: &str) -> Option<String> {
 /// Parse a deliberately limited `sequenceDiagram` Mermaid subset.
 ///
 /// Supported lines (after `sequenceDiagram`):
-/// - `participant <name>` or `<role> <name>` (identifiers must not contain whitespace or `/`)
+/// - `participant <name>` or `<role> <name>`
 /// - `<from><arrow><to>: <text>` where `<arrow>` is one of Mermaid's documented message arrows
 ///   (normalized internally; export uses `->>`, `-)`, `-->>`)
 /// - `alt [header...]` / `opt [header...]` / `loop [header...]` / `par [header...]`
@@ -1085,8 +1087,6 @@ mod tests {
         assert_eq!(out2, expected);
     }
 
-    // Regression: a participant declared with the Mermaid `actor` keyword must set role "actor"
-    // and that role must survive export -> parse (the exporter emits `actor <name>`).
     #[test]
     fn actor_role_round_trips_through_export_and_parse() {
         let role_of = |ast: &SequenceAst, name: &str| -> Option<String> {

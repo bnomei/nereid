@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Unicode sequence-diagram renderer with lifeline, message, and block drawing.
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 

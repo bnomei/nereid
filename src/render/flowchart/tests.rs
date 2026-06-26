@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Flowchart render regression tests and golden fixtures.
+
 use super::super::test_utils::collect_spanned_text;
 use super::{
     render_flowchart_unicode, render_flowchart_unicode_annotated,

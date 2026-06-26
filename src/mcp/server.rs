@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! MCP server core: session state, tool routing, persistence sync, and transport entrypoints.
+
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::Arc;
 
@@ -63,6 +65,9 @@ struct McpState {
     walkthrough_delta_history: BTreeMap<WalkthroughId, VecDeque<WalkthroughLastDelta>>,
 }
 
+/// MCP server owning session state, optional folder persistence, and tool routing.
+///
+/// Shares agent highlights and UI state with the TUI when constructed for combined mode.
 #[derive(Clone)]
 pub struct NereidMcp {
     state: Arc<Mutex<McpState>>,
@@ -81,6 +86,7 @@ impl NereidMcp {
             + Self::queries_tool_router()
     }
 
+    /// In-memory MCP server without filesystem persistence.
     pub fn new(session: Session) -> Self {
         Self::new_with_agent_highlights(session, Arc::new(Mutex::new(BTreeSet::new())))
     }
@@ -110,6 +116,7 @@ impl NereidMcp {
         }
     }
 
+    /// MCP server that persists session mutations through a [`SessionFolder`].
     pub fn new_persistent(session: Session, session_folder: SessionFolder) -> Self {
         Self::new_persistent_with_agent_highlights(
             session,
@@ -150,6 +157,7 @@ impl NereidMcp {
         }
     }
 
+    /// Stable JSON snapshot of registered MCP tool schemas for CLI introspection.
     pub fn tool_schema_snapshot() -> Result<String, serde_json::Error> {
         let tools = Self::tool_router().list_all();
         let mut snapshot = serde_json::to_string_pretty(&tools)?;
@@ -157,6 +165,7 @@ impl NereidMcp {
         Ok(snapshot)
     }
 
+    /// Serve MCP over stdio until the transport closes.
     pub async fn serve_stdio(self) -> Result<(), rmcp::RmcpError> {
         let service = self.serve((tokio::io::stdin(), tokio::io::stdout())).await?;
         service.waiting().await?;
@@ -201,9 +210,6 @@ impl NereidMcp {
         Ok(state)
     }
 
-    /// Drop agent spotlight refs that no longer resolve to an object in `session`. Mirrors the
-    /// pruning `diagram.delete` performs, but for individual object removals (e.g. via
-    /// `diagram.apply_ops`), so `attention.agent.read` never returns refs to missing objects.
     async fn prune_missing_agent_highlights(&self, session: &Session) {
         let mut agent_highlights = self.agent_highlights.lock().await;
         agent_highlights.retain(|object_ref| !object_ref_is_missing(session, object_ref));

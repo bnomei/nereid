@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Sequence-diagram column placement and per-message row spacing budgets.
+
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 

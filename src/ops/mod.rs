@@ -22,6 +22,7 @@ use crate::model::{
 use crate::model::{ObjectId, ObjectRef, SequenceAst, SequenceMessage, SequenceMessageKind};
 use crate::model::{SequenceParticipant, XRefId};
 
+/// Single diagram mutation tagged by AST kind (sequence, flowchart, or xref).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Op {
     Seq(SeqOp),
@@ -205,6 +206,7 @@ fn sort_object_refs(refs: &mut [ObjectRef]) {
     });
 }
 
+/// Apply ops with optimistic revision check; bumps diagram rev and returns a change delta.
 pub fn apply_ops(
     diagram: &mut Diagram,
     base_rev: u64,

@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Mermaid-ish flowchart parser and exporter for the internal flowchart AST.
+
 use std::fmt;
 
 use super::ident::validate_mermaid_ident;
@@ -1007,15 +1009,8 @@ mod tests {
         assert_eq!(node_b.mermaid_id(), Some("B"));
     }
 
-    // Regression: linkStyle must follow the same semantic edge across parse -> export -> re-parse
-    // even when declaration order differs from the export's (from, to, edge_id) sort order. Export
-    // recomputes each linkStyle index from the styled edge's position in the emitted (sorted) order,
-    // and emits edges in that same order, so re-parse's declaration-order index lands on the same
-    // edge.
     #[test]
     fn linkstyle_roundtrips_to_same_edge_when_declaration_differs_from_sort_order() {
-        // First-declared edge (Z-->A) sorts AFTER the second (A-->B), so naive index reuse would
-        // misassign the style.
         let input = "flowchart\nZ --> A\nA --> B\nlinkStyle 0 stroke:#ff0000;\n";
 
         let style_of = |ast: &FlowchartAst, from: &str, to: &str| -> Option<String> {
@@ -1034,7 +1029,6 @@ mod tests {
         let out = export_flowchart(&ast1).expect("export");
         let ast2 = parse_flowchart(&out).expect("parse 2");
 
-        // The red stroke must still be on Z-->A, not the lexicographically-first A-->B.
         assert_eq!(
             style_of(&ast2, "n:Z", "n:A").as_deref(),
             Some("stroke:#ff0000;"),

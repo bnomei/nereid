@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Session folder persistence: meta JSON, Mermaid sidecars, ASCII exports, and write locking.
+
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::fmt;
@@ -221,6 +223,7 @@ fn ascii_exports() -> &'static AsciiExportManager {
     ASCII_EXPORTS.get_or_init(AsciiExportManager::new)
 }
 
+/// Filesystem, parse, layout/render, and validation errors from session persistence.
 #[derive(Debug)]
 pub enum StoreError {
     Io {
@@ -300,8 +303,6 @@ pub enum StoreError {
     SessionWriteLockTimeout {
         path: PathBuf,
     },
-    /// The session meta index is missing but diagram artifacts already exist on disk. Seeding a
-    /// fresh session would orphan them, so the caller must repair (restore meta) instead.
     MetaMissingWithExistingDiagrams {
         meta_path: PathBuf,
         diagrams_dir: PathBuf,
@@ -526,15 +527,14 @@ pub enum XRefStatus {
     DanglingBoth,
 }
 
+/// Filesystem adapter for the session folder format under a single root directory.
+///
+/// Coordinates meta JSON, per-diagram Mermaid sidecars, walkthrough JSON, ASCII exports,
+/// and cross-process write locking.
 #[derive(Debug, Clone)]
 pub struct SessionFolder {
     root: PathBuf,
     durability: WriteDurability,
-    /// Serializes session-meta read-modify-write sequences so that a partial meta update
-    /// (`save_selected_object_refs`/`save_active_diagram_id`) cannot drop diagrams/walkthroughs
-    /// added by a concurrent `save_session`. Shared across clones of the same folder (e.g. the
-    /// TUI and MCP server holding clones of one `SessionFolder`), so it serializes the in-process
-    /// writers that actually race here.
     meta_lock: Arc<Mutex<()>>,
 }
 
@@ -546,6 +546,7 @@ struct DiagramArtifactsSnapshot {
     meta_contents: Option<Vec<u8>>,
 }
 
+/// Scoped session mutation guarded by the folder write lock; commit persists atomically.
 #[derive(Debug)]
 pub struct SessionUpdate<'a> {
     folder: &'a SessionFolder,
@@ -681,8 +682,6 @@ impl SessionFolder {
         }
     }
 
-    /// Acquire the session-meta write lock, recovering from poisoning (a panic in a prior
-    /// critical section leaves the `()` payload intact, so the lock is safe to keep using).
     fn lock_meta(&self) -> std::sync::MutexGuard<'_, ()> {
         self.meta_lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
     }
@@ -831,10 +830,6 @@ impl SessionFolder {
             Err(StoreError::Io { path, source })
                 if source.kind() == io::ErrorKind::NotFound && path == self.meta_path() =>
             {
-                // Meta is the session index. If it is missing but diagram files already exist,
-                // seeding a fresh session would orphan them (they would vanish from the session
-                // view while remaining on disk). Refuse and require repair instead of silently
-                // discarding prior work.
                 if self.has_existing_diagram_files()? {
                     return Err(StoreError::MetaMissingWithExistingDiagrams {
                         meta_path: self.meta_path(),
@@ -849,8 +844,6 @@ impl SessionFolder {
         }
     }
 
-    /// Whether the session's `diagrams/` directory contains at least one `.mmd` file. Used to
-    /// detect orphaned diagram artifacts when the session meta index is absent.
     fn has_existing_diagram_files(&self) -> Result<bool, StoreError> {
         let diagrams_dir = self.root.join("diagrams");
         let entries = match fs::read_dir(&diagrams_dir) {
@@ -978,7 +971,6 @@ impl SessionFolder {
         Ok(snapshot)
     }
 
-    /// Body of [`Self::save_session`], assuming the caller already holds the meta lock.
     fn save_session_locked(&self, session: &Session) -> Result<(), StoreError> {
         #[derive(Debug, Deserialize)]
         struct WalkthroughRevJson {
@@ -1097,11 +1089,6 @@ impl SessionFolder {
                     DiagramAst::Flowchart(_) => BTreeMap::new(),
                 };
 
-                // Write the sidecar before the `.mmd`, then record enough state to roll both
-                // files back if this save fails before the session meta commit. Without that
-                // rollback, a failed `.mmd` write could leave old Mermaid content with a new
-                // sidecar, and a later pre-meta failure could leave new diagram artifacts behind
-                // a stale session meta index.
                 let diagram_meta = DiagramMeta {
                     diagram_id: diagram_id.clone(),
                     mmd_path: mmd_path.clone(),
@@ -1175,11 +1162,6 @@ impl SessionFolder {
             }
         }
 
-        // Commit the meta index (the record of truth) BEFORE deleting any walkthrough files.
-        // If meta write fails, no files have been removed yet, so the prior meta still matches
-        // on-disk files. If GC then fails, the orphaned file is no longer referenced by meta, so
-        // the session remains loadable. Deleting before the meta commit would instead leave meta
-        // pointing at files that no longer exist.
         if let Err(err) = self.save_meta(&meta) {
             return self.rollback_diagram_artifacts_then(&changed_diagram_artifacts, err);
         }
@@ -1456,9 +1438,6 @@ impl SessionFolder {
     }
 
     pub fn save_selected_object_refs(&self, session: &Session) -> Result<(), StoreError> {
-        // Hold the session write lock across the load-modify-save so a concurrent
-        // `save_session`, even from an independently constructed SessionFolder for the same path,
-        // cannot interleave and have its diagram/walkthrough additions dropped here.
         let _guard = self.lock_session_write()?;
         match self.load_meta() {
             Ok(mut meta) => {
@@ -1475,9 +1454,6 @@ impl SessionFolder {
     }
 
     pub fn save_active_diagram_id(&self, session: &Session) -> Result<(), StoreError> {
-        // Hold the session write lock across the load-modify-save so a concurrent
-        // `save_session`, even from an independently constructed SessionFolder for the same path,
-        // cannot interleave and have its diagram/walkthrough additions dropped here.
         let _guard = self.lock_session_write()?;
         match self.load_meta() {
             Ok(mut meta) => {

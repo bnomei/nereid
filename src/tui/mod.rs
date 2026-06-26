@@ -564,14 +564,8 @@ struct PendingDiagramSync {
     expected_disk_rev: u64,
 }
 
-/// Outcome of a failed pending-diagram-sync flush.
 enum DiagramSyncError {
-    /// Transient failure (e.g. disk I/O). The pending sync should be retained so the next tick
-    /// retries; disk reload stays blocked meanwhile, protecting the unsynced edit.
     Retriable(String),
-    /// Unresolvable conflict (the diagram is gone locally or on disk, or the disk revision has
-    /// diverged from the edit's baseline). Retrying cannot succeed, so the pending sync is
-    /// abandoned and reload is allowed to proceed.
     Terminal(String),
 }
 
@@ -724,10 +718,6 @@ impl App {
 
         let mut ui_state = ui_state.blocking_lock();
         ui_state.set_follow_ai(self.follow_ai);
-        // Publish the visible viewport as the human's attention when the human owns focus, and
-        // also while follow-AI is active: in that mode the viewport tracks the agent spotlight
-        // (focus_owner == Agent) but the human is looking at that followed target, so
-        // attention.human.read must reflect it rather than the pre-follow selection.
         if self.focus_owner == FocusOwner::Human || self.follow_ai {
             let active_diagram_id = self.session.active_diagram_id().cloned();
             let active_object_ref = self.selected_ref().cloned();
@@ -1500,15 +1490,10 @@ impl App {
                 self.set_toast(format!("Synced edited diagram: {}", pending.diagram_id));
             }
             Err(err @ DiagramSyncError::Retriable(_)) => {
-                // Transient failure: keep the edit pending so the next tick retries. While pending
-                // is Some, sync_from_ui_state will not reload from disk, so the unsynced in-memory
-                // edit is preserved instead of being clobbered by a concurrent MCP write.
                 self.set_toast(err.message().to_owned());
                 self.pending_diagram_sync = Some(pending);
             }
             Err(err @ DiagramSyncError::Terminal(_)) => {
-                // Unresolvable conflict: retrying cannot help, so drop the pending sync (already
-                // taken) and let reload proceed.
                 self.set_toast(err.message().to_owned());
             }
         }
@@ -1520,7 +1505,6 @@ impl App {
         pending: &PendingDiagramSync,
     ) -> Result<(), DiagramSyncError> {
         let Some(local_diagram) = self.session.diagrams().get(&pending.diagram_id).cloned() else {
-            // The edited diagram is gone locally; there is nothing left to persist.
             return Err(DiagramSyncError::Terminal(format!(
                 "sync skipped: edited diagram no longer exists: {}",
                 pending.diagram_id

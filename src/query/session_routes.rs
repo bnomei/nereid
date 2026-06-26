@@ -6,11 +6,14 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Session-wide route finding over diagram structure and cross-diagram xrefs.
+
 use std::cmp::{Ordering, Reverse};
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque};
 
 use crate::model::{CategoryPath, DiagramAst, DiagramId, ObjectId, ObjectRef, Session};
 
+/// Precomputed adjacency over session diagrams and xrefs for route queries.
 #[derive(Clone, Debug)]
 pub struct SessionRouteAdjacency {
     adjacency: BTreeMap<ObjectRef, BTreeSet<ObjectRef>>,
@@ -191,10 +194,6 @@ fn derive_adjacency(session: &Session) -> BTreeMap<ObjectRef, BTreeSet<ObjectRef
     for xref in session.xrefs().values() {
         let a = xref.from().clone();
         let b = xref.to().clone();
-        // Only bridge endpoints that were materialized from a real AST object above. A dangling
-        // xref (its target deleted) is persisted session state; routing through it would
-        // fabricate edges to objects that no longer exist. `insert_edge`'s `or_default()` would
-        // otherwise resurrect the missing endpoint as a traversable phantom node.
         if !adjacency.contains_key(&a) || !adjacency.contains_key(&b) {
             continue;
         }
@@ -222,6 +221,7 @@ fn reconstruct_path(
     reversed
 }
 
+/// Tie-breaking strategy when multiple routes share the same hop count.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RoutesOrdering {
     FewestHops,
@@ -259,8 +259,6 @@ pub fn find_routes_with_adjacency(
     }
 
     if from == to {
-        // A self route only exists if the endpoint is a real object in the session; otherwise an
-        // unknown id would fabricate a single-node "route exists" answer. Mirrors flow::paths.
         return if adjacency.adjacency.contains_key(from) {
             vec![vec![from.clone()]]
         } else {
@@ -329,7 +327,6 @@ pub fn find_route_with_adjacency(
     to: &ObjectRef,
 ) -> Option<Vec<ObjectRef>> {
     if from == to {
-        // See find_routes_with_adjacency: don't fabricate a self route for an unknown id.
         return adjacency.adjacency.contains_key(from).then(|| vec![from.clone()]);
     }
 
@@ -468,9 +465,6 @@ mod tests {
 
     #[test]
     fn dangling_xref_endpoints_do_not_create_phantom_route() {
-        // A flow diagram with one real node, plus stale xrefs whose targets were deleted.
-        // Dangling xrefs are normal persisted state; route derivation must not resurrect their
-        // missing endpoints as traversable phantom nodes.
         let mut session = Session::new(SessionId::new("s-dangling").expect("session id"));
 
         let flow_id = DiagramId::new("flow").expect("diagram id");
@@ -481,7 +475,6 @@ mod tests {
             Diagram::new(flow_id.clone(), "Flow", DiagramAst::Flowchart(flow_ast)),
         );
 
-        // n:a -> n:gone (deleted), and n:gone -> n:also_gone (both deleted).
         let x1_from: ObjectRef = "d:flow/flow/node/n:a".parse().expect("ref");
         let x1_to: ObjectRef = "d:flow/flow/node/n:gone".parse().expect("ref");
         session.xrefs_mut().insert(
@@ -498,18 +491,14 @@ mod tests {
         let start: ObjectRef = "d:flow/flow/node/n:a".parse().expect("start ref");
         let goal: ObjectRef = "d:flow/flow/node/n:also_gone".parse().expect("goal ref");
 
-        // No route exists: the only real object is n:a; n:gone and n:also_gone do not exist.
         assert_eq!(find_route(&session, &start, &goal), None);
 
-        // And the deleted endpoints never become reachable graph nodes at all.
         let adjacency = SessionRouteAdjacency::derive(&session);
         assert_eq!(find_route_with_adjacency(&adjacency, &start, &goal), None);
     }
 
     #[test]
     fn self_route_for_unknown_id_returns_no_route() {
-        // An empty session knows no objects; a self-to-self query for a non-existent id must not
-        // fabricate a single-node success path.
         let session = Session::new(SessionId::new("s-empty").expect("session id"));
         let ghost: ObjectRef = "d:none/none/node/n:ghost".parse().expect("ghost ref");
 
@@ -533,7 +522,6 @@ mod tests {
 
     #[test]
     fn self_route_for_existing_id_returns_single_node() {
-        // A real object should still get its trivial self route.
         let mut session = Session::new(SessionId::new("s-real").expect("session id"));
         let flow_id = DiagramId::new("flow").expect("diagram id");
         let mut flow_ast = FlowchartAst::default();

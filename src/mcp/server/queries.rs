@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Query MCP tools: route finding, message search, and flow reachability.
+
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::{tool, tool_router};
 
@@ -335,9 +337,6 @@ impl NereidMcp {
             ));
         };
 
-        // Surface a missing node consistently with sibling flow tools (`flow.paths`,
-        // `flow.unreachable`) instead of returning an empty success, which is indistinguishable
-        // from a valid node that simply reaches nothing.
         if !ast.nodes().contains_key(&from_node_id_parsed) {
             return Err(ErrorData::resource_not_found(
                 "from node not found",

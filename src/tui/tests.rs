@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! TUI regression tests for input handling, rendering, and session interaction.
+
 use super::{
     apply_highlight_flags, category_path, demo_session, demo_session_fallback,
     diagram_bottom_title, diagram_counter_label, diagram_note_title, diagram_view_title,
@@ -782,9 +784,6 @@ fn enabling_follow_ai_jumps_to_agent_highlight_diagram() {
     assert_eq!(app.selected_ref(), Some(&target));
 }
 
-// Regression: while follow-AI tracks the agent spotlight, the viewport shows the followed target,
-// so UiState human-attention fields (read by attention.human.read) must reflect it rather than
-// the stale pre-follow selection.
 #[test]
 fn follow_ai_publishes_followed_target_as_human_attention() {
     use crate::ui::UiState;
@@ -1065,9 +1064,6 @@ fn sequence_message_focus_highlights_spaces_inside_label() {
         .find(|cells| cells.iter().map(|(ch, _)| *ch).collect::<String>().contains("Can I"))
         .expect("message row with phrase");
 
-    // Locate the phrase by CHAR index (not byte offset): the rendered row can contain multibyte
-    // box-drawing/arrow glyphs before the label, so `str::find`'s byte offset would not line up
-    // with the per-char `line` cells.
     let phrase_chars: Vec<char> = "Can I".chars().collect();
     let phrase_start = line
         .windows(phrase_chars.len())
@@ -1100,9 +1096,6 @@ fn sequence_message_selected_highlights_spaces_inside_label() {
         .find(|cells| cells.iter().map(|(ch, _)| *ch).collect::<String>().contains("Can I"))
         .expect("message row with phrase");
 
-    // Locate the phrase by CHAR index (not byte offset): the rendered row can contain multibyte
-    // box-drawing/arrow glyphs before the label, so `str::find`'s byte offset would not line up
-    // with the per-char `line` cells.
     let phrase_chars: Vec<char> = "Can I".chars().collect();
     let phrase_start = line
         .windows(phrase_chars.len())
@@ -1676,9 +1669,6 @@ fn unique_temp_session_dir(tag: &str) -> std::path::PathBuf {
     dir
 }
 
-// Regression: a transient (retriable) sync failure must NOT discard the pending edit. Dropping it
-// would let a concurrent MCP write reload over and clobber the unsynced in-memory edit on the next
-// tick. We force a retriable save failure by symlinking the meta file (atomic writes refuse it).
 #[cfg(unix)]
 #[test]
 fn flush_pending_diagram_sync_retains_pending_on_retriable_error() {
@@ -1700,7 +1690,6 @@ fn flush_pending_diagram_sync_retains_pending_on_retriable_error() {
         .rev();
     app.pending_diagram_sync = Some(PendingDiagramSync { diagram_id, expected_disk_rev: disk_rev });
 
-    // Force save_session to fail with a retriable I/O error.
     let meta_path = folder.meta_path();
     let backing = meta_path.with_extension("json.backing");
     std::fs::rename(&meta_path, &backing).expect("move meta");
@@ -1716,8 +1705,6 @@ fn flush_pending_diagram_sync_retains_pending_on_retriable_error() {
     let _ = std::fs::remove_dir_all(&tmp_dir);
 }
 
-// Regression: an unresolvable (terminal) conflict — here the disk revision has diverged from the
-// edit's baseline — must abandon the pending sync rather than retry forever.
 #[test]
 fn flush_pending_diagram_sync_drops_pending_on_terminal_conflict() {
     let session = demo_session();
@@ -1729,7 +1716,6 @@ fn flush_pending_diagram_sync_drops_pending_on_terminal_conflict() {
     let diagram_id = app.active_diagram_id().cloned().expect("active diagram");
     app.session_folder = Some(folder.clone());
 
-    // expected_disk_rev deliberately diverges from the on-disk revision.
     app.pending_diagram_sync = Some(PendingDiagramSync { diagram_id, expected_disk_rev: 9999 });
 
     app.flush_pending_diagram_sync();

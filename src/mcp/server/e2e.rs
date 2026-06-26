@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! End-to-end MCP integration tests with headless TUI and filesystem sessions.
+
 use super::*;
 use rmcp::handler::server::wrapper::{Json, Parameters};
 

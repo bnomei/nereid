@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Session folder persistence regression tests and round-trip fixtures.
+
 use std::env;
 use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -175,14 +177,10 @@ fn load_or_init_session_creates_seed_diagram_when_meta_is_missing(ctx: SessionFo
     assert_eq!(loaded.diagrams().len(), 1);
 }
 
-// Regression: if the meta index is missing but diagram files already exist on disk,
-// load_or_init_session must refuse to seed a fresh session (which would orphan them) and instead
-// surface a distinct error so the data loss is visible rather than silent.
 #[rstest]
 fn load_or_init_session_refuses_to_seed_when_diagram_files_exist(ctx: SessionFolderTestCtx) {
     let folder = &ctx.folder;
 
-    // Persist a real session with one diagram, then delete only the meta index.
     let mut session = Session::new(SessionId::new("s:prior").unwrap());
     let d1 = DiagramId::new("d1").unwrap();
     let mut ast = FlowchartAst::default();
@@ -195,7 +193,6 @@ fn load_or_init_session_refuses_to_seed_when_diagram_files_exist(ctx: SessionFol
     let meta_path = folder.meta_path();
     assert!(meta_path.is_file());
     std::fs::remove_file(&meta_path).unwrap();
-    // The diagram file must still be present.
     assert!(ctx.session_dir.join("diagrams/d1.mmd").is_file());
 
     let err = folder.load_or_init_session().unwrap_err();
@@ -206,7 +203,6 @@ fn load_or_init_session_refuses_to_seed_when_diagram_files_exist(ctx: SessionFol
         other => panic!("expected MetaMissingWithExistingDiagrams, got: {other:?}"),
     }
 
-    // It must not have re-seeded a meta over the existing artifacts.
     assert!(!meta_path.exists(), "load_or_init must not write a seed meta when diagrams exist");
 }
 
@@ -273,12 +269,6 @@ fn save_active_diagram_id_updates_meta_and_loads_back(ctx: SessionFolderTestCtx)
     assert_eq!(loaded.active_diagram_id(), Some(&d2));
 }
 
-// Regression: a partial meta update (`save_active_diagram_id`) and a full `save_session` that
-// adds diagrams run concurrently against independently constructed folders for the same path. The
-// meta index must never list fewer diagrams than have `.mmd` files on disk — i.e. the partial
-// update must not drop additions made by a concurrent full save. Without path-level serialization
-// the load-modify-save in `save_active_diagram_id` races `save_session` and orphans freshly written
-// diagram files.
 #[rstest]
 fn save_active_diagram_id_does_not_drop_concurrent_save_session_additions(
     ctx: SessionFolderTestCtx,
@@ -294,7 +284,6 @@ fn save_active_diagram_id_does_not_drop_concurrent_save_session_additions(
         Diagram::new(id.clone(), "D", DiagramAst::Flowchart(ast))
     }
 
-    // Seed an initial session containing the first diagram.
     let mut session = Session::new(SessionId::new("s:concurrent").unwrap());
     let first = DiagramId::new("d-000").unwrap();
     session.diagrams_mut().insert(first.clone(), diagram(&first, "n:000"));
@@ -310,7 +299,6 @@ fn save_active_diagram_id_does_not_drop_concurrent_save_session_additions(
     let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let observer_done = done.clone();
 
-    // Writer thread: cumulatively grows the session, adding one diagram per save_session.
     let writer = std::thread::spawn(move || {
         writer_barrier.wait();
         let mut session = session;
@@ -322,8 +310,6 @@ fn save_active_diagram_id_does_not_drop_concurrent_save_session_additions(
         }
     });
 
-    // Patcher thread: repeatedly rewrites only the active-diagram field, reloading the on-disk
-    // session each time so it patches whatever meta currently exists.
     let patcher = std::thread::spawn(move || {
         barrier.wait();
         for _ in 0..DIAGRAMS * 4 {
@@ -332,9 +318,6 @@ fn save_active_diagram_id_does_not_drop_concurrent_save_session_additions(
         }
     });
 
-    // Observer thread: the writer only ever adds diagrams, so the indexed count must be
-    // monotonically non-decreasing. A stale partial write that drops a diagram is caught here
-    // as a transient decrease, making the regression deterministic rather than end-state only.
     let observer = std::thread::spawn(move || {
         observer_barrier.wait();
         let mut high_water = 0usize;
@@ -353,7 +336,6 @@ fn save_active_diagram_id_does_not_drop_concurrent_save_session_additions(
     done.store(true, std::sync::atomic::Ordering::Relaxed);
     observer.join().unwrap();
 
-    // Every diagram the writer added must still be indexed in meta (none orphaned).
     let meta = ctx.folder.load_meta().unwrap();
     let indexed: std::collections::BTreeSet<_> =
         meta.diagrams.iter().map(|d| d.diagram_id.clone()).collect();
@@ -364,15 +346,10 @@ fn save_active_diagram_id_does_not_drop_concurrent_save_session_additions(
             "diagram {id} missing from meta index after concurrent saves"
         );
     }
-    // And the session loads all of them back.
     let loaded = ctx.folder.load_session().unwrap();
     assert_eq!(loaded.diagrams().len(), DIAGRAMS);
 }
 
-// Regression: read-modify-save writers must hold the session write lock while loading, mutating,
-// and committing. A second writer that starts while the first has loaded but not committed must
-// load after the first commit, otherwise its full-session save can overwrite the first writer's
-// different-diagram edit with a stale snapshot.
 #[rstest]
 fn session_update_waits_to_load_until_prior_writer_commits(ctx: SessionFolderTestCtx) {
     fn diagram(id: &DiagramId, node_id: &str, label: &str) -> Diagram {
@@ -892,11 +869,6 @@ fn legacy_meta_without_walkthrough_ids_scans_directory(ctx: SessionFolderTestCtx
     assert!(loaded.walkthroughs().contains_key(&w1));
 }
 
-// Regression: a partial save_session failure must never leave a new .mmd next to a stale sidecar
-// (which load_session would reconcile, reassigning object ids). Writing the sidecar before the
-// .mmd guarantees that if the sidecar write fails, the .mmd is never updated, so reload yields a
-// clean rollback to the prior revision. We force the sidecar write to fail by symlinking it
-// (atomic writes refuse symlinks) while keeping the prior sidecar readable through the link.
 #[cfg(unix)]
 #[rstest]
 fn save_session_rolls_back_diagram_when_sidecar_write_fails(ctx: SessionFolderTestCtx) {
@@ -906,7 +878,6 @@ fn save_session_rolls_back_diagram_when_sidecar_write_fails(ctx: SessionFolderTe
     let n_a = ObjectId::new("n:a").unwrap();
     let n_b = ObjectId::new("n:b").unwrap();
 
-    // rev 0: a single node n:a.
     let mut session = Session::new(SessionId::new("s1").unwrap());
     let mut ast0 = FlowchartAst::default();
     ast0.nodes_mut().insert(n_a.clone(), FlowNode::new("A"));
@@ -919,13 +890,10 @@ fn save_session_rolls_back_diagram_when_sidecar_write_fails(ctx: SessionFolderTe
     let sidecar_path = folder.diagram_meta_path(&mmd_path).unwrap();
     assert!(mmd_path.is_file() && sidecar_path.is_file());
 
-    // Turn the sidecar into a symlink: still readable through the link, but the next atomic
-    // write to it will fail with SymlinkRefused.
     let sidecar_backing = sidecar_path.with_extension("json.backing");
     std::fs::rename(&sidecar_path, &sidecar_backing).unwrap();
     std::os::unix::fs::symlink(&sidecar_backing, &sidecar_path).unwrap();
 
-    // rev 1: add node n:b, then save. The sidecar write fails before the .mmd is touched.
     {
         let diagram = session.diagrams_mut().get_mut(&d1).unwrap();
         let DiagramAst::Flowchart(mut ast1) = diagram.ast().clone() else { panic!() };
@@ -939,8 +907,6 @@ fn save_session_rolls_back_diagram_when_sidecar_write_fails(ctx: SessionFolderTe
         other => panic!("expected SymlinkRefused from sidecar write, got: {other:?}"),
     }
 
-    // Restore the sidecar to a plain file (drop the symlink) so reload is realistic, then verify
-    // the on-disk diagram rolled back cleanly to rev 0: n:b must NOT have been written to the .mmd.
     std::fs::remove_file(&sidecar_path).unwrap();
     std::fs::rename(&sidecar_backing, &sidecar_path).unwrap();
 
@@ -954,9 +920,6 @@ fn save_session_rolls_back_diagram_when_sidecar_write_fails(ctx: SessionFolderTe
     );
 }
 
-// Regression: if a sidecar write succeeds but the following `.mmd` write fails, the new sidecar
-// must be rolled back. Otherwise reload would parse old Mermaid content through a sidecar from the
-// failed new revision.
 #[cfg(unix)]
 #[rstest]
 fn save_session_restores_sidecar_when_mmd_write_fails(ctx: SessionFolderTestCtx) {
@@ -1012,8 +975,6 @@ fn save_session_restores_sidecar_when_mmd_write_fails(ctx: SessionFolderTestCtx)
     );
 }
 
-// Regression: diagram artifacts written before the session meta commit must be rolled back if the
-// meta commit fails. Otherwise the old meta index can point at newly written `.mmd`/sidecar files.
 #[cfg(unix)]
 #[rstest]
 fn save_session_rolls_back_diagram_artifacts_when_meta_write_fails(ctx: SessionFolderTestCtx) {
@@ -1071,10 +1032,6 @@ fn save_session_rolls_back_diagram_artifacts_when_meta_write_fails(ctx: SessionF
     );
 }
 
-// Regression: walkthrough GC must run only after the meta index is committed. If the meta
-// write fails, the removed walkthrough's file must still exist so the prior meta stays loadable.
-// A symlinked meta file makes the atomic meta write fail (SymlinkRefused) while remaining
-// readable through the symlink, deterministically exercising the failure path.
 #[cfg(unix)]
 #[rstest]
 fn save_session_keeps_removed_walkthrough_loadable_when_meta_commit_fails(
@@ -1092,14 +1049,11 @@ fn save_session_keeps_removed_walkthrough_loadable_when_meta_commit_fails(
     let w2_path = folder.walkthrough_json_path(&w2);
     assert!(w2_path.is_file(), "precondition: w2 file written");
 
-    // Turn the meta file into a symlink: load_meta still reads through it, but the atomic
-    // meta write refuses to overwrite a symlink, so the upcoming save_meta will fail.
     let meta_path = folder.meta_path();
     let backing = folder.root().join("nereid-session.meta.json.backing");
     std::fs::rename(&meta_path, &backing).unwrap();
     std::os::unix::fs::symlink(&backing, &meta_path).unwrap();
 
-    // Remove w2 and save. The meta commit fails before GC, so w2's file must survive.
     session.walkthroughs_mut().remove(&w2);
     let err = folder.save_session(&session).unwrap_err();
     match err {
@@ -1112,7 +1066,6 @@ fn save_session_keeps_removed_walkthrough_loadable_when_meta_commit_fails(
         "removed walkthrough file must not be deleted before the meta commit succeeds",
     );
 
-    // The session still loads consistently from the prior (unchanged) meta.
     let loaded = folder.load_session().unwrap();
     assert!(loaded.walkthroughs().contains_key(&w2));
 }

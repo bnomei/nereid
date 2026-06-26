@@ -6,8 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-/// Sequence/flow mutation implementation helpers used by `apply_ops`.
-/// Keeps `ops::mod` focused on public op types and orchestration.
+// Sequence and flowchart op application: validation, AST mutation, and delta recording.
+
 fn apply_seq_op(
     diagram_id: &DiagramId,
     ast: &mut SequenceAst,
@@ -216,12 +216,6 @@ fn sort_seq_messages(ast: &mut SequenceAst) {
     ast.messages_mut().sort_by(SequenceMessage::cmp_in_order);
 }
 
-/// Remove the given message ids from every block section after the messages were deleted, then
-/// drop sections that become empty and blocks that lose all sections. Block/section membership is
-/// stored independently of `SequenceAst::messages`, so without this a removed message leaves a
-/// dangling `section.message_ids` entry that makes Mermaid export hard-error
-/// (`InvalidBlockMembership`). A block is kept only while it retains a non-empty section, matching
-/// the exporter/renderer requirement that every block has at least one section.
 fn prune_messages_from_blocks(ast: &mut SequenceAst, removed: &HashSet<ObjectId>) {
     if removed.is_empty() {
         return;

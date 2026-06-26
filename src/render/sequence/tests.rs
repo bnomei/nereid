@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Sequence render regression tests and golden fixtures.
+
 use super::super::test_utils::collect_spanned_text;
 use super::{
     render_sequence_unicode, render_sequence_unicode_annotated,
@@ -589,11 +591,6 @@ A->>B: Post\n";
     }
 }
 
-// Regression: the renderer must consume the layout's column-gap spacing budget. A long
-// cross-column message label produces col_gap pressure; honoring it widens the gap so the label
-// is not clipped and lifelines do not overlap. With identical participants, the long-label
-// diagram must therefore render wider than a short-label one. A renderer using only the fixed
-// COL_GAP would produce identical widths.
 #[test]
 fn render_consumes_col_gap_budget_for_long_cross_column_label() {
     fn build(label: &str) -> SequenceAst {
@@ -625,7 +622,6 @@ fn render_consumes_col_gap_budget_for_long_cross_column_label() {
 
     let long_ast =
         build("This message label is intentionally long to exceed baseline span capacity");
-    // Precondition: the long label produces column-gap pressure the renderer must honor.
     let long_layout = layout_sequence(&long_ast).expect("layout");
     assert!(
         !long_layout.spacing_budget().col_gap_extra_spacing_by_col().is_empty(),
@@ -642,9 +638,6 @@ fn render_consumes_col_gap_budget_for_long_cross_column_label() {
     );
 }
 
-// Regression: a section whose member messages are non-contiguous (skipping an intermediate
-// message) must be rejected by the renderer, matching the exporter. Otherwise the min/max row
-// span draws a frame over the skipped message, implying it belongs to the section.
 #[test]
 fn render_rejects_non_contiguous_section_membership() {
     let a = ObjectId::new("p:a").unwrap();
@@ -664,11 +657,10 @@ fn render_rejects_non_contiguous_section_membership() {
             order,
         )
     };
-    ast.messages_mut().push(msg("m:1", 1000)); // row 0
-    ast.messages_mut().push(msg("m:2", 2000)); // row 1
-    ast.messages_mut().push(msg("m:3", 3000)); // row 2
+    ast.messages_mut().push(msg("m:1", 1000));
+    ast.messages_mut().push(msg("m:2", 2000));
+    ast.messages_mut().push(msg("m:3", 3000));
 
-    // Section skips m:2, so its rows are {0, 2} — non-contiguous.
     let section = SequenceSection::new(
         ObjectId::new("sec:0001:00").unwrap(),
         SequenceSectionKind::Main,
@@ -693,7 +685,6 @@ fn render_rejects_non_contiguous_section_membership() {
         other => panic!("expected InvalidBlockMembership, got: {other:?}"),
     }
 
-    // The exporter rejects the same membership; render and export now agree.
     assert!(
         export_sequence_diagram(&ast).is_err(),
         "exporter should also reject non-contiguous section membership",

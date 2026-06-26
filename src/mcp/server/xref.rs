@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Cross-reference MCP tools: list, add, remove, and neighbor exploration.
+
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::{tool, tool_router};
 
@@ -194,8 +196,6 @@ impl NereidMcp {
         let mut state = self.lock_state_synced().await?;
         if let Some(session_folder) = &self.session_folder {
             let (candidate, status) = {
-                // Hold the session-folder write lock from reload through commit so another writer
-                // cannot advance a different object between our reload and full-session save.
                 let mut update = session_folder.begin_session_update().map_err(|err| {
                     ErrorData::internal_error(
                         format!("failed to reload session before save: {err}"),
@@ -274,8 +274,6 @@ impl NereidMcp {
         let mut state = self.lock_state_synced().await?;
         if let Some(session_folder) = &self.session_folder {
             let candidate = {
-                // Hold the session-folder write lock from reload through commit so another writer
-                // cannot advance a different object between our reload and full-session save.
                 let mut update = session_folder.begin_session_update().map_err(|err| {
                     ErrorData::internal_error(
                         format!("failed to reload session before save: {err}"),

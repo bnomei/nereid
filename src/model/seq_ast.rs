@@ -6,11 +6,14 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Sequence-diagram AST: participants, ordered messages, notes, and alt/par blocks.
+
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
 use super::ids::ObjectId;
 
+/// Mutable sequence-diagram content: participants, ordered messages, notes, and blocks.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SequenceAst {
     participants: BTreeMap<ObjectId, SequenceParticipant>,
@@ -97,6 +100,7 @@ impl SequenceAst {
     }
 }
 
+/// Sequence lifeline with Mermaid name, optional role alias, and note text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SequenceParticipant {
     mermaid_name: String,

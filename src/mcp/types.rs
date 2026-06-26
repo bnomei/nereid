@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! MCP tool request/response types and JSON Schema definitions for the protocol surface.
+
 use std::collections::BTreeMap;
 
 use schemars::JsonSchema;

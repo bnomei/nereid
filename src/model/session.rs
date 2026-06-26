@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! In-memory session aggregate: diagrams, walkthroughs, xrefs, and UI selection state.
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::diagram::{Diagram, DiagramAst};

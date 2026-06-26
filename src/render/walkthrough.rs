@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Walkthrough graph renderer as a left-to-right Unicode node flow.
+
 use std::fmt;
 
 use crate::model::ids::WalkthroughNodeId;

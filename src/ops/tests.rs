@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Op application regression tests: revision conflicts, kind mismatches, and deltas.
+
 use crate::model::{
     DiagramAst, DiagramId, FlowchartAst, ObjectId, SequenceAst, SequenceParticipant,
 };
@@ -974,10 +976,6 @@ fn apply_seq_remove_participant_records_cascading_message_removal_in_delta() {
     assert!(ast.messages().is_empty());
 }
 
-// Regression: removing a sequence message (directly or via participant cascade) must also prune
-// that message id from any block section that referenced it, otherwise the section holds a
-// dangling id and Mermaid export hard-errors (InvalidBlockMembership), leaving the diagram
-// un-exportable after a legal edit.
 #[test]
 fn remove_message_prunes_section_membership_and_keeps_export_valid() {
     use crate::format::mermaid::sequence::export_sequence_diagram;
@@ -1035,7 +1033,6 @@ fn remove_message_prunes_section_membership_and_keeps_export_valid() {
     let mut diagram =
         Diagram::new(DiagramId::new("d:1").expect("id"), "seq", DiagramAst::Sequence(ast));
 
-    // Sanity: exports cleanly before the edit.
     let DiagramAst::Sequence(ast) = diagram.ast() else { panic!("sequence") };
     export_sequence_diagram(ast).expect("export before edit");
 
@@ -1043,7 +1040,6 @@ fn remove_message_prunes_section_membership_and_keeps_export_valid() {
         .expect("remove message");
 
     let DiagramAst::Sequence(ast) = diagram.ast() else { panic!("sequence") };
-    // The removed id must not linger in any section, and export must still succeed.
     for block in ast.blocks() {
         for section in block.sections() {
             assert!(

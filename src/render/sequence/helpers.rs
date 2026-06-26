@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+// Sequence render helpers: lifeline boxes, message arrows, and block framing.
+
 /// Sequence rendering internals:
 /// row/column placement, block decoration, overlays, and text composition.
 fn seq_box_height(options: RenderOptions) -> usize {
@@ -27,13 +29,6 @@ fn participants_in_col_order(layout: &SequenceLayout) -> Vec<(usize, &ObjectId)>
     participants
 }
 
-/// Place participant boxes left-to-right, honoring the layout's column-gap spacing budget.
-///
-/// Both the text renderer and the annotated renderer derive participant coordinates this way, so
-/// the placement (including the budgeted extra gap) must stay identical between them or highlight
-/// spans would drift from the rendered text. The budget is keyed by the gap's left column and adds
-/// room the layout reserved for wide participant labels or long inter-column message spans on top
-/// of the fixed `COL_GAP`.
 fn compute_participant_renders<'a>(
     ast: &'a SequenceAst,
     layout: &'a SequenceLayout,
@@ -888,11 +883,6 @@ fn section_row_ranges<'a>(
         rows.sort_unstable();
         rows.dedup();
 
-        // The frame spans [first_row, last_row]. If membership is non-contiguous the span would
-        // cover rows of messages that are not in the section, drawing a misleading frame. Reject
-        // it to stay consistent with the exporter, which rejects the same non-contiguous
-        // membership (message rows are dense and 1:1 with message order, so row contiguity here
-        // matches the exporter's index contiguity).
         for window in rows.windows(2) {
             if window[1] != window[0] + 1 {
                 return Err(SequenceRenderError::InvalidBlockMembership {

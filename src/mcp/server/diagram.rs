@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Diagram MCP tools: list, open, render, mutate, and bootstrap from Mermaid.
+
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::{tool, tool_router};
 
@@ -115,8 +117,6 @@ impl NereidMcp {
 
         if let Some(session_folder) = &self.session_folder {
             let candidate = {
-                // Hold the session-folder write lock from reload through commit so another writer
-                // cannot advance a different diagram between our reload and full-session save.
                 let mut update = session_folder.begin_session_update().map_err(|err| {
                     ErrorData::internal_error(
                         format!("failed to reload session before save: {err}"),
@@ -192,8 +192,6 @@ impl NereidMcp {
 
         if let Some(session_folder) = &self.session_folder {
             let candidate = {
-                // Hold the session-folder write lock from reload through commit so another writer
-                // cannot advance a different diagram between our reload and full-session save.
                 let mut update = session_folder.begin_session_update().map_err(|err| {
                     ErrorData::internal_error(
                         format!("failed to reload session before save: {err}"),
@@ -250,8 +248,6 @@ impl NereidMcp {
 
         if let Some(session_folder) = &self.session_folder {
             let candidate = {
-                // Hold the session-folder write lock from reload through commit so another writer
-                // cannot advance a different diagram between our reload and full-session save.
                 let mut update = session_folder.begin_session_update().map_err(|err| {
                     ErrorData::internal_error(
                         format!("failed to reload session before save: {err}"),
@@ -993,10 +989,6 @@ impl NereidMcp {
 
         if let Some(session_folder) = &self.session_folder {
             let (candidate_session, history, response) = {
-                // Hold the session-folder write lock from reload through commit so concurrent edits
-                // to other diagrams/walkthroughs cannot be overwritten by a stale full-session
-                // snapshot. Sourcing the edited diagram from the freshly loaded session also lets
-                // `apply_ops` reject the op when another writer advanced this diagram on disk.
                 let mut update = session_folder.begin_session_update().map_err(|err| {
                     ErrorData::internal_error(
                         format!("failed to reload session before save: {err}"),
@@ -1024,10 +1016,6 @@ impl NereidMcp {
                     )
                 })?;
                 candidate_session.diagrams_mut().insert(diagram_id.clone(), candidate_diagram);
-                // Ops may remove objects that the selection or xrefs reference. Prune dangling
-                // selection entries and recompute xref status before persisting, so the saved meta
-                // never lists removed refs and xref.list reflects dangling endpoints. Matches
-                // diagram.delete and the disk-load path.
                 retain_existing_selected_object_refs(candidate_session);
                 refresh_xref_statuses(candidate_session);
 
@@ -1063,8 +1051,6 @@ impl NereidMcp {
             };
             state.session = candidate_session;
             state.delta_history.insert(diagram_id, history);
-            // Ops may have removed an object the agent spotlight points at; drop stale highlights
-            // so attention.agent.read does not return missing refs, mirroring diagram.delete.
             self.prune_missing_agent_highlights(&state.session).await;
             drop(state);
             self.notify_ui_session_changed().await;
@@ -1091,8 +1077,6 @@ impl NereidMcp {
             )
         })?;
         state.session.diagrams_mut().insert(diagram_id.clone(), candidate_diagram);
-        // Ops may remove objects that the selection or xrefs reference; prune dangling selection
-        // entries and recompute xref status, matching diagram.delete and the disk-load path.
         retain_existing_selected_object_refs(&mut state.session);
         refresh_xref_statuses(&mut state.session);
         let history = state.delta_history.entry(diagram_id).or_insert_with(VecDeque::new);
@@ -1114,8 +1098,6 @@ impl NereidMcp {
                 updated: result.delta.updated.iter().map(ToString::to_string).collect(),
             },
         });
-        // Ops may have removed an object the agent spotlight points at; drop stale highlights
-        // so attention.agent.read does not return missing refs, mirroring diagram.delete.
         self.prune_missing_agent_highlights(&state.session).await;
         drop(state);
         self.notify_ui_session_changed().await;

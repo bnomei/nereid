@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Walkthrough graph: narrative nodes and edges layered over session diagrams.
+
 use super::ids::{WalkthroughId, WalkthroughNodeId};
 use super::object_ref::ObjectRef;
 

@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Cross-diagram links between `ObjectRef` endpoints with lifecycle status.
+
 use std::fmt;
 use std::str::FromStr;
 

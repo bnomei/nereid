@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Walkthrough MCP tools: list, open, render, and node-level reads.
+
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::{tool, tool_router};
 
@@ -35,8 +37,6 @@ impl NereidMcp {
 
         if let Some(session_folder) = &self.session_folder {
             let candidate = {
-                // Hold the session-folder write lock from reload through commit so another writer
-                // cannot advance a different object between our reload and full-session save.
                 let mut update = session_folder.begin_session_update().map_err(|err| {
                     ErrorData::internal_error(
                         format!("failed to reload session before save: {err}"),
@@ -343,10 +343,6 @@ impl NereidMcp {
 
         if let Some(session_folder) = &self.session_folder {
             let (candidate_session, history, response) = {
-                // Hold the session-folder write lock from reload through commit so concurrent edits
-                // to other diagrams/walkthroughs cannot be overwritten by a stale full-session
-                // snapshot. The `base_rev` check below runs against this freshly loaded walkthrough,
-                // so a concurrent edit to this same walkthrough is reported as a conflict.
                 let mut update = session_folder.begin_session_update().map_err(|err| {
                     ErrorData::internal_error(
                         format!("failed to reload session before save: {err}"),
@@ -474,10 +470,6 @@ impl NereidMcp {
             }));
         }
 
-        // Apply on a clone and commit only after every op succeeds, so a mid-batch failure
-        // leaves the live walkthrough unchanged. This mirrors diagram.apply_ops and the
-        // persistent walkthrough path; applying directly would leave partial mutations behind
-        // when a later op in the batch errors.
         let mut candidate = walkthrough.clone();
         let delta = apply_walkthrough_ops(&mut candidate, &parsed, &ops)?;
         candidate.bump_rev();

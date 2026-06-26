@@ -13,6 +13,7 @@
 
 use crate::model::{DiagramId, ObjectRef};
 
+/// Cross-process UI snapshot: human selection, follow-AI flag, and revision counters.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UiState {
     rev: u64,
