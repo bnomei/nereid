@@ -539,6 +539,14 @@ pub struct SessionFolder {
 }
 
 #[derive(Debug)]
+struct DiagramArtifactsSnapshot {
+    mmd_path: PathBuf,
+    meta_path: PathBuf,
+    mmd_contents: Option<Vec<u8>>,
+    meta_contents: Option<Vec<u8>>,
+}
+
+#[derive(Debug)]
 pub struct SessionUpdate<'a> {
     folder: &'a SessionFolder,
     _guard: SessionWriteGuard<'a>,
@@ -872,6 +880,104 @@ impl SessionFolder {
         Ok(SessionUpdate { folder: self, _guard: guard, session: Some(session) })
     }
 
+    fn read_file_snapshot(path: &Path) -> Result<Option<Vec<u8>>, StoreError> {
+        match fs::read(path) {
+            Ok(contents) => Ok(Some(contents)),
+            Err(source) if source.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(source) => Err(StoreError::Io { path: path.to_path_buf(), source }),
+        }
+    }
+
+    fn snapshot_diagram_artifacts(
+        &self,
+        mmd_path: &Path,
+        meta_path: &Path,
+    ) -> Result<DiagramArtifactsSnapshot, StoreError> {
+        Ok(DiagramArtifactsSnapshot {
+            mmd_path: mmd_path.to_path_buf(),
+            meta_path: meta_path.to_path_buf(),
+            mmd_contents: Self::read_file_snapshot(mmd_path)?,
+            meta_contents: Self::read_file_snapshot(meta_path)?,
+        })
+    }
+
+    fn restore_file_snapshot(
+        &self,
+        path: &Path,
+        contents: &Option<Vec<u8>>,
+    ) -> Result<(), StoreError> {
+        match contents {
+            Some(contents) => {
+                write_atomic_in_session(self.root(), path, contents, self.durability)?;
+            }
+            None => match fs::remove_file(path) {
+                Ok(()) => {}
+                Err(source) if source.kind() == io::ErrorKind::NotFound => {}
+                Err(source) => return Err(StoreError::Io { path: path.to_path_buf(), source }),
+            },
+        }
+        Ok(())
+    }
+
+    fn restore_file_snapshot_unless_symlink(
+        &self,
+        path: &Path,
+        contents: &Option<Vec<u8>>,
+    ) -> Result<(), StoreError> {
+        match fs::symlink_metadata(path) {
+            Ok(metadata) if metadata.file_type().is_symlink() => Ok(()),
+            Ok(_) | Err(_) => self.restore_file_snapshot(path, contents),
+        }
+    }
+
+    fn restore_diagram_artifacts(
+        &self,
+        snapshot: &DiagramArtifactsSnapshot,
+    ) -> Result<(), StoreError> {
+        self.restore_file_snapshot(&snapshot.mmd_path, &snapshot.mmd_contents)?;
+        self.restore_file_snapshot(&snapshot.meta_path, &snapshot.meta_contents)?;
+        Ok(())
+    }
+
+    fn rollback_diagram_artifacts(
+        &self,
+        snapshots: &[DiagramArtifactsSnapshot],
+    ) -> Result<(), StoreError> {
+        for snapshot in snapshots.iter().rev() {
+            self.restore_diagram_artifacts(snapshot)?;
+        }
+        Ok(())
+    }
+
+    fn rollback_diagram_artifacts_then<T>(
+        &self,
+        snapshots: &[DiagramArtifactsSnapshot],
+        err: StoreError,
+    ) -> Result<T, StoreError> {
+        self.rollback_diagram_artifacts(snapshots)?;
+        Err(err)
+    }
+
+    fn save_diagram_artifacts(
+        &self,
+        diagram: &Diagram,
+        mmd_path: &Path,
+        meta_path: &Path,
+        diagram_meta: &DiagramMeta,
+    ) -> Result<DiagramArtifactsSnapshot, StoreError> {
+        let snapshot = self.snapshot_diagram_artifacts(mmd_path, meta_path)?;
+
+        self.save_diagram_meta(diagram_meta)?;
+
+        if let Err(err) = export_diagram_mmd(self, diagram, mmd_path) {
+            self.restore_file_snapshot(&snapshot.meta_path, &snapshot.meta_contents)?;
+            self.restore_file_snapshot_unless_symlink(&snapshot.mmd_path, &snapshot.mmd_contents)?;
+            return Err(err);
+        }
+
+        Ok(snapshot)
+    }
+
     /// Body of [`Self::save_session`], assuming the caller already holds the meta lock.
     fn save_session_locked(&self, session: &Session) -> Result<(), StoreError> {
         #[derive(Debug, Deserialize)]
@@ -913,11 +1019,23 @@ impl SessionFolder {
             xrefs: Vec::new(),
             selected_object_refs: session.selected_object_refs().iter().cloned().collect(),
         };
+        let mut changed_diagram_artifacts = Vec::new();
+        let mut pending_diagram_ascii_exports = Vec::new();
 
         for (diagram_id, diagram) in session.diagrams() {
             let mmd_path = self.default_diagram_mmd_path(diagram_id);
-            let ascii_path = self.diagram_ascii_path(&mmd_path)?;
-            let meta_path = self.diagram_meta_path(&mmd_path)?;
+            let ascii_path = match self.diagram_ascii_path(&mmd_path) {
+                Ok(path) => path,
+                Err(err) => {
+                    return self.rollback_diagram_artifacts_then(&changed_diagram_artifacts, err);
+                }
+            };
+            let meta_path = match self.diagram_meta_path(&mmd_path) {
+                Ok(path) => path,
+                Err(err) => {
+                    return self.rollback_diagram_artifacts_then(&changed_diagram_artifacts, err);
+                }
+            };
 
             let diagram_rev_unchanged = existing_diagram_revs
                 .get(diagram_id)
@@ -979,16 +1097,12 @@ impl SessionFolder {
                     DiagramAst::Flowchart(_) => BTreeMap::new(),
                 };
 
-                // Write the sidecar BEFORE the .mmd. Each per-file write is already atomic
-                // (temp + rename), but the .mmd and its sidecar are separate files with no
-                // shared transaction. Ordering the sidecar first guarantees the dangerous
-                // "new .mmd + stale sidecar" combination can never appear on disk after a
-                // partial/crashed save: if a new .mmd exists, its matching sidecar was already
-                // written. load_session therefore never reconciles fresh Mermaid content against
-                // a stale stable-id map (which would reassign object ids and break xrefs and
-                // selection). A crash between the two writes leaves the diagram at its prior
-                // revision — a clean rollback that self-heals on the next successful save.
-                self.save_diagram_meta(&DiagramMeta {
+                // Write the sidecar before the `.mmd`, then record enough state to roll both
+                // files back if this save fails before the session meta commit. Without that
+                // rollback, a failed `.mmd` write could leave old Mermaid content with a new
+                // sidecar, and a later pre-meta failure could leave new diagram artifacts behind
+                // a stale session meta index.
+                let diagram_meta = DiagramMeta {
                     diagram_id: diagram_id.clone(),
                     mmd_path: mmd_path.clone(),
                     stable_id_map: stable_id_map_from_ast(diagram.ast()),
@@ -997,13 +1111,19 @@ impl SessionFolder {
                     sequence_messages,
                     flow_node_notes,
                     sequence_participant_notes,
-                })?;
+                };
 
-                export_diagram_mmd(self, diagram, &mmd_path)?;
+                match self.save_diagram_artifacts(diagram, &mmd_path, &meta_path, &diagram_meta) {
+                    Ok(snapshot) => changed_diagram_artifacts.push(snapshot),
+                    Err(err) => {
+                        return self
+                            .rollback_diagram_artifacts_then(&changed_diagram_artifacts, err);
+                    }
+                }
             }
 
             if !diagram_rev_unchanged || !ascii_path.is_file() {
-                self.schedule_diagram_ascii_export(&mmd_path, diagram)?;
+                pending_diagram_ascii_exports.push((mmd_path.clone(), diagram.clone()));
             }
 
             meta.diagrams.push(SessionMetaDiagram {
@@ -1045,9 +1165,13 @@ impl SessionFolder {
                 && read_walkthrough_rev(&json_path).is_some_and(|rev| rev == walkthrough.rev());
 
             if !rev_matches {
-                self.save_walkthrough(walkthrough)?;
+                if let Err(err) = self.save_walkthrough(walkthrough) {
+                    return self.rollback_diagram_artifacts_then(&changed_diagram_artifacts, err);
+                }
             } else if !ascii_path.is_file() {
-                self.schedule_walkthrough_ascii_export(walkthrough)?;
+                if let Err(err) = self.schedule_walkthrough_ascii_export(walkthrough) {
+                    return self.rollback_diagram_artifacts_then(&changed_diagram_artifacts, err);
+                }
             }
         }
 
@@ -1056,7 +1180,13 @@ impl SessionFolder {
         // on-disk files. If GC then fails, the orphaned file is no longer referenced by meta, so
         // the session remains loadable. Deleting before the meta commit would instead leave meta
         // pointing at files that no longer exist.
-        self.save_meta(&meta)?;
+        if let Err(err) = self.save_meta(&meta) {
+            return self.rollback_diagram_artifacts_then(&changed_diagram_artifacts, err);
+        }
+
+        for (mmd_path, diagram) in pending_diagram_ascii_exports {
+            self.schedule_diagram_ascii_export(&mmd_path, &diagram)?;
+        }
 
         if !skip_walkthrough_gc {
             if let Some(walkthrough_ids) = meta.walkthrough_ids.as_deref() {

@@ -954,6 +954,123 @@ fn save_session_rolls_back_diagram_when_sidecar_write_fails(ctx: SessionFolderTe
     );
 }
 
+// Regression: if a sidecar write succeeds but the following `.mmd` write fails, the new sidecar
+// must be rolled back. Otherwise reload would parse old Mermaid content through a sidecar from the
+// failed new revision.
+#[cfg(unix)]
+#[rstest]
+fn save_session_restores_sidecar_when_mmd_write_fails(ctx: SessionFolderTestCtx) {
+    let folder = &ctx.folder;
+
+    let d1 = DiagramId::new("d1").unwrap();
+    let n_a = ObjectId::new("n:a").unwrap();
+    let n_b = ObjectId::new("n:b").unwrap();
+
+    let mut session = Session::new(SessionId::new("s1").unwrap());
+    let mut ast0 = FlowchartAst::default();
+    ast0.nodes_mut().insert(n_a.clone(), FlowNode::new("A"));
+    session
+        .diagrams_mut()
+        .insert(d1.clone(), Diagram::new(d1.clone(), "D", DiagramAst::Flowchart(ast0)));
+    folder.save_session(&session).unwrap();
+
+    let mmd_path = folder.default_diagram_mmd_path(&d1);
+    let sidecar_path = folder.diagram_meta_path(&mmd_path).unwrap();
+    let sidecar_before = std::fs::read(&sidecar_path).unwrap();
+
+    let mmd_backing = mmd_path.with_extension("mmd.backing");
+    std::fs::rename(&mmd_path, &mmd_backing).unwrap();
+    std::os::unix::fs::symlink(&mmd_backing, &mmd_path).unwrap();
+
+    {
+        let diagram = session.diagrams_mut().get_mut(&d1).unwrap();
+        let DiagramAst::Flowchart(mut ast1) = diagram.ast().clone() else { panic!() };
+        ast1.nodes_mut().insert(n_b.clone(), FlowNode::new("B"));
+        diagram.set_ast(DiagramAst::Flowchart(ast1)).unwrap();
+        diagram.bump_rev();
+    }
+
+    let err = folder.save_session(&session).unwrap_err();
+    match err {
+        StoreError::SymlinkRefused { path } => assert_eq!(path, mmd_path),
+        other => panic!("expected SymlinkRefused from mmd write, got: {other:?}"),
+    }
+
+    let sidecar_after = std::fs::read(&sidecar_path).unwrap();
+    assert_eq!(sidecar_after, sidecar_before, "failed mmd write must restore old sidecar");
+
+    std::fs::remove_file(&mmd_path).unwrap();
+    std::fs::rename(&mmd_backing, &mmd_path).unwrap();
+
+    let loaded = folder.load_session().unwrap();
+    let diagram = loaded.diagrams().get(&d1).expect("diagram");
+    let DiagramAst::Flowchart(ast) = diagram.ast() else { panic!() };
+    assert!(ast.nodes().contains_key(&n_a), "n:a must survive");
+    assert!(
+        !ast.nodes().contains_key(&n_b),
+        "failed .mmd write must leave the diagram at the prior revision",
+    );
+}
+
+// Regression: diagram artifacts written before the session meta commit must be rolled back if the
+// meta commit fails. Otherwise the old meta index can point at newly written `.mmd`/sidecar files.
+#[cfg(unix)]
+#[rstest]
+fn save_session_rolls_back_diagram_artifacts_when_meta_write_fails(ctx: SessionFolderTestCtx) {
+    let folder = &ctx.folder;
+
+    let d1 = DiagramId::new("d1").unwrap();
+    let n_a = ObjectId::new("n:a").unwrap();
+    let n_b = ObjectId::new("n:b").unwrap();
+
+    let mut session = Session::new(SessionId::new("s1").unwrap());
+    let mut ast0 = FlowchartAst::default();
+    ast0.nodes_mut().insert(n_a.clone(), FlowNode::new("A"));
+    session
+        .diagrams_mut()
+        .insert(d1.clone(), Diagram::new(d1.clone(), "D", DiagramAst::Flowchart(ast0)));
+    folder.save_session(&session).unwrap();
+
+    let mmd_path = folder.default_diagram_mmd_path(&d1);
+    let sidecar_path = folder.diagram_meta_path(&mmd_path).unwrap();
+    let mmd_before = std::fs::read(&mmd_path).unwrap();
+    let sidecar_before = std::fs::read(&sidecar_path).unwrap();
+
+    let meta_path = folder.meta_path();
+    let meta_backing = folder.root().join("nereid-session.meta.json.backing");
+    std::fs::rename(&meta_path, &meta_backing).unwrap();
+    std::os::unix::fs::symlink(&meta_backing, &meta_path).unwrap();
+
+    {
+        let diagram = session.diagrams_mut().get_mut(&d1).unwrap();
+        let DiagramAst::Flowchart(mut ast1) = diagram.ast().clone() else { panic!() };
+        ast1.nodes_mut().insert(n_b.clone(), FlowNode::new("B"));
+        diagram.set_ast(DiagramAst::Flowchart(ast1)).unwrap();
+        diagram.bump_rev();
+    }
+
+    let err = folder.save_session(&session).unwrap_err();
+    match err {
+        StoreError::SymlinkRefused { path } => assert_eq!(path, meta_path),
+        other => panic!("expected SymlinkRefused from meta write, got: {other:?}"),
+    }
+
+    assert_eq!(std::fs::read(&mmd_path).unwrap(), mmd_before, "mmd must roll back");
+    assert_eq!(std::fs::read(&sidecar_path).unwrap(), sidecar_before, "sidecar must roll back",);
+
+    std::fs::remove_file(&meta_path).unwrap();
+    std::fs::rename(&meta_backing, &meta_path).unwrap();
+
+    let loaded = folder.load_session().unwrap();
+    let diagram = loaded.diagrams().get(&d1).expect("diagram");
+    let DiagramAst::Flowchart(ast) = diagram.ast() else { panic!() };
+    assert!(ast.nodes().contains_key(&n_a), "n:a must survive");
+    assert!(
+        !ast.nodes().contains_key(&n_b),
+        "failed meta commit must leave the diagram at the prior revision",
+    );
+}
+
 // Regression: walkthrough GC must run only after the meta index is committed. If the meta
 // write fails, the removed walkthrough's file must still exist so the prior meta stays loadable.
 // A symlinked meta file makes the atomic meta write fail (SymlinkRefused) while remaining
