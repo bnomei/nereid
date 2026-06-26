@@ -18,6 +18,7 @@ use crate::format::mermaid::flowchart::MermaidIdentError;
 use crate::model::{
     CategoryPath, Diagram, DiagramAst, DiagramId, DiagramKind, FlowEdge, FlowNode, FlowchartAst,
 };
+use crate::model::seq_ast::SequenceBlock;
 use crate::model::{ObjectId, ObjectRef, SequenceAst, SequenceMessage, SequenceMessageKind};
 use crate::model::{SequenceParticipant, XRefId};
 

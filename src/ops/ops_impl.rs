@@ -89,6 +89,7 @@ fn apply_seq_op(
             ast.messages_mut().retain(|m| {
                 m.from_participant_id() != participant_id && m.to_participant_id() != participant_id
             });
+            prune_messages_from_blocks(ast, &removed_message_ids.iter().cloned().collect());
             for message_id in removed_message_ids {
                 delta.record_removed(seq_message_ref(diagram_id, &message_id));
             }
@@ -204,6 +205,7 @@ fn apply_seq_op(
                     object_id: message_id.clone(),
                 });
             }
+            prune_messages_from_blocks(ast, &HashSet::from([message_id.clone()]));
             delta.record_removed(seq_message_ref(diagram_id, message_id));
             Ok(())
         }
@@ -212,6 +214,28 @@ fn apply_seq_op(
 
 fn sort_seq_messages(ast: &mut SequenceAst) {
     ast.messages_mut().sort_by(SequenceMessage::cmp_in_order);
+}
+
+/// Remove the given message ids from every block section after the messages were deleted, then
+/// drop sections that become empty and blocks that lose all sections. Block/section membership is
+/// stored independently of `SequenceAst::messages`, so without this a removed message leaves a
+/// dangling `section.message_ids` entry that makes Mermaid export hard-error
+/// (`InvalidBlockMembership`). A block is kept only while it retains a non-empty section, matching
+/// the exporter/renderer requirement that every block has at least one section.
+fn prune_messages_from_blocks(ast: &mut SequenceAst, removed: &HashSet<ObjectId>) {
+    if removed.is_empty() {
+        return;
+    }
+    ast.blocks_mut().retain_mut(|block| prune_messages_from_block(block, removed));
+}
+
+fn prune_messages_from_block(block: &mut SequenceBlock, removed: &HashSet<ObjectId>) -> bool {
+    block.blocks_mut().retain_mut(|nested| prune_messages_from_block(nested, removed));
+    for section in block.sections_mut().iter_mut() {
+        section.message_ids_mut().retain(|message_id| !removed.contains(message_id));
+    }
+    block.sections_mut().retain(|section| !section.message_ids().is_empty());
+    !block.sections().is_empty()
 }
 
 fn normalize_seq_raw_arrow(kind: SequenceMessageKind, raw_arrow: Option<String>) -> Option<String> {

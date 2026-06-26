@@ -973,3 +973,84 @@ fn apply_seq_remove_participant_records_cascading_message_removal_in_delta() {
     assert!(ast.participants().contains_key(&bob));
     assert!(ast.messages().is_empty());
 }
+
+// Regression: removing a sequence message (directly or via participant cascade) must also prune
+// that message id from any block section that referenced it, otherwise the section holds a
+// dangling id and Mermaid export hard-errors (InvalidBlockMembership), leaving the diagram
+// un-exportable after a legal edit.
+#[test]
+fn remove_message_prunes_section_membership_and_keeps_export_valid() {
+    use crate::format::mermaid::sequence::export_sequence_diagram;
+    use crate::model::seq_ast::{
+        SequenceBlock, SequenceBlockKind, SequenceMessage, SequenceMessageKind, SequenceSection,
+        SequenceSectionKind,
+    };
+    use crate::model::Diagram;
+
+    let a = ObjectId::new("p:a").expect("id");
+    let b = ObjectId::new("p:b").expect("id");
+    let m1 = ObjectId::new("m:0001").expect("id");
+    let m2 = ObjectId::new("m:0002").expect("id");
+
+    let mut ast = SequenceAst::default();
+    ast.participants_mut().insert(a.clone(), SequenceParticipant::new("A"));
+    ast.participants_mut().insert(b.clone(), SequenceParticipant::new("B"));
+    ast.messages_mut().push(SequenceMessage::new(
+        m1.clone(),
+        a.clone(),
+        b.clone(),
+        SequenceMessageKind::Sync,
+        "One",
+        1000,
+    ));
+    ast.messages_mut().push(SequenceMessage::new(
+        m2.clone(),
+        b.clone(),
+        a.clone(),
+        SequenceMessageKind::Sync,
+        "Two",
+        2000,
+    ));
+    ast.blocks_mut().push(SequenceBlock::new(
+        ObjectId::new("b:0001").expect("id"),
+        SequenceBlockKind::Alt,
+        Some("X".to_owned()),
+        vec![
+            SequenceSection::new(
+                ObjectId::new("sec:0001:00").expect("id"),
+                SequenceSectionKind::Main,
+                Some("X".to_owned()),
+                vec![m1.clone()],
+            ),
+            SequenceSection::new(
+                ObjectId::new("sec:0001:01").expect("id"),
+                SequenceSectionKind::Else,
+                Some("Y".to_owned()),
+                vec![m2.clone()],
+            ),
+        ],
+        Vec::new(),
+    ));
+
+    let mut diagram =
+        Diagram::new(DiagramId::new("d:1").expect("id"), "seq", DiagramAst::Sequence(ast));
+
+    // Sanity: exports cleanly before the edit.
+    let DiagramAst::Sequence(ast) = diagram.ast() else { panic!("sequence") };
+    export_sequence_diagram(ast).expect("export before edit");
+
+    apply_ops(&mut diagram, 0, &[Op::Seq(SeqOp::RemoveMessage { message_id: m2.clone() })])
+        .expect("remove message");
+
+    let DiagramAst::Sequence(ast) = diagram.ast() else { panic!("sequence") };
+    // The removed id must not linger in any section, and export must still succeed.
+    for block in ast.blocks() {
+        for section in block.sections() {
+            assert!(
+                !section.message_ids().contains(&m2),
+                "section still references removed message {m2}",
+            );
+        }
+    }
+    export_sequence_diagram(ast).expect("export after removing a section's message must succeed");
+}
