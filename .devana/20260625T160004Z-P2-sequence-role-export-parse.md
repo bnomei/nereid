@@ -1,6 +1,6 @@
 DEVANA-FINDING: v1
-DEVANA-STATE: open
-Priority: P2 | Confidence: high | Security-sensitive: no | Status: open
+DEVANA-STATE: fixed
+Priority: P2 | Confidence: high | Security-sensitive: no | Status: fixed
 Location: src/format/mermaid/sequence.rs:847-856,365-400 | Slug: sequence-role-export-parse
 
 # Sequence participant role export cannot be re-parsed
@@ -41,5 +41,7 @@ Teach parser to accept Mermaid role keywords and set `participant.role()`, or ex
 
 2026-06-26: Still open after static validation, with a partial fix in place. `actor` now round-trips: the parser accepts `actor <name>` and sets `participant.role()` to `Some("actor")`. The public model still accepts arbitrary role strings and the exporter writes any role verbatim; for example, a model-built participant with role `boundary` exports `boundary Alice`, but the parser only accepts `participant` and `actor`, so export -> parse can still fail for other role values.
 
+2026-06-26: Marked fixed after teaching the sequence parser to accept two-token role declarations emitted by the exporter, while keeping known sequence control/directive keywords out of the custom-role path. Export now rejects reserved/unparseable role keywords instead of writing role lines the parser cannot round-trip. Regressions cover a model-built `boundary` role export -> parse round-trip, ensure unsupported `activate Alice` remains rejected instead of becoming a fake custom role, and verify a reserved `activate` role fails export.
+
 DEVANA-KEY: src/format/mermaid/sequence.rs:847-856 | P2 | sequence-role-export-parse
-DEVANA-SUMMARY: open P2 high src/format/mermaid/sequence.rs:847-856 - Participant roles exported as Mermaid role syntax cannot be parsed back into the AST.
+DEVANA-SUMMARY: fixed P2 high src/format/mermaid/sequence.rs:847-856 - Participant roles exported as Mermaid role syntax cannot be parsed back into the AST.
