@@ -191,6 +191,13 @@ fn derive_adjacency(session: &Session) -> BTreeMap<ObjectRef, BTreeSet<ObjectRef
     for xref in session.xrefs().values() {
         let a = xref.from().clone();
         let b = xref.to().clone();
+        // Only bridge endpoints that were materialized from a real AST object above. A dangling
+        // xref (its target deleted) is persisted session state; routing through it would
+        // fabricate edges to objects that no longer exist. `insert_edge`'s `or_default()` would
+        // otherwise resurrect the missing endpoint as a traversable phantom node.
+        if !adjacency.contains_key(&a) || !adjacency.contains_key(&b) {
+            continue;
+        }
         insert_edge(&mut adjacency, a.clone(), b.clone());
         insert_edge(&mut adjacency, b, a);
     }
@@ -450,6 +457,46 @@ mod tests {
                 "d:seq/seq/message/m:2",
             ]
         );
+    }
+
+    #[test]
+    fn dangling_xref_endpoints_do_not_create_phantom_route() {
+        // A flow diagram with one real node, plus stale xrefs whose targets were deleted.
+        // Dangling xrefs are normal persisted state; route derivation must not resurrect their
+        // missing endpoints as traversable phantom nodes.
+        let mut session = Session::new(SessionId::new("s-dangling").expect("session id"));
+
+        let flow_id = DiagramId::new("flow").expect("diagram id");
+        let mut flow_ast = FlowchartAst::default();
+        flow_ast.nodes_mut().insert(oid("n:a"), FlowNode::new("A"));
+        session.diagrams_mut().insert(
+            flow_id.clone(),
+            Diagram::new(flow_id.clone(), "Flow", DiagramAst::Flowchart(flow_ast)),
+        );
+
+        // n:a -> n:gone (deleted), and n:gone -> n:also_gone (both deleted).
+        let x1_from: ObjectRef = "d:flow/flow/node/n:a".parse().expect("ref");
+        let x1_to: ObjectRef = "d:flow/flow/node/n:gone".parse().expect("ref");
+        session.xrefs_mut().insert(
+            XRefId::new("x:1").expect("xref id"),
+            XRef::new(x1_from, x1_to, "relates", XRefStatus::DanglingTo),
+        );
+        let x2_from: ObjectRef = "d:flow/flow/node/n:gone".parse().expect("ref");
+        let x2_to: ObjectRef = "d:flow/flow/node/n:also_gone".parse().expect("ref");
+        session.xrefs_mut().insert(
+            XRefId::new("x:2").expect("xref id"),
+            XRef::new(x2_from, x2_to, "relates", XRefStatus::DanglingFrom),
+        );
+
+        let start: ObjectRef = "d:flow/flow/node/n:a".parse().expect("start ref");
+        let goal: ObjectRef = "d:flow/flow/node/n:also_gone".parse().expect("goal ref");
+
+        // No route exists: the only real object is n:a; n:gone and n:also_gone do not exist.
+        assert_eq!(find_route(&session, &start, &goal), None);
+
+        // And the deleted endpoints never become reachable graph nodes at all.
+        let adjacency = SessionRouteAdjacency::derive(&session);
+        assert_eq!(find_route_with_adjacency(&adjacency, &start, &goal), None);
     }
 
     #[test]
