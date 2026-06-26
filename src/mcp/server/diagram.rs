@@ -1019,6 +1019,9 @@ impl NereidMcp {
                 )
             })?;
             candidate_session.diagrams_mut().insert(diagram_id.clone(), candidate_diagram);
+            // Ops may remove objects that xrefs point at; recompute xref status so xref.list
+            // reflects dangling endpoints, matching diagram.delete and the disk-load path.
+            refresh_xref_statuses(&mut candidate_session);
 
             let mut history =
                 state.delta_history.get(&diagram_id).cloned().unwrap_or_else(VecDeque::new);
@@ -1075,6 +1078,9 @@ impl NereidMcp {
             )
         })?;
         state.session.diagrams_mut().insert(diagram_id.clone(), candidate_diagram);
+        // Ops may remove objects that xrefs point at; recompute xref status so xref.list
+        // reflects dangling endpoints, matching diagram.delete and the disk-load path.
+        refresh_xref_statuses(&mut state.session);
         let history = state.delta_history.entry(diagram_id).or_insert_with(VecDeque::new);
         history.push_back(LastDelta {
             from_rev: base_rev,

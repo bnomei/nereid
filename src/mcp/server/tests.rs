@@ -1469,6 +1469,35 @@ async fn xref_list_returns_all_xrefs_ordered_by_id() {
 }
 
 #[tokio::test]
+async fn diagram_apply_ops_refreshes_xref_status_after_removing_endpoint() {
+    // x:2 points to d-flow/n:a and starts "ok"; removing that node via apply_ops must refresh the
+    // xref status to dangling, matching diagram.delete (rather than reporting a stale "ok").
+    let server = NereidMcp::new(demo_session_with_xrefs());
+
+    let Json(before) = server.xref_list(Parameters(xref_list_params())).await.expect("xref list");
+    let status_before =
+        before.xrefs.iter().find(|x| x.xref_id == "x:2").expect("x:2").status.clone();
+    assert_eq!(status_before, "ok");
+
+    server
+        .diagram_apply_ops(Parameters(ApplyOpsParams {
+            diagram_id: Some("d-flow".into()),
+            base_rev: 0,
+            ops: vec![McpOp::FlowRemoveNode { node_id: "n:a".into() }],
+        }))
+        .await
+        .expect("apply ops");
+
+    let Json(after) = server.xref_list(Parameters(xref_list_params())).await.expect("xref list");
+    let status_after =
+        after.xrefs.iter().find(|x| x.xref_id == "x:2").expect("x:2").status.clone();
+    assert_ne!(
+        status_after, "ok",
+        "xref status must refresh to dangling after its endpoint node is removed",
+    );
+}
+
+#[tokio::test]
 async fn xref_list_can_filter_to_dangling_only() {
     let server = NereidMcp::new(demo_session_with_xrefs());
     let mut params = xref_list_params();
