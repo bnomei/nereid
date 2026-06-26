@@ -1211,6 +1211,42 @@ async fn walkthrough_apply_ops_bumps_rev_and_returns_delta_for_add_update_remove
 }
 
 #[tokio::test]
+async fn walkthrough_apply_ops_rolls_back_partial_batch_on_failure_non_persistent() {
+    // Without a SessionFolder the handler mutates the in-memory walkthrough. A batch whose
+    // later op fails must leave the walkthrough fully unchanged (transactional), matching
+    // diagram.apply_ops and the persistent path.
+    let server = NereidMcp::new(demo_session_with_walkthroughs());
+
+    let add_new = || McpWalkthroughOp::AddNode {
+        node_id: "wn:new".into(),
+        title: "Dup".into(),
+        body_md: None,
+        refs: None,
+        tags: None,
+        status: None,
+    };
+
+    // First op adds wn:new and succeeds; the second reuses the id and fails the whole batch.
+    let result = server
+        .walkthrough_apply_ops(Parameters(WalkthroughApplyOpsParams {
+            walkthrough_id: "w:1".into(),
+            base_rev: 0,
+            ops: vec![add_new(), add_new()],
+        }))
+        .await;
+    assert!(result.is_err(), "duplicate node id in batch should error");
+
+    // The failed batch must not have committed the first op: rev stays 0 and the node count is
+    // unchanged (original wn:2 and wn:3 only).
+    let Json(stat) = server
+        .walkthrough_stat(Parameters(WalkthroughGetParams { walkthrough_id: "w:1".into() }))
+        .await
+        .expect("walkthrough stat");
+    assert_eq!(stat.digest.rev, 0, "failed batch must not bump rev");
+    assert_eq!(stat.digest.counts.nodes, 2, "failed batch must not leave wn:new behind");
+}
+
+#[tokio::test]
 async fn walkthrough_diff_spans_multiple_revisions() {
     let server = NereidMcp::new(demo_session_with_walkthroughs());
 

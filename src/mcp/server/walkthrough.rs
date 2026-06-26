@@ -465,9 +465,15 @@ impl NereidMcp {
             }));
         }
 
-        let delta = apply_walkthrough_ops(walkthrough, &parsed, &ops)?;
-        walkthrough.bump_rev();
-        let new_rev = walkthrough.rev();
+        // Apply on a clone and commit only after every op succeeds, so a mid-batch failure
+        // leaves the live walkthrough unchanged. This mirrors diagram.apply_ops and the
+        // persistent walkthrough path; applying directly would leave partial mutations behind
+        // when a later op in the batch errors.
+        let mut candidate = walkthrough.clone();
+        let delta = apply_walkthrough_ops(&mut candidate, &parsed, &ops)?;
+        candidate.bump_rev();
+        let new_rev = candidate.rev();
+        *walkthrough = candidate;
 
         let history = state.walkthrough_delta_history.entry(parsed).or_insert_with(VecDeque::new);
         history.push_back(WalkthroughLastDelta {
