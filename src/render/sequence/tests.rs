@@ -9,13 +9,14 @@
 use super::super::test_utils::collect_spanned_text;
 use super::{
     render_sequence_unicode, render_sequence_unicode_annotated,
-    render_sequence_unicode_with_options, SELF_MESSAGE_STUB_LEN,
+    render_sequence_unicode_with_options, SequenceRenderError, SELF_MESSAGE_STUB_LEN,
 };
-use crate::format::mermaid::sequence::parse_sequence_diagram;
+use crate::format::mermaid::sequence::{export_sequence_diagram, parse_sequence_diagram};
 use crate::layout::layout_sequence;
 use crate::model::ids::ObjectId;
 use crate::model::seq_ast::{
-    SequenceAst, SequenceMessage, SequenceMessageKind, SequenceParticipant,
+    SequenceAst, SequenceBlock, SequenceBlockKind, SequenceMessage, SequenceMessageKind,
+    SequenceParticipant, SequenceSection, SequenceSectionKind,
 };
 use crate::model::{DiagramId, ObjectRef};
 use crate::render::{HighlightIndex, RenderOptions};
@@ -638,5 +639,63 @@ fn render_consumes_col_gap_budget_for_long_cross_column_label() {
          (short width={}, long width={})\n{long}",
         width(&short),
         width(&long),
+    );
+}
+
+// Regression: a section whose member messages are non-contiguous (skipping an intermediate
+// message) must be rejected by the renderer, matching the exporter. Otherwise the min/max row
+// span draws a frame over the skipped message, implying it belongs to the section.
+#[test]
+fn render_rejects_non_contiguous_section_membership() {
+    let a = ObjectId::new("p:a").unwrap();
+    let b = ObjectId::new("p:b").unwrap();
+
+    let mut ast = SequenceAst::default();
+    ast.participants_mut().insert(a.clone(), SequenceParticipant::new("A"));
+    ast.participants_mut().insert(b.clone(), SequenceParticipant::new("B"));
+
+    let msg = |id: &str, order: i64| {
+        SequenceMessage::new(
+            ObjectId::new(id).unwrap(),
+            a.clone(),
+            b.clone(),
+            SequenceMessageKind::Sync,
+            "msg",
+            order,
+        )
+    };
+    ast.messages_mut().push(msg("m:1", 1000)); // row 0
+    ast.messages_mut().push(msg("m:2", 2000)); // row 1
+    ast.messages_mut().push(msg("m:3", 3000)); // row 2
+
+    // Section skips m:2, so its rows are {0, 2} — non-contiguous.
+    let section = SequenceSection::new(
+        ObjectId::new("sec:0001:00").unwrap(),
+        SequenceSectionKind::Main,
+        Some("X".to_owned()),
+        vec![ObjectId::new("m:1").unwrap(), ObjectId::new("m:3").unwrap()],
+    );
+    ast.blocks_mut().push(SequenceBlock::new(
+        ObjectId::new("b:0001").unwrap(),
+        SequenceBlockKind::Alt,
+        Some("Alt".to_owned()),
+        vec![section],
+        Vec::new(),
+    ));
+
+    let layout = layout_sequence(&ast).expect("layout");
+    let err = render_sequence_unicode(&ast, &layout)
+        .expect_err("render must reject non-contiguous section membership");
+    match err {
+        SequenceRenderError::InvalidBlockMembership { reason, .. } => {
+            assert!(reason.contains("not contiguous"), "unexpected reason: {reason}");
+        }
+        other => panic!("expected InvalidBlockMembership, got: {other:?}"),
+    }
+
+    // The exporter rejects the same membership; render and export now agree.
+    assert!(
+        export_sequence_diagram(&ast).is_err(),
+        "exporter should also reject non-contiguous section membership",
     );
 }

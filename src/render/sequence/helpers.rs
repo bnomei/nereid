@@ -871,8 +871,7 @@ fn section_row_ranges<'a>(
             });
         }
 
-        let mut min_row = None::<usize>;
-        let mut max_row = None::<usize>;
+        let mut rows = Vec::<usize>::with_capacity(section.message_ids().len());
         for message_id in section.message_ids() {
             let row = message_row_by_id.get(message_id).copied().ok_or_else(|| {
                 SequenceRenderError::InvalidBlockMembership {
@@ -884,15 +883,32 @@ fn section_row_ranges<'a>(
                     ),
                 }
             })?;
+            rows.push(row);
+        }
+        rows.sort_unstable();
+        rows.dedup();
 
-            min_row = Some(min_row.map_or(row, |prev| prev.min(row)));
-            max_row = Some(max_row.map_or(row, |prev| prev.max(row)));
+        // The frame spans [first_row, last_row]. If membership is non-contiguous the span would
+        // cover rows of messages that are not in the section, drawing a misleading frame. Reject
+        // it to stay consistent with the exporter, which rejects the same non-contiguous
+        // membership (message rows are dense and 1:1 with message order, so row contiguity here
+        // matches the exporter's index contiguity).
+        for window in rows.windows(2) {
+            if window[1] != window[0] + 1 {
+                return Err(SequenceRenderError::InvalidBlockMembership {
+                    block_id: block.block_id().clone(),
+                    reason: format!(
+                        "section {} message membership is not contiguous",
+                        section.section_id()
+                    ),
+                });
+            }
         }
 
         ranges.push(SectionRowRange {
             section,
-            start_row: min_row.unwrap_or(0),
-            end_row: max_row.unwrap_or(0),
+            start_row: rows.first().copied().unwrap_or(0),
+            end_row: rows.last().copied().unwrap_or(0),
         });
     }
 
