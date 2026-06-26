@@ -2145,6 +2145,27 @@ async fn flow_reachable_rejects_invalid_direction() {
 }
 
 #[tokio::test]
+async fn flow_reachable_returns_not_found_for_missing_from_node() {
+    // Matches sibling flow tools (flow.paths, flow.unreachable): a missing from_node_id is a
+    // resource_not_found error, not an empty success (which is indistinguishable from a valid
+    // node that reaches nothing).
+    let server = NereidMcp::new(demo_session_for_flow_reachable());
+    let err = match server
+        .flow_reachable(Parameters(FlowReachableParams {
+            diagram_id: None,
+            from_node_id: "n:does-not-exist".into(),
+            direction: Some("out".into()),
+        }))
+        .await
+    {
+        Ok(_) => panic!("expected resource_not_found for missing from_node_id"),
+        Err(err) => err,
+    };
+
+    assert_eq!(err.code, rmcp::model::ErrorCode::RESOURCE_NOT_FOUND);
+}
+
+#[tokio::test]
 async fn flow_paths_returns_multiple_paths_in_deterministic_order() {
     let server = NereidMcp::new(demo_session_for_flow_paths());
     let Json(result) = server

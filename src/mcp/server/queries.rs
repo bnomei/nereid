@@ -335,8 +335,17 @@ impl NereidMcp {
             ));
         };
 
+        // Surface a missing node consistently with sibling flow tools (`flow.paths`,
+        // `flow.unreachable`) instead of returning an empty success, which is indistinguishable
+        // from a valid node that simply reaches nothing.
         if !ast.nodes().contains_key(&from_node_id_parsed) {
-            return Ok(Json(FlowReachableResponse { nodes: Vec::new() }));
+            return Err(ErrorData::resource_not_found(
+                "from node not found",
+                Some(serde_json::json!({
+                    "diagram_id": diagram_id.as_str(),
+                    "from_node_id": from_node_id,
+                })),
+            ));
         }
 
         let reachable =
