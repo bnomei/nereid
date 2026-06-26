@@ -835,8 +835,6 @@ impl SessionFolder {
                 && meta_path.is_file();
 
             if !diagram_rev_unchanged {
-                export_diagram_mmd(self, diagram, &mmd_path)?;
-
                 let flow_edges = match diagram.ast() {
                     DiagramAst::Flowchart(ast) => ast
                         .edges()
@@ -889,6 +887,15 @@ impl SessionFolder {
                     DiagramAst::Flowchart(_) => BTreeMap::new(),
                 };
 
+                // Write the sidecar BEFORE the .mmd. Each per-file write is already atomic
+                // (temp + rename), but the .mmd and its sidecar are separate files with no
+                // shared transaction. Ordering the sidecar first guarantees the dangerous
+                // "new .mmd + stale sidecar" combination can never appear on disk after a
+                // partial/crashed save: if a new .mmd exists, its matching sidecar was already
+                // written. load_session therefore never reconciles fresh Mermaid content against
+                // a stale stable-id map (which would reassign object ids and break xrefs and
+                // selection). A crash between the two writes leaves the diagram at its prior
+                // revision — a clean rollback that self-heals on the next successful save.
                 self.save_diagram_meta(&DiagramMeta {
                     diagram_id: diagram_id.clone(),
                     mmd_path: mmd_path.clone(),
@@ -899,6 +906,8 @@ impl SessionFolder {
                     flow_node_notes,
                     sequence_participant_notes,
                 })?;
+
+                export_diagram_mmd(self, diagram, &mmd_path)?;
             }
 
             if !diagram_rev_unchanged || !ascii_path.is_file() {
