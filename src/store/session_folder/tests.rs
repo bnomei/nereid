@@ -175,6 +175,41 @@ fn load_or_init_session_creates_seed_diagram_when_meta_is_missing(ctx: SessionFo
     assert_eq!(loaded.diagrams().len(), 1);
 }
 
+// Regression: if the meta index is missing but diagram files already exist on disk,
+// load_or_init_session must refuse to seed a fresh session (which would orphan them) and instead
+// surface a distinct error so the data loss is visible rather than silent.
+#[rstest]
+fn load_or_init_session_refuses_to_seed_when_diagram_files_exist(ctx: SessionFolderTestCtx) {
+    let folder = &ctx.folder;
+
+    // Persist a real session with one diagram, then delete only the meta index.
+    let mut session = Session::new(SessionId::new("s:prior").unwrap());
+    let d1 = DiagramId::new("d1").unwrap();
+    let mut ast = FlowchartAst::default();
+    ast.nodes_mut().insert(ObjectId::new("n:keep").unwrap(), FlowNode::new("Keep"));
+    session
+        .diagrams_mut()
+        .insert(d1.clone(), Diagram::new(d1.clone(), "Prior", DiagramAst::Flowchart(ast)));
+    folder.save_session(&session).unwrap();
+
+    let meta_path = folder.meta_path();
+    assert!(meta_path.is_file());
+    std::fs::remove_file(&meta_path).unwrap();
+    // The diagram file must still be present.
+    assert!(ctx.session_dir.join("diagrams/d1.mmd").is_file());
+
+    let err = folder.load_or_init_session().unwrap_err();
+    match err {
+        StoreError::MetaMissingWithExistingDiagrams { meta_path: reported, .. } => {
+            assert_eq!(reported, meta_path);
+        }
+        other => panic!("expected MetaMissingWithExistingDiagrams, got: {other:?}"),
+    }
+
+    // It must not have re-seeded a meta over the existing artifacts.
+    assert!(!meta_path.exists(), "load_or_init must not write a seed meta when diagrams exist");
+}
+
 #[rstest]
 fn load_or_init_session_does_not_hide_missing_diagram_errors(ctx: SessionFolderTestCtx) {
     let missing_mmd_path = ctx.session_dir.join("diagrams/missing.mmd");

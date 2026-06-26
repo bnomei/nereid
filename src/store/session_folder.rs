@@ -293,6 +293,12 @@ pub enum StoreError {
     SymlinkRefused {
         path: PathBuf,
     },
+    /// The session meta index is missing but diagram artifacts already exist on disk. Seeding a
+    /// fresh session would orphan them, so the caller must repair (restore meta) instead.
+    MetaMissingWithExistingDiagrams {
+        meta_path: PathBuf,
+        diagrams_dir: PathBuf,
+    },
 }
 
 impl fmt::Display for StoreError {
@@ -392,6 +398,11 @@ impl fmt::Display for StoreError {
             Self::SymlinkRefused { path } => {
                 write!(f, "refusing to write through symlink at {path:?}")
             }
+            Self::MetaMissingWithExistingDiagrams { meta_path, diagrams_dir } => write!(
+                f,
+                "session meta {meta_path:?} is missing but diagram files exist in {diagrams_dir:?}; \
+                 refusing to seed a fresh session and orphan them (restore the meta index to repair)"
+            ),
         }
     }
 }
@@ -415,6 +426,7 @@ impl std::error::Error for StoreError {
             Self::InvalidRelativePath { .. } => None,
             Self::PathOutsideSession { .. } => None,
             Self::SymlinkRefused { .. } => None,
+            Self::MetaMissingWithExistingDiagrams { .. } => None,
         }
     }
 }
@@ -723,12 +735,44 @@ impl SessionFolder {
             Err(StoreError::Io { path, source })
                 if source.kind() == io::ErrorKind::NotFound && path == self.meta_path() =>
             {
+                // Meta is the session index. If it is missing but diagram files already exist,
+                // seeding a fresh session would orphan them (they would vanish from the session
+                // view while remaining on disk). Refuse and require repair instead of silently
+                // discarding prior work.
+                if self.has_existing_diagram_files()? {
+                    return Err(StoreError::MetaMissingWithExistingDiagrams {
+                        meta_path: self.meta_path(),
+                        diagrams_dir: self.root.join("diagrams"),
+                    });
+                }
                 let session = self.initial_session();
                 self.save_session(&session)?;
                 Ok(session)
             }
             Err(err) => Err(err),
         }
+    }
+
+    /// Whether the session's `diagrams/` directory contains at least one `.mmd` file. Used to
+    /// detect orphaned diagram artifacts when the session meta index is absent.
+    fn has_existing_diagram_files(&self) -> Result<bool, StoreError> {
+        let diagrams_dir = self.root.join("diagrams");
+        let entries = match fs::read_dir(&diagrams_dir) {
+            Ok(entries) => entries,
+            Err(source) if source.kind() == io::ErrorKind::NotFound => return Ok(false),
+            Err(source) => return Err(StoreError::Io { path: diagrams_dir, source }),
+        };
+        for entry in entries {
+            let entry = entry
+                .map_err(|source| StoreError::Io { path: diagrams_dir.clone(), source })?;
+            let path = entry.path();
+            if path.extension().and_then(|ext| ext.to_str()) == Some("mmd")
+                && path.is_file()
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     pub fn save_session(&self, session: &Session) -> Result<(), StoreError> {
