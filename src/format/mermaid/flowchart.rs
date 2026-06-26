@@ -1007,6 +1007,42 @@ mod tests {
         assert_eq!(node_b.mermaid_id(), Some("B"));
     }
 
+    // Regression: linkStyle must follow the same semantic edge across parse -> export -> re-parse
+    // even when declaration order differs from the export's (from, to, edge_id) sort order. Export
+    // recomputes each linkStyle index from the styled edge's position in the emitted (sorted) order,
+    // and emits edges in that same order, so re-parse's declaration-order index lands on the same
+    // edge.
+    #[test]
+    fn linkstyle_roundtrips_to_same_edge_when_declaration_differs_from_sort_order() {
+        // First-declared edge (Z-->A) sorts AFTER the second (A-->B), so naive index reuse would
+        // misassign the style.
+        let input = "flowchart\nZ --> A\nA --> B\nlinkStyle 0 stroke:#ff0000;\n";
+
+        let style_of = |ast: &FlowchartAst, from: &str, to: &str| -> Option<String> {
+            ast.edges()
+                .values()
+                .find(|edge| {
+                    edge.from_node_id().as_str() == from && edge.to_node_id().as_str() == to
+                })
+                .and_then(|edge| edge.style().map(ToOwned::to_owned))
+        };
+
+        let ast1 = parse_flowchart(input).expect("parse 1");
+        assert_eq!(style_of(&ast1, "n:Z", "n:A").as_deref(), Some("stroke:#ff0000;"));
+        assert_eq!(style_of(&ast1, "n:A", "n:B"), None);
+
+        let out = export_flowchart(&ast1).expect("export");
+        let ast2 = parse_flowchart(&out).expect("parse 2");
+
+        // The red stroke must still be on Z-->A, not the lexicographically-first A-->B.
+        assert_eq!(
+            style_of(&ast2, "n:Z", "n:A").as_deref(),
+            Some("stroke:#ff0000;"),
+            "linkStyle drifted to the wrong edge on round-trip; export:\n{out}",
+        );
+        assert_eq!(style_of(&ast2, "n:A", "n:B"), None, "export:\n{out}");
+    }
+
     #[test]
     fn semantic_roundtrip_parse_export_parse() {
         let input = r#"
