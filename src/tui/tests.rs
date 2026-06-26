@@ -1035,8 +1035,14 @@ fn sequence_message_focus_highlights_spaces_inside_label() {
         .find(|cells| cells.iter().map(|(ch, _)| *ch).collect::<String>().contains("Can I"))
         .expect("message row with phrase");
 
-    let line_text = line.iter().map(|(ch, _)| *ch).collect::<String>();
-    let phrase_start = line_text.find("Can I").expect("phrase start");
+    // Locate the phrase by CHAR index (not byte offset): the rendered row can contain multibyte
+    // box-drawing/arrow glyphs before the label, so `str::find`'s byte offset would not line up
+    // with the per-char `line` cells.
+    let phrase_chars: Vec<char> = "Can I".chars().collect();
+    let phrase_start = line
+        .windows(phrase_chars.len())
+        .position(|window| window.iter().map(|(ch, _)| *ch).eq(phrase_chars.iter().copied()))
+        .expect("phrase start");
     let space_x = phrase_start + 3;
     assert_eq!(line[space_x].0, ' ');
     assert_eq!(line[space_x].1.bg, Some(Color::LightGreen));
@@ -1064,8 +1070,14 @@ fn sequence_message_selected_highlights_spaces_inside_label() {
         .find(|cells| cells.iter().map(|(ch, _)| *ch).collect::<String>().contains("Can I"))
         .expect("message row with phrase");
 
-    let line_text = line.iter().map(|(ch, _)| *ch).collect::<String>();
-    let phrase_start = line_text.find("Can I").expect("phrase start");
+    // Locate the phrase by CHAR index (not byte offset): the rendered row can contain multibyte
+    // box-drawing/arrow glyphs before the label, so `str::find`'s byte offset would not line up
+    // with the per-char `line` cells.
+    let phrase_chars: Vec<char> = "Can I".chars().collect();
+    let phrase_start = line
+        .windows(phrase_chars.len())
+        .position(|window| window.iter().map(|(ch, _)| *ch).eq(phrase_chars.iter().copied()))
+        .expect("phrase start");
     let space_x = phrase_start + 3;
     assert_eq!(line[space_x].0, ' ');
     assert_eq!(line[space_x].1.bg, Some(Color::DarkGray));

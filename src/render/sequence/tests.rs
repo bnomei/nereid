@@ -587,3 +587,56 @@ A->>B: Post\n";
         assert_highlight_spans_in_bounds(fixture_id, &annotated.text, &annotated.highlight_index);
     }
 }
+
+// Regression: the renderer must consume the layout's column-gap spacing budget. A long
+// cross-column message label produces col_gap pressure; honoring it widens the gap so the label
+// is not clipped and lifelines do not overlap. With identical participants, the long-label
+// diagram must therefore render wider than a short-label one. A renderer using only the fixed
+// COL_GAP would produce identical widths.
+#[test]
+fn render_consumes_col_gap_budget_for_long_cross_column_label() {
+    fn build(label: &str) -> SequenceAst {
+        let mut ast = SequenceAst::default();
+        let alice = ObjectId::new("p:alice").expect("id");
+        let bob = ObjectId::new("p:bob").expect("id");
+        let carol = ObjectId::new("p:carol").expect("id");
+        ast.participants_mut().insert(alice.clone(), SequenceParticipant::new("Alice"));
+        ast.participants_mut().insert(bob, SequenceParticipant::new("Bob"));
+        ast.participants_mut().insert(carol.clone(), SequenceParticipant::new("Carol"));
+        ast.messages_mut().push(SequenceMessage::new(
+            ObjectId::new("m:0001").expect("id"),
+            alice,
+            carol,
+            SequenceMessageKind::Sync,
+            label,
+            1000,
+        ));
+        ast
+    }
+
+    let render = |ast: &SequenceAst| {
+        let layout = layout_sequence(ast).expect("layout");
+        render_sequence_unicode(ast, &layout).expect("render")
+    };
+    let width = |text: &str| text.lines().map(|line| line.chars().count()).max().unwrap_or(0);
+
+    let short = render(&build("hi"));
+
+    let long_ast =
+        build("This message label is intentionally long to exceed baseline span capacity");
+    // Precondition: the long label produces column-gap pressure the renderer must honor.
+    let long_layout = layout_sequence(&long_ast).expect("layout");
+    assert!(
+        !long_layout.spacing_budget().col_gap_extra_spacing_by_col().is_empty(),
+        "fixture precondition: long label should create col_gap budget",
+    );
+    let long = render(&long_ast);
+
+    assert!(
+        width(&long) > width(&short),
+        "long cross-column label must widen the diagram by consuming col_gap budget \
+         (short width={}, long width={})\n{long}",
+        width(&short),
+        width(&long),
+    );
+}

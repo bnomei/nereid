@@ -116,37 +116,9 @@ pub fn render_sequence_unicode_with_options(
     options: RenderOptions,
 ) -> Result<String, SequenceRenderError> {
     let box_height = seq_box_height(options);
-    let participants = participants_in_col_order(layout);
     let messages_by_id = messages_by_id(ast);
 
-    let mut participant_renders = Vec::<ParticipantRender>::with_capacity(participants.len());
-    let mut cursor_x = PARTICIPANT_LEFT_MARGIN;
-
-    for (col, participant_id) in participants {
-        let participant = ast.participants().get(participant_id).ok_or_else(|| {
-            SequenceRenderError::MissingParticipant { participant_id: participant_id.clone() }
-        })?;
-        let name = participant.mermaid_name();
-        let note = if options.show_notes { participant.note() } else { None };
-
-        let (box_inner_width, box_total_width) = box_widths_prefixed(name, options);
-        let box_x0 = cursor_x;
-        let box_x1 = box_x0 + box_total_width - 1;
-        let lifeline_x = box_x0 + (box_total_width / 2);
-
-        participant_renders.push(ParticipantRender {
-            col,
-            participant_id,
-            name,
-            note,
-            box_x0,
-            box_x1,
-            box_inner_width,
-            lifeline_x,
-        });
-
-        cursor_x = box_x1 + 1 + COL_GAP;
-    }
+    let participant_renders = compute_participant_renders(ast, layout, options)?;
 
     let width = participant_renders.last().map(|p| p.box_x1 + 1 + RIGHT_MARGIN).unwrap_or(1);
 
@@ -260,35 +232,7 @@ pub fn render_sequence_unicode_annotated_with_options(
     let box_height = seq_box_height(options);
     let text = render_sequence_unicode_with_options(ast, layout, options)?;
 
-    let participants = participants_in_col_order(layout);
-    let mut participant_renders = Vec::<ParticipantRender>::with_capacity(participants.len());
-    let mut cursor_x = PARTICIPANT_LEFT_MARGIN;
-
-    for (col, participant_id) in participants {
-        let participant = ast.participants().get(participant_id).ok_or_else(|| {
-            SequenceRenderError::MissingParticipant { participant_id: participant_id.clone() }
-        })?;
-        let name = participant.mermaid_name();
-        let note = if options.show_notes { participant.note() } else { None };
-
-        let (box_inner_width, box_total_width) = box_widths_prefixed(name, options);
-        let box_x0 = cursor_x;
-        let box_x1 = box_x0 + box_total_width - 1;
-        let lifeline_x = box_x0 + (box_total_width / 2);
-
-        participant_renders.push(ParticipantRender {
-            col,
-            participant_id,
-            name,
-            note,
-            box_x0,
-            box_x1,
-            box_inner_width,
-            lifeline_x,
-        });
-
-        cursor_x = box_x1 + 1 + COL_GAP;
-    }
+    let participant_renders = compute_participant_renders(ast, layout, options)?;
 
     let width = participant_renders.last().map(|p| p.box_x1 + 1 + RIGHT_MARGIN).unwrap_or(1);
 

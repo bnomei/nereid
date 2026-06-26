@@ -27,6 +27,54 @@ fn participants_in_col_order(layout: &SequenceLayout) -> Vec<(usize, &ObjectId)>
     participants
 }
 
+/// Place participant boxes left-to-right, honoring the layout's column-gap spacing budget.
+///
+/// Both the text renderer and the annotated renderer derive participant coordinates this way, so
+/// the placement (including the budgeted extra gap) must stay identical between them or highlight
+/// spans would drift from the rendered text. The budget is keyed by the gap's left column and adds
+/// room the layout reserved for wide participant labels or long inter-column message spans on top
+/// of the fixed `COL_GAP`.
+fn compute_participant_renders<'a>(
+    ast: &'a SequenceAst,
+    layout: &'a SequenceLayout,
+    options: RenderOptions,
+) -> Result<Vec<ParticipantRender<'a>>, SequenceRenderError> {
+    let participants = participants_in_col_order(layout);
+    let col_gap_budget = layout.spacing_budget().col_gap_extra_spacing_by_col();
+
+    let mut participant_renders = Vec::<ParticipantRender>::with_capacity(participants.len());
+    let mut cursor_x = PARTICIPANT_LEFT_MARGIN;
+
+    for (col, participant_id) in participants {
+        let participant = ast.participants().get(participant_id).ok_or_else(|| {
+            SequenceRenderError::MissingParticipant { participant_id: participant_id.clone() }
+        })?;
+        let name = participant.mermaid_name();
+        let note = if options.show_notes { participant.note() } else { None };
+
+        let (box_inner_width, box_total_width) = box_widths_prefixed(name, options);
+        let box_x0 = cursor_x;
+        let box_x1 = box_x0 + box_total_width - 1;
+        let lifeline_x = box_x0 + (box_total_width / 2);
+
+        participant_renders.push(ParticipantRender {
+            col,
+            participant_id,
+            name,
+            note,
+            box_x0,
+            box_x1,
+            box_inner_width,
+            lifeline_x,
+        });
+
+        let col_gap_extra = col_gap_budget.get(&col).copied().unwrap_or(0);
+        cursor_x = box_x1 + 1 + COL_GAP + col_gap_extra;
+    }
+
+    Ok(participant_renders)
+}
+
 fn next_lifeline_x_by_col(participant_renders: &[ParticipantRender<'_>]) -> BTreeMap<usize, usize> {
     let mut out = BTreeMap::<usize, usize>::new();
     for window in participant_renders.windows(2) {
