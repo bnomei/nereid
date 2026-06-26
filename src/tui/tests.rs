@@ -809,10 +809,7 @@ fn follow_ai_publishes_followed_target_as_human_attention() {
         Some(&target),
         "human attention must reflect the followed target during follow-AI",
     );
-    assert_eq!(
-        ui.human_active_diagram_id().map(ToString::to_string).as_deref(),
-        Some("demo-seq"),
-    );
+    assert_eq!(ui.human_active_diagram_id().map(ToString::to_string).as_deref(), Some("demo-seq"),);
 }
 
 #[test]
@@ -1701,8 +1698,7 @@ fn flush_pending_diagram_sync_retains_pending_on_retriable_error() {
         .get(&diagram_id)
         .expect("diagram on disk")
         .rev();
-    app.pending_diagram_sync =
-        Some(PendingDiagramSync { diagram_id, expected_disk_rev: disk_rev });
+    app.pending_diagram_sync = Some(PendingDiagramSync { diagram_id, expected_disk_rev: disk_rev });
 
     // Force save_session to fail with a retriable I/O error.
     let meta_path = folder.meta_path();
@@ -1734,8 +1730,7 @@ fn flush_pending_diagram_sync_drops_pending_on_terminal_conflict() {
     app.session_folder = Some(folder.clone());
 
     // expected_disk_rev deliberately diverges from the on-disk revision.
-    app.pending_diagram_sync =
-        Some(PendingDiagramSync { diagram_id, expected_disk_rev: 9999 });
+    app.pending_diagram_sync = Some(PendingDiagramSync { diagram_id, expected_disk_rev: 9999 });
 
     app.flush_pending_diagram_sync();
 

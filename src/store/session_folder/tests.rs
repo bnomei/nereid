@@ -369,6 +369,66 @@ fn save_active_diagram_id_does_not_drop_concurrent_save_session_additions(
     assert_eq!(loaded.diagrams().len(), DIAGRAMS);
 }
 
+// Regression: read-modify-save writers must hold the session write lock while loading, mutating,
+// and committing. A second writer that starts while the first has loaded but not committed must
+// load after the first commit, otherwise its full-session save can overwrite the first writer's
+// different-diagram edit with a stale snapshot.
+#[rstest]
+fn session_update_waits_to_load_until_prior_writer_commits(ctx: SessionFolderTestCtx) {
+    fn diagram(id: &DiagramId, node_id: &str, label: &str) -> Diagram {
+        let mut ast = FlowchartAst::default();
+        ast.nodes_mut().insert(ObjectId::new(node_id).unwrap(), FlowNode::new(label));
+        Diagram::new(id.clone(), label, DiagramAst::Flowchart(ast))
+    }
+
+    fn add_node(session: &mut Session, diagram_id: &DiagramId, node_id: &str, label: &str) {
+        let mut diagram = session.diagrams().get(diagram_id).cloned().expect("diagram");
+        let DiagramAst::Flowchart(mut ast) = diagram.ast().clone() else {
+            panic!("expected flowchart");
+        };
+        ast.nodes_mut().insert(ObjectId::new(node_id).unwrap(), FlowNode::new(label));
+        diagram.set_ast(DiagramAst::Flowchart(ast)).unwrap();
+        diagram.bump_rev();
+        session.diagrams_mut().insert(diagram_id.clone(), diagram);
+    }
+
+    let d_a = DiagramId::new("d-a").unwrap();
+    let d_b = DiagramId::new("d-b").unwrap();
+    let mut session = Session::new(SessionId::new("s:tx").unwrap());
+    session.diagrams_mut().insert(d_a.clone(), diagram(&d_a, "n:a0", "A"));
+    session.diagrams_mut().insert(d_b.clone(), diagram(&d_b, "n:b0", "B"));
+    ctx.folder.save_session(&session).unwrap();
+
+    let first_folder = SessionFolder::new(&ctx.session_dir);
+    let mut first_update = first_folder.begin_session_update().unwrap();
+    add_node(first_update.session_mut(), &d_b, "n:b1", "B1");
+
+    let second_folder = SessionFolder::new(&ctx.session_dir);
+    let d_a_for_thread = d_a.clone();
+    let (started_tx, started_rx) = std::sync::mpsc::channel();
+    let second_writer = std::thread::spawn(move || {
+        started_tx.send(()).unwrap();
+        let mut second_update = second_folder.begin_session_update().unwrap();
+        add_node(second_update.session_mut(), &d_a_for_thread, "n:a1", "A1");
+        second_update.commit().unwrap();
+    });
+
+    started_rx.recv().unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    first_update.commit().unwrap();
+    second_writer.join().unwrap();
+
+    let loaded = ctx.folder.load_session().unwrap();
+    let DiagramAst::Flowchart(ast_a) = loaded.diagrams().get(&d_a).unwrap().ast() else {
+        panic!("expected d-a flowchart");
+    };
+    assert!(ast_a.nodes().contains_key(&ObjectId::new("n:a1").unwrap()));
+    let DiagramAst::Flowchart(ast_b) = loaded.diagrams().get(&d_b).unwrap().ast() else {
+        panic!("expected d-b flowchart");
+    };
+    assert!(ast_b.nodes().contains_key(&ObjectId::new("n:b1").unwrap()));
+}
+
 #[rstest]
 fn save_diagram_meta_stores_relative_paths_and_load_resolves_them(ctx: SessionFolderTestCtx) {
     let session_dir = &ctx.session_dir;

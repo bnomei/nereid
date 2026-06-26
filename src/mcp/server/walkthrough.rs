@@ -34,28 +34,30 @@ impl NereidMcp {
         }
 
         if let Some(session_folder) = &self.session_folder {
-            // Reload the on-disk session immediately before persisting so concurrent edits
-            // to diagrams/walkthroughs (e.g. from a TUI sharing this SessionFolder) are
-            // preserved instead of being overwritten by a stale full-session snapshot.
-            let mut candidate = session_folder.load_session().map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to reload session before save: {err}"),
-                    Some(serde_json::json!({ "walkthrough_id": walkthrough_id })),
-                )
-            })?;
-            if !candidate.walkthroughs().contains_key(&parsed) {
-                return Err(ErrorData::resource_not_found(
-                    "walkthrough not found",
-                    Some(serde_json::json!({ "walkthrough_id": walkthrough_id })),
-                ));
-            }
-            candidate.set_active_walkthrough_id(Some(parsed.clone()));
-            session_folder.save_session(&candidate).map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to persist session: {err}"),
-                    Some(serde_json::json!({ "walkthrough_id": walkthrough_id })),
-                )
-            })?;
+            let candidate = {
+                // Hold the session-folder write lock from reload through commit so another writer
+                // cannot advance a different object between our reload and full-session save.
+                let mut update = session_folder.begin_session_update().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to reload session before save: {err}"),
+                        Some(serde_json::json!({ "walkthrough_id": walkthrough_id })),
+                    )
+                })?;
+                let candidate = update.session_mut();
+                if !candidate.walkthroughs().contains_key(&parsed) {
+                    return Err(ErrorData::resource_not_found(
+                        "walkthrough not found",
+                        Some(serde_json::json!({ "walkthrough_id": walkthrough_id })),
+                    ));
+                }
+                candidate.set_active_walkthrough_id(Some(parsed.clone()));
+                update.commit().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to persist session: {err}"),
+                        Some(serde_json::json!({ "walkthrough_id": walkthrough_id })),
+                    )
+                })?
+            };
             state.session = candidate;
         } else {
             state.session.set_active_walkthrough_id(Some(parsed.clone()));
@@ -340,91 +342,98 @@ impl NereidMcp {
         let mut state = self.lock_state_synced().await?;
 
         if let Some(session_folder) = &self.session_folder {
-            // Reload the on-disk session immediately before persisting so concurrent edits
-            // to other diagrams/walkthroughs (e.g. from a TUI sharing this SessionFolder)
-            // are preserved instead of being overwritten by a stale full-session snapshot.
-            // The `base_rev` check below runs against this freshly loaded walkthrough, so a
-            // concurrent edit to this same walkthrough is reported as a conflict.
-            let mut candidate_session = session_folder.load_session().map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to reload session before save: {err}"),
-                    Some(serde_json::json!({ "walkthrough_id": walkthrough_id, "base_rev": base_rev })),
-                )
-            })?;
-            let walkthrough =
-                candidate_session.walkthroughs_mut().get_mut(&parsed).ok_or_else(|| {
-                    ErrorData::resource_not_found(
-                        "walkthrough not found",
-                        Some(serde_json::json!({ "walkthrough_id": walkthrough_id })),
+            let (candidate_session, history, response) = {
+                // Hold the session-folder write lock from reload through commit so concurrent edits
+                // to other diagrams/walkthroughs cannot be overwritten by a stale full-session
+                // snapshot. The `base_rev` check below runs against this freshly loaded walkthrough,
+                // so a concurrent edit to this same walkthrough is reported as a conflict.
+                let mut update = session_folder.begin_session_update().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to reload session before save: {err}"),
+                        Some(serde_json::json!({ "walkthrough_id": walkthrough_id, "base_rev": base_rev })),
+                    )
+                })?;
+                let candidate_session = update.session_mut();
+                let walkthrough =
+                    candidate_session.walkthroughs_mut().get_mut(&parsed).ok_or_else(|| {
+                        ErrorData::resource_not_found(
+                            "walkthrough not found",
+                            Some(serde_json::json!({ "walkthrough_id": walkthrough_id })),
+                        )
+                    })?;
+
+                let current_rev = walkthrough.rev();
+                if base_rev != current_rev {
+                    let digest = digest_for_walkthrough(walkthrough);
+                    return Err(ErrorData::invalid_request(
+                        "conflict: stale base_rev",
+                        Some(serde_json::json!({
+                            "base_rev": base_rev,
+                            "current_rev": current_rev,
+                            "snapshot_tool": "walkthrough.stat",
+                            "digest": {
+                                "rev": digest.rev,
+                                "counts": {
+                                    "nodes": digest.counts.nodes,
+                                    "edges": digest.counts.edges,
+                                },
+                            },
+                        })),
+                    ));
+                }
+
+                if ops.is_empty() {
+                    return Ok(Json(ApplyOpsResponse {
+                        new_rev: current_rev,
+                        applied: 0,
+                        delta: DeltaSummary {
+                            added: Vec::new(),
+                            removed: Vec::new(),
+                            updated: Vec::new(),
+                        },
+                    }));
+                }
+
+                let delta = apply_walkthrough_ops(walkthrough, &parsed, &ops)?;
+                walkthrough.bump_rev();
+                let new_rev = walkthrough.rev();
+
+                let mut history = state
+                    .walkthrough_delta_history
+                    .get(&parsed)
+                    .cloned()
+                    .unwrap_or_else(VecDeque::new);
+                history.push_back(WalkthroughLastDelta {
+                    from_rev: base_rev,
+                    to_rev: new_rev,
+                    delta: delta.clone(),
+                });
+                while history.len() > DELTA_HISTORY_LIMIT {
+                    history.pop_front();
+                }
+
+                let candidate_session = update.commit().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to persist session: {err}"),
+                        Some(serde_json::json!({ "walkthrough_id": walkthrough_id, "base_rev": base_rev })),
                     )
                 })?;
 
-            let current_rev = walkthrough.rev();
-            if base_rev != current_rev {
-                let digest = digest_for_walkthrough(walkthrough);
-                return Err(ErrorData::invalid_request(
-                    "conflict: stale base_rev",
-                    Some(serde_json::json!({
-                        "base_rev": base_rev,
-                        "current_rev": current_rev,
-                        "snapshot_tool": "walkthrough.stat",
-                        "digest": {
-                            "rev": digest.rev,
-                            "counts": {
-                                "nodes": digest.counts.nodes,
-                                "edges": digest.counts.edges,
-                            },
-                        },
-                    })),
-                ));
-            }
-
-            if ops.is_empty() {
-                return Ok(Json(ApplyOpsResponse {
-                    new_rev: current_rev,
-                    applied: 0,
+                let response = Json(ApplyOpsResponse {
+                    new_rev,
+                    applied: ops.len() as u64,
                     delta: DeltaSummary {
-                        added: Vec::new(),
-                        removed: Vec::new(),
-                        updated: Vec::new(),
+                        added: delta.added.iter().cloned().collect(),
+                        removed: delta.removed.iter().cloned().collect(),
+                        updated: delta.updated.iter().cloned().collect(),
                     },
-                }));
-            }
+                });
 
-            let delta = apply_walkthrough_ops(walkthrough, &parsed, &ops)?;
-            walkthrough.bump_rev();
-            let new_rev = walkthrough.rev();
-
-            let mut history =
-                state.walkthrough_delta_history.get(&parsed).cloned().unwrap_or_else(VecDeque::new);
-            history.push_back(WalkthroughLastDelta {
-                from_rev: base_rev,
-                to_rev: new_rev,
-                delta: delta.clone(),
-            });
-            while history.len() > DELTA_HISTORY_LIMIT {
-                history.pop_front();
-            }
-
-            session_folder.save_session(&candidate_session).map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to persist session: {err}"),
-                    Some(serde_json::json!({ "walkthrough_id": walkthrough_id, "base_rev": base_rev })),
-                )
-            })?;
+                (candidate_session, history, response)
+            };
 
             state.session = candidate_session;
             state.walkthrough_delta_history.insert(parsed, history);
-
-            let response = Json(ApplyOpsResponse {
-                new_rev,
-                applied: ops.len() as u64,
-                delta: DeltaSummary {
-                    added: delta.added.iter().cloned().collect(),
-                    removed: delta.removed.iter().cloned().collect(),
-                    updated: delta.updated.iter().cloned().collect(),
-                },
-            });
             drop(state);
             self.notify_ui_session_changed().await;
             return Ok(response);

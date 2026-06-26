@@ -1527,9 +1527,10 @@ impl App {
             )));
         };
 
-        let mut disk_session = session_folder
-            .load_session()
+        let mut update = session_folder
+            .begin_session_update()
             .map_err(|err| DiagramSyncError::Retriable(format!("sync failed (load): {err}")))?;
+        let disk_session = update.session_mut();
         let Some(disk_diagram) = disk_session.diagrams().get(&pending.diagram_id) else {
             return Err(DiagramSyncError::Terminal(format!(
                 "sync conflict: diagram removed on disk: {}",
@@ -1547,9 +1548,10 @@ impl App {
         }
 
         disk_session.diagrams_mut().insert(pending.diagram_id.clone(), local_diagram);
-        session_folder
-            .save_session(&disk_session)
+        update
+            .commit()
             .map_err(|err| DiagramSyncError::Retriable(format!("sync failed (save): {err}")))
+            .map(|_| ())
     }
 
     fn retain_existing_selected_refs(&mut self) {

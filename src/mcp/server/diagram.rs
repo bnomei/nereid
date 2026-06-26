@@ -114,33 +114,34 @@ impl NereidMcp {
         })?;
 
         if let Some(session_folder) = &self.session_folder {
-            // Reload the on-disk session immediately before persisting so concurrent edits
-            // to other diagrams/walkthroughs (e.g. from a TUI sharing this SessionFolder)
-            // are preserved instead of being overwritten by a stale full-session snapshot.
-            let mut candidate = session_folder.load_session().map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to reload session before save: {err}"),
-                    Some(serde_json::json!({ "diagram_id": diagram_id.as_str() })),
-                )
-            })?;
-            if candidate.diagrams().contains_key(&diagram_id) {
-                return Err(ErrorData::invalid_params(
-                    "diagram_id already exists",
-                    Some(serde_json::json!({ "diagram_id": diagram_id.as_str() })),
-                ));
-            }
-            candidate.diagrams_mut().insert(diagram_id.clone(), diagram);
-            if make_active {
-                candidate.set_active_diagram_id(Some(diagram_id.clone()));
-            }
+            let candidate = {
+                // Hold the session-folder write lock from reload through commit so another writer
+                // cannot advance a different diagram between our reload and full-session save.
+                let mut update = session_folder.begin_session_update().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to reload session before save: {err}"),
+                        Some(serde_json::json!({ "diagram_id": diagram_id.as_str() })),
+                    )
+                })?;
+                let candidate = update.session_mut();
+                if candidate.diagrams().contains_key(&diagram_id) {
+                    return Err(ErrorData::invalid_params(
+                        "diagram_id already exists",
+                        Some(serde_json::json!({ "diagram_id": diagram_id.as_str() })),
+                    ));
+                }
+                candidate.diagrams_mut().insert(diagram_id.clone(), diagram);
+                if make_active {
+                    candidate.set_active_diagram_id(Some(diagram_id.clone()));
+                }
 
-            session_folder.save_session(&candidate).map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to persist session: {err}"),
-                    Some(serde_json::json!({ "diagram_id": diagram_id.as_str() })),
-                )
-            })?;
-
+                update.commit().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to persist session: {err}"),
+                        Some(serde_json::json!({ "diagram_id": diagram_id.as_str() })),
+                    )
+                })?
+            };
             state.session = candidate;
         } else {
             state.session.diagrams_mut().insert(diagram_id.clone(), diagram);
@@ -190,28 +191,30 @@ impl NereidMcp {
         }
 
         if let Some(session_folder) = &self.session_folder {
-            // Reload the on-disk session immediately before persisting so concurrent edits
-            // to other diagrams/walkthroughs (e.g. from a TUI sharing this SessionFolder)
-            // are preserved instead of being overwritten by a stale full-session snapshot.
-            let mut candidate = session_folder.load_session().map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to reload session before save: {err}"),
-                    Some(serde_json::json!({ "diagram_id": diagram_id })),
-                )
-            })?;
-            if !candidate.diagrams().contains_key(&parsed) {
-                return Err(ErrorData::resource_not_found(
-                    "diagram not found",
-                    Some(serde_json::json!({ "diagram_id": diagram_id })),
-                ));
-            }
-            candidate.set_active_diagram_id(Some(parsed.clone()));
-            session_folder.save_session(&candidate).map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to persist session: {err}"),
-                    Some(serde_json::json!({ "diagram_id": diagram_id })),
-                )
-            })?;
+            let candidate = {
+                // Hold the session-folder write lock from reload through commit so another writer
+                // cannot advance a different diagram between our reload and full-session save.
+                let mut update = session_folder.begin_session_update().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to reload session before save: {err}"),
+                        Some(serde_json::json!({ "diagram_id": diagram_id })),
+                    )
+                })?;
+                let candidate = update.session_mut();
+                if !candidate.diagrams().contains_key(&parsed) {
+                    return Err(ErrorData::resource_not_found(
+                        "diagram not found",
+                        Some(serde_json::json!({ "diagram_id": diagram_id })),
+                    ));
+                }
+                candidate.set_active_diagram_id(Some(parsed.clone()));
+                update.commit().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to persist session: {err}"),
+                        Some(serde_json::json!({ "diagram_id": diagram_id })),
+                    )
+                })?
+            };
             state.session = candidate;
         } else {
             state.session.set_active_diagram_id(Some(parsed.clone()));
@@ -246,31 +249,33 @@ impl NereidMcp {
         }
 
         if let Some(session_folder) = &self.session_folder {
-            // Reload the on-disk session immediately before persisting so concurrent edits
-            // to other diagrams/walkthroughs (e.g. from a TUI sharing this SessionFolder)
-            // are preserved instead of being overwritten by a stale full-session snapshot.
-            let mut candidate = session_folder.load_session().map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to reload session before save: {err}"),
-                    Some(serde_json::json!({ "diagram_id": diagram_id })),
-                )
-            })?;
-            candidate.diagrams_mut().remove(&parsed);
+            let candidate = {
+                // Hold the session-folder write lock from reload through commit so another writer
+                // cannot advance a different diagram between our reload and full-session save.
+                let mut update = session_folder.begin_session_update().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to reload session before save: {err}"),
+                        Some(serde_json::json!({ "diagram_id": diagram_id })),
+                    )
+                })?;
+                let candidate = update.session_mut();
+                candidate.diagrams_mut().remove(&parsed);
 
-            if candidate.active_diagram_id().is_some_and(|active| active == &parsed) {
-                let next_active = candidate.diagrams().keys().next().cloned();
-                candidate.set_active_diagram_id(next_active);
-            }
+                if candidate.active_diagram_id().is_some_and(|active| active == &parsed) {
+                    let next_active = candidate.diagrams().keys().next().cloned();
+                    candidate.set_active_diagram_id(next_active);
+                }
 
-            retain_existing_selected_object_refs(&mut candidate);
-            refresh_xref_statuses(&mut candidate);
+                retain_existing_selected_object_refs(candidate);
+                refresh_xref_statuses(candidate);
 
-            session_folder.save_session(&candidate).map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to persist session: {err}"),
-                    Some(serde_json::json!({ "diagram_id": diagram_id })),
-                )
-            })?;
+                update.commit().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to persist session: {err}"),
+                        Some(serde_json::json!({ "diagram_id": diagram_id })),
+                    )
+                })?
+            };
             state.session = candidate;
         } else {
             state.session.diagrams_mut().remove(&parsed);
@@ -987,75 +992,77 @@ impl NereidMcp {
         }
 
         if let Some(session_folder) = &self.session_folder {
-            // Reload the on-disk session immediately before persisting so concurrent edits
-            // to other diagrams/walkthroughs (e.g. from a TUI sharing this SessionFolder)
-            // are preserved instead of being overwritten by a stale full-session snapshot.
-            // This mirrors the TUI's `persist_pending_diagram_sync` merge-on-save pattern.
-            // Sourcing the edited diagram from the freshly loaded session also lets
-            // `apply_ops` reject the op when another writer advanced this diagram on disk.
-            let mut candidate_session = session_folder.load_session().map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to reload session before save: {err}"),
-                    Some(serde_json::json!({ "diagram_id": diagram_id.as_str(), "base_rev": base_rev })),
-                )
-            })?;
-            let mut candidate_diagram = candidate_session
-                .diagrams()
-                .get(&diagram_id)
-                .cloned()
-                .ok_or_else(|| ErrorData::resource_not_found("diagram not found", None))?;
+            let (candidate_session, history, response) = {
+                // Hold the session-folder write lock from reload through commit so concurrent edits
+                // to other diagrams/walkthroughs cannot be overwritten by a stale full-session
+                // snapshot. Sourcing the edited diagram from the freshly loaded session also lets
+                // `apply_ops` reject the op when another writer advanced this diagram on disk.
+                let mut update = session_folder.begin_session_update().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to reload session before save: {err}"),
+                        Some(serde_json::json!({ "diagram_id": diagram_id.as_str(), "base_rev": base_rev })),
+                    )
+                })?;
+                let candidate_session = update.session_mut();
+                let mut candidate_diagram = candidate_session
+                    .diagrams()
+                    .get(&diagram_id)
+                    .cloned()
+                    .ok_or_else(|| ErrorData::resource_not_found("diagram not found", None))?;
 
-            let result =
-                apply_ops(&mut candidate_diagram, base_rev, &ops).map_err(map_apply_error)?;
-            render_diagram_unicode(&candidate_diagram).map_err(|err| {
-                ErrorData::invalid_request(
-                    format!("cannot render diagram after apply_ops: {err}"),
-                    Some(serde_json::json!({
-                        "diagram_id": diagram_id.as_str(),
-                        "base_rev": base_rev,
-                        "op_count": ops.len() as u64,
-                        "render_error": err.to_string(),
-                    })),
-                )
-            })?;
-            candidate_session.diagrams_mut().insert(diagram_id.clone(), candidate_diagram);
-            // Ops may remove objects that the selection or xrefs reference. Prune dangling
-            // selection entries and recompute xref status before persisting, so the saved meta
-            // never lists removed refs and xref.list reflects dangling endpoints. Matches
-            // diagram.delete and the disk-load path.
-            retain_existing_selected_object_refs(&mut candidate_session);
-            refresh_xref_statuses(&mut candidate_session);
+                let result =
+                    apply_ops(&mut candidate_diagram, base_rev, &ops).map_err(map_apply_error)?;
+                render_diagram_unicode(&candidate_diagram).map_err(|err| {
+                    ErrorData::invalid_request(
+                        format!("cannot render diagram after apply_ops: {err}"),
+                        Some(serde_json::json!({
+                            "diagram_id": diagram_id.as_str(),
+                            "base_rev": base_rev,
+                            "op_count": ops.len() as u64,
+                            "render_error": err.to_string(),
+                        })),
+                    )
+                })?;
+                candidate_session.diagrams_mut().insert(diagram_id.clone(), candidate_diagram);
+                // Ops may remove objects that the selection or xrefs reference. Prune dangling
+                // selection entries and recompute xref status before persisting, so the saved meta
+                // never lists removed refs and xref.list reflects dangling endpoints. Matches
+                // diagram.delete and the disk-load path.
+                retain_existing_selected_object_refs(candidate_session);
+                refresh_xref_statuses(candidate_session);
 
-            let mut history =
-                state.delta_history.get(&diagram_id).cloned().unwrap_or_else(VecDeque::new);
-            history.push_back(LastDelta {
-                from_rev: base_rev,
-                to_rev: result.new_rev,
-                delta: result.delta.clone(),
-            });
-            while history.len() > DELTA_HISTORY_LIMIT {
-                history.pop_front();
-            }
+                let mut history =
+                    state.delta_history.get(&diagram_id).cloned().unwrap_or_else(VecDeque::new);
+                history.push_back(LastDelta {
+                    from_rev: base_rev,
+                    to_rev: result.new_rev,
+                    delta: result.delta.clone(),
+                });
+                while history.len() > DELTA_HISTORY_LIMIT {
+                    history.pop_front();
+                }
 
-            session_folder.save_session(&candidate_session).map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to persist session: {err}"),
-                    Some(serde_json::json!({ "diagram_id": diagram_id.as_str(), "base_rev": base_rev })),
-                )
-            })?;
+                let candidate_session = update.commit().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to persist session: {err}"),
+                        Some(serde_json::json!({ "diagram_id": diagram_id.as_str(), "base_rev": base_rev })),
+                    )
+                })?;
 
+                let response = Json(ApplyOpsResponse {
+                    new_rev: result.new_rev,
+                    applied: result.applied as u64,
+                    delta: DeltaSummary {
+                        added: result.delta.added.iter().map(ToString::to_string).collect(),
+                        removed: result.delta.removed.iter().map(ToString::to_string).collect(),
+                        updated: result.delta.updated.iter().map(ToString::to_string).collect(),
+                    },
+                });
+
+                (candidate_session, history, response)
+            };
             state.session = candidate_session;
             state.delta_history.insert(diagram_id, history);
-
-            let response = Json(ApplyOpsResponse {
-                new_rev: result.new_rev,
-                applied: result.applied as u64,
-                delta: DeltaSummary {
-                    added: result.delta.added.iter().map(ToString::to_string).collect(),
-                    removed: result.delta.removed.iter().map(ToString::to_string).collect(),
-                    updated: result.delta.updated.iter().map(ToString::to_string).collect(),
-                },
-            });
             // Ops may have removed an object the agent spotlight points at; drop stale highlights
             // so attention.agent.read does not return missing refs, mirroring diagram.delete.
             self.prune_missing_agent_highlights(&state.session).await;

@@ -1518,8 +1518,7 @@ async fn diagram_apply_ops_refreshes_xref_status_after_removing_endpoint() {
         .expect("apply ops");
 
     let Json(after) = server.xref_list(Parameters(xref_list_params())).await.expect("xref list");
-    let status_after =
-        after.xrefs.iter().find(|x| x.xref_id == "x:2").expect("x:2").status.clone();
+    let status_after = after.xrefs.iter().find(|x| x.xref_id == "x:2").expect("x:2").status.clone();
     assert_ne!(
         status_after, "ok",
         "xref status must refresh to dangling after its endpoint node is removed",
@@ -4132,11 +4131,7 @@ async fn diagram_apply_ops_prunes_dangling_selection_from_persisted_meta() {
         .expect("apply ops");
 
     let loaded = SessionFolder::new(dir_str).load_session().expect("load session");
-    let refs = loaded
-        .selected_object_refs()
-        .iter()
-        .map(ToString::to_string)
-        .collect::<Vec<_>>();
+    let refs = loaded.selected_object_refs().iter().map(ToString::to_string).collect::<Vec<_>>();
     assert!(
         refs.iter().any(|r| r == "d:d-flow/flow/node/n:b"),
         "selection ref to surviving node must be retained: {refs:?}",

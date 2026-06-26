@@ -514,8 +514,9 @@ mod tests {
         let ghost: ObjectRef = "d:none/none/node/n:ghost".parse().expect("ghost ref");
 
         assert_eq!(find_route(&session, &ghost, &ghost), None);
-        assert!(find_routes(&session, &ghost, &ghost, 1, None, RoutesOrdering::FewestHops)
-            .is_empty());
+        assert!(
+            find_routes(&session, &ghost, &ghost, 1, None, RoutesOrdering::FewestHops).is_empty()
+        );
 
         let adjacency = SessionRouteAdjacency::derive(&session);
         assert_eq!(find_route_with_adjacency(&adjacency, &ghost, &ghost), None);

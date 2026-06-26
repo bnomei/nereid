@@ -539,6 +539,29 @@ pub struct SessionFolder {
 }
 
 #[derive(Debug)]
+pub struct SessionUpdate<'a> {
+    folder: &'a SessionFolder,
+    _guard: SessionWriteGuard<'a>,
+    session: Option<Session>,
+}
+
+impl<'a> SessionUpdate<'a> {
+    pub fn session(&self) -> &Session {
+        self.session.as_ref().expect("session update is committed")
+    }
+
+    pub fn session_mut(&mut self) -> &mut Session {
+        self.session.as_mut().expect("session update is committed")
+    }
+
+    pub fn commit(mut self) -> Result<Session, StoreError> {
+        let session = self.session.take().expect("session update is committed once");
+        self.folder.save_session_locked(&session)?;
+        Ok(session)
+    }
+}
+
+#[derive(Debug)]
 struct SessionWriteGuard<'a> {
     _meta_guard: std::sync::MutexGuard<'a, ()>,
     lock_path: PathBuf,
@@ -841,6 +864,12 @@ impl SessionFolder {
     pub fn save_session(&self, session: &Session) -> Result<(), StoreError> {
         let _guard = self.lock_session_write()?;
         self.save_session_locked(session)
+    }
+
+    pub fn begin_session_update(&self) -> Result<SessionUpdate<'_>, StoreError> {
+        let guard = self.lock_session_write()?;
+        let session = self.load_session()?;
+        Ok(SessionUpdate { folder: self, _guard: guard, session: Some(session) })
     }
 
     /// Body of [`Self::save_session`], assuming the caller already holds the meta lock.
