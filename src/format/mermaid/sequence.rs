@@ -363,7 +363,10 @@ pub fn parse_sequence_diagram(input: &str) -> Result<SequenceAst, MermaidSequenc
         }
 
         if let Some(keyword) = trimmed.split_whitespace().next() {
-            if keyword == "participant" {
+            // Mermaid declares participants with either `participant <name>` or `actor <name>`.
+            // `actor` sets the participant's role so role-bearing diagrams round-trip: the
+            // exporter emits `actor <name>` for role == "actor", and this restores it.
+            if keyword == "participant" || keyword == "actor" {
                 let mut parts = trimmed.split_whitespace();
                 parts.next(); // keyword
                 let Some(name) = parts.next() else {
@@ -394,9 +397,13 @@ pub fn parse_sequence_diagram(input: &str) -> Result<SequenceAst, MermaidSequenc
                         reason,
                     }
                 })?;
-                ast.participants_mut()
+                let participant = ast
+                    .participants_mut()
                     .entry(participant_id)
                     .or_insert_with(|| SequenceParticipant::new(name.to_owned()));
+                if keyword == "actor" {
+                    participant.set_role(Some("actor"));
+                }
                 continue;
             }
 
@@ -1004,6 +1011,35 @@ mod tests {
         let ast2 = parse_sequence_diagram(&out1).expect("parse 2");
         let out2 = export_sequence_diagram(&ast2).expect("export 2");
         assert_eq!(out2, expected);
+    }
+
+    // Regression: a participant declared with the Mermaid `actor` keyword must set role "actor"
+    // and that role must survive export -> parse (the exporter emits `actor <name>`).
+    #[test]
+    fn actor_role_round_trips_through_export_and_parse() {
+        let role_of = |ast: &SequenceAst, name: &str| -> Option<String> {
+            ast.participants()
+                .values()
+                .find(|participant| participant.mermaid_name() == name)
+                .and_then(|participant| participant.role().map(ToOwned::to_owned))
+        };
+
+        let input = "sequenceDiagram\nactor Alice\nparticipant Bob\nAlice->>Bob: hi\n";
+        let ast1 = parse_sequence_diagram(input).expect("parse 1");
+        assert_eq!(role_of(&ast1, "Alice").as_deref(), Some("actor"));
+        assert_eq!(role_of(&ast1, "Bob"), None);
+
+        let out = export_sequence_diagram(&ast1).expect("export");
+        assert!(out.contains("actor Alice"), "export must emit the actor keyword:\n{out}");
+        assert!(out.contains("participant Bob"), "export:\n{out}");
+
+        let ast2 = parse_sequence_diagram(&out).expect("parse 2");
+        assert_eq!(
+            role_of(&ast2, "Alice").as_deref(),
+            Some("actor"),
+            "actor role must survive the round-trip; export was:\n{out}",
+        );
+        assert_eq!(role_of(&ast2, "Bob"), None);
     }
 
     fn semantic_view(
