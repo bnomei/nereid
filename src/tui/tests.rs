@@ -15,7 +15,7 @@ use super::{
     ranked_search_results, search_candidates_from_session, search_footer_line,
     stack_main_panes_vertically, style_for_diagram_cell, xref_involves_selected, xref_item_style,
     xrefs_cursor_highlight_style, App, ExternalAction, Focus, FocusOwner, HintKind, HintMode,
-    SearchKind, SearchMode, SelectableObject,
+    PendingDiagramSync, SearchKind, SearchMode, SelectableObject,
 };
 use crate::format::mermaid::{parse_flowchart, parse_sequence_diagram};
 use crate::model::{
@@ -1631,6 +1631,87 @@ fn diagram_switching_updates_active_diagram_and_objects() {
     app.handle_key_code(KeyCode::Char('['));
     let back_diagram = app.active_diagram_id().map(ToString::to_string);
     assert_eq!(before_diagram, back_diagram);
+}
+
+fn unique_temp_session_dir(tag: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!(
+        "nereid-tui-{tag}-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).expect("create temp session dir");
+    dir
+}
+
+// Regression: a transient (retriable) sync failure must NOT discard the pending edit. Dropping it
+// would let a concurrent MCP write reload over and clobber the unsynced in-memory edit on the next
+// tick. We force a retriable save failure by symlinking the meta file (atomic writes refuse it).
+#[cfg(unix)]
+#[test]
+fn flush_pending_diagram_sync_retains_pending_on_retriable_error() {
+    let session = demo_session();
+    let tmp_dir = unique_temp_session_dir("pending-retain");
+    let folder = SessionFolder::new(&tmp_dir);
+    folder.save_session(&session).expect("save session");
+
+    let mut app = App::new(session);
+    let diagram_id = app.active_diagram_id().cloned().expect("active diagram");
+    app.session_folder = Some(folder.clone());
+
+    let disk_rev = folder
+        .load_session()
+        .expect("load session")
+        .diagrams()
+        .get(&diagram_id)
+        .expect("diagram on disk")
+        .rev();
+    app.pending_diagram_sync =
+        Some(PendingDiagramSync { diagram_id, expected_disk_rev: disk_rev });
+
+    // Force save_session to fail with a retriable I/O error.
+    let meta_path = folder.meta_path();
+    let backing = meta_path.with_extension("json.backing");
+    std::fs::rename(&meta_path, &backing).expect("move meta");
+    std::os::unix::fs::symlink(&backing, &meta_path).expect("symlink meta");
+
+    app.flush_pending_diagram_sync();
+
+    assert!(
+        app.pending_diagram_sync.is_some(),
+        "retriable failure must retain the pending sync so the next tick retries",
+    );
+
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+}
+
+// Regression: an unresolvable (terminal) conflict — here the disk revision has diverged from the
+// edit's baseline — must abandon the pending sync rather than retry forever.
+#[test]
+fn flush_pending_diagram_sync_drops_pending_on_terminal_conflict() {
+    let session = demo_session();
+    let tmp_dir = unique_temp_session_dir("pending-drop");
+    let folder = SessionFolder::new(&tmp_dir);
+    folder.save_session(&session).expect("save session");
+
+    let mut app = App::new(session);
+    let diagram_id = app.active_diagram_id().cloned().expect("active diagram");
+    app.session_folder = Some(folder.clone());
+
+    // expected_disk_rev deliberately diverges from the on-disk revision.
+    app.pending_diagram_sync =
+        Some(PendingDiagramSync { diagram_id, expected_disk_rev: 9999 });
+
+    app.flush_pending_diagram_sync();
+
+    assert!(
+        app.pending_diagram_sync.is_none(),
+        "an unresolvable rev conflict must abandon the pending sync",
+    );
+
+    let _ = std::fs::remove_dir_all(&tmp_dir);
 }
 
 #[test]

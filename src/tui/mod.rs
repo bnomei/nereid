@@ -564,6 +564,25 @@ struct PendingDiagramSync {
     expected_disk_rev: u64,
 }
 
+/// Outcome of a failed pending-diagram-sync flush.
+enum DiagramSyncError {
+    /// Transient failure (e.g. disk I/O). The pending sync should be retained so the next tick
+    /// retries; disk reload stays blocked meanwhile, protecting the unsynced edit.
+    Retriable(String),
+    /// Unresolvable conflict (the diagram is gone locally or on disk, or the disk revision has
+    /// diverged from the edit's baseline). Retrying cannot succeed, so the pending sync is
+    /// abandoned and reload is allowed to proceed.
+    Terminal(String),
+}
+
+impl DiagramSyncError {
+    fn message(&self) -> &str {
+        match self {
+            Self::Retriable(message) | Self::Terminal(message) => message,
+        }
+    }
+}
+
 struct App {
     session: Session,
     session_folder: Option<SessionFolder>,
@@ -1476,8 +1495,17 @@ impl App {
             Ok(()) => {
                 self.set_toast(format!("Synced edited diagram: {}", pending.diagram_id));
             }
-            Err(err) => {
-                self.set_toast(err);
+            Err(err @ DiagramSyncError::Retriable(_)) => {
+                // Transient failure: keep the edit pending so the next tick retries. While pending
+                // is Some, sync_from_ui_state will not reload from disk, so the unsynced in-memory
+                // edit is preserved instead of being clobbered by a concurrent MCP write.
+                self.set_toast(err.message().to_owned());
+                self.pending_diagram_sync = Some(pending);
+            }
+            Err(err @ DiagramSyncError::Terminal(_)) => {
+                // Unresolvable conflict: retrying cannot help, so drop the pending sync (already
+                // taken) and let reload proceed.
+                self.set_toast(err.message().to_owned());
             }
         }
     }
@@ -1486,33 +1514,38 @@ impl App {
         &self,
         session_folder: &SessionFolder,
         pending: &PendingDiagramSync,
-    ) -> Result<(), String> {
+    ) -> Result<(), DiagramSyncError> {
         let Some(local_diagram) = self.session.diagrams().get(&pending.diagram_id).cloned() else {
-            return Err(format!(
+            // The edited diagram is gone locally; there is nothing left to persist.
+            return Err(DiagramSyncError::Terminal(format!(
                 "sync skipped: edited diagram no longer exists: {}",
                 pending.diagram_id
-            ));
+            )));
         };
 
-        let mut disk_session =
-            session_folder.load_session().map_err(|err| format!("sync failed (load): {err}"))?;
+        let mut disk_session = session_folder
+            .load_session()
+            .map_err(|err| DiagramSyncError::Retriable(format!("sync failed (load): {err}")))?;
         let Some(disk_diagram) = disk_session.diagrams().get(&pending.diagram_id) else {
-            return Err(format!("sync conflict: diagram removed on disk: {}", pending.diagram_id));
+            return Err(DiagramSyncError::Terminal(format!(
+                "sync conflict: diagram removed on disk: {}",
+                pending.diagram_id
+            )));
         };
 
         if disk_diagram.rev() != pending.expected_disk_rev {
-            return Err(format!(
+            return Err(DiagramSyncError::Terminal(format!(
                 "sync conflict for {}: disk rev {} != expected {}",
                 pending.diagram_id,
                 disk_diagram.rev(),
                 pending.expected_disk_rev
-            ));
+            )));
         }
 
         disk_session.diagrams_mut().insert(pending.diagram_id.clone(), local_diagram);
         session_folder
             .save_session(&disk_session)
-            .map_err(|err| format!("sync failed (save): {err}"))
+            .map_err(|err| DiagramSyncError::Retriable(format!("sync failed (save): {err}")))
     }
 
     fn retain_existing_selected_refs(&mut self) {
