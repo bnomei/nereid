@@ -259,7 +259,13 @@ pub fn find_routes_with_adjacency(
     }
 
     if from == to {
-        return vec![vec![from.clone()]];
+        // A self route only exists if the endpoint is a real object in the session; otherwise an
+        // unknown id would fabricate a single-node "route exists" answer. Mirrors flow::paths.
+        return if adjacency.adjacency.contains_key(from) {
+            vec![vec![from.clone()]]
+        } else {
+            Vec::new()
+        };
     }
 
     let max_hops = max_hops.unwrap_or(u64::MAX);
@@ -323,7 +329,8 @@ pub fn find_route_with_adjacency(
     to: &ObjectRef,
 ) -> Option<Vec<ObjectRef>> {
     if from == to {
-        return Some(vec![from.clone()]);
+        // See find_routes_with_adjacency: don't fabricate a self route for an unknown id.
+        return adjacency.adjacency.contains_key(from).then(|| vec![from.clone()]);
     }
 
     let start = from.clone();
@@ -497,6 +504,46 @@ mod tests {
         // And the deleted endpoints never become reachable graph nodes at all.
         let adjacency = SessionRouteAdjacency::derive(&session);
         assert_eq!(find_route_with_adjacency(&adjacency, &start, &goal), None);
+    }
+
+    #[test]
+    fn self_route_for_unknown_id_returns_no_route() {
+        // An empty session knows no objects; a self-to-self query for a non-existent id must not
+        // fabricate a single-node success path.
+        let session = Session::new(SessionId::new("s-empty").expect("session id"));
+        let ghost: ObjectRef = "d:none/none/node/n:ghost".parse().expect("ghost ref");
+
+        assert_eq!(find_route(&session, &ghost, &ghost), None);
+        assert!(find_routes(&session, &ghost, &ghost, 1, None, RoutesOrdering::FewestHops)
+            .is_empty());
+
+        let adjacency = SessionRouteAdjacency::derive(&session);
+        assert_eq!(find_route_with_adjacency(&adjacency, &ghost, &ghost), None);
+        assert!(find_routes_with_adjacency(
+            &adjacency,
+            &ghost,
+            &ghost,
+            1,
+            None,
+            RoutesOrdering::FewestHops
+        )
+        .is_empty());
+    }
+
+    #[test]
+    fn self_route_for_existing_id_returns_single_node() {
+        // A real object should still get its trivial self route.
+        let mut session = Session::new(SessionId::new("s-real").expect("session id"));
+        let flow_id = DiagramId::new("flow").expect("diagram id");
+        let mut flow_ast = FlowchartAst::default();
+        flow_ast.nodes_mut().insert(oid("n:a"), FlowNode::new("A"));
+        session.diagrams_mut().insert(
+            flow_id.clone(),
+            Diagram::new(flow_id, "Flow", DiagramAst::Flowchart(flow_ast)),
+        );
+
+        let node: ObjectRef = "d:flow/flow/node/n:a".parse().expect("node ref");
+        assert_eq!(find_route(&session, &node, &node), Some(vec![node.clone()]));
     }
 
     #[test]
