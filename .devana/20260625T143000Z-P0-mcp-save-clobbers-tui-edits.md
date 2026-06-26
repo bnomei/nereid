@@ -1,4 +1,5 @@
 DEVANA-FINDING: v1
+DEVANA-STATE: open
 Priority: P0 | Confidence: high | Security-sensitive: no | Status: open
 Location: src/mcp/server/diagram.rs:974-1021 | Slug: mcp-save-clobbers-tui-edits
 
@@ -44,5 +45,9 @@ Same pattern in `src/mcp/server/walkthrough.rs:335-405` and `src/mcp/server/xref
 
 Re-read disk session immediately before save and merge only the mutated diagram/walkthrough, or reject save when any other diagram's disk rev differs from the in-memory copy.
 
+## Status Notes
+
+2026-06-26: Still open after static validation. Persistent MCP handlers now reload the on-disk session immediately before mutating, which narrows the stale snapshot window, but the reload and later full `save_session` are not atomic. A TUI save can still advance another diagram after the MCP reload and before MCP `save_session`; `save_session_locked` then treats that other diagram as changed and writes the stale candidate copy back to disk, regressing its rev/content.
+
 DEVANA-KEY: src/mcp/server/diagram.rs:974-1021 | P0 | mcp-save-clobbers-tui-edits
-DEVANA-SUMMARY: P0 high src/mcp/server/diagram.rs:974-1021 - MCP save_session writes a stale full-session snapshot that can overwrite concurrent TUI diagram saves on the shared SessionFolder.
+DEVANA-SUMMARY: open P0 high src/mcp/server/diagram.rs:974-1021 - MCP save_session writes a stale full-session snapshot that can overwrite concurrent TUI diagram saves on the shared SessionFolder.

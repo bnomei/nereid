@@ -1,5 +1,6 @@
 DEVANA-FINDING: v1
-Priority: P1 | Confidence: high | Security-sensitive: no | Status: open
+DEVANA-STATE: fixed
+Priority: P1 | Confidence: high | Security-sensitive: no | Status: fixed
 Location: src/tui/mod.rs:1467-1482,723-724 | Slug: tui-pending-sync-dropped
 
 # TUI drops pending diagram sync after a single failed flush
@@ -36,5 +37,9 @@ Control-flow trace: `take()` at `1468` before `match`; error arm at `1479-1481` 
 
 Restore `pending_diagram_sync` on retriable errors; keep blocking disk reload while sync is pending.
 
+## Status Notes
+
+2026-06-26: Marked fixed after static validation. `flush_pending_diagram_sync` restores `pending_diagram_sync` for `DiagramSyncError::Retriable`, and `sync_from_ui_state` still skips disk reload while pending is present, so transient I/O failures no longer abandon the unsynced in-memory edit. Terminal conflicts intentionally drop pending as unretriable, which is outside the original transient-failure counterexample.
+
 DEVANA-KEY: src/tui/mod.rs:1467-1482 | P1 | tui-pending-sync-dropped
-DEVANA-SUMMARY: P1 high src/tui/mod.rs:1467-1482 - Failed diagram sync flush permanently clears pending state, allowing MCP reload to clobber unsynced TUI edits.
+DEVANA-SUMMARY: fixed P1 high src/tui/mod.rs:1467-1482 - Failed diagram sync flush permanently clears pending state, allowing MCP reload to clobber unsynced TUI edits.

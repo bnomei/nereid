@@ -1,5 +1,6 @@
 DEVANA-FINDING: v1
-Priority: P2 | Confidence: high | Security-sensitive: no | Status: open
+DEVANA-STATE: fixed
+Priority: P2 | Confidence: high | Security-sensitive: no | Status: fixed
 Location: src/render/sequence/helpers.rs:826-848, src/format/mermaid/sequence.rs:713-722 | Slug: sequence-section-noncontiguous-render
 
 # Sequence section frames span gap rows when message_ids are non-contiguous
@@ -36,5 +37,9 @@ Mermaid parse appends messages sequentially into sections (contiguous at parse t
 
 Align render with export: reject non-contiguous sections or draw per-message frames instead of min/max span.
 
+## Status Notes
+
+2026-06-26: Marked fixed after static validation. `section_row_ranges` now sorts and deduplicates member rows, rejects missing message ids, and returns `InvalidBlockMembership` when adjacent rows are not contiguous. Render now rejects the same non-contiguous section membership the exporter rejects, so it no longer draws a misleading min/max frame over skipped messages.
+
 DEVANA-KEY: src/render/sequence/helpers.rs:826-848 | P2 | sequence-section-noncontiguous-render
-DEVANA-SUMMARY: P2 high src/render/sequence/helpers.rs:826-848 - Section frames use min/max row span, drawing over messages not in the section while export rejects the same layout.
+DEVANA-SUMMARY: fixed P2 high src/render/sequence/helpers.rs:826-848 - Section frames use min/max row span, drawing over messages not in the section while export rejects the same layout.

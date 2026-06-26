@@ -1,5 +1,6 @@
 DEVANA-FINDING: v1
-Priority: P2 | Confidence: high | Security-sensitive: no | Status: open
+DEVANA-STATE: fixed
+Priority: P2 | Confidence: high | Security-sensitive: no | Status: fixed
 Location: src/render/sequence.rs:30,148 | Slug: sequence-col-gap-budget-ignored
 
 # Sequence renderer ignores layout column-gap spacing budget
@@ -38,5 +39,9 @@ Grep for `col_gap_extra` under `src/render/` returns no matches. Layout and rend
 
 Apply `layout.spacing_budget().col_gap_extra_spacing_by_col()` when computing participant `cursor_x` in `render_sequence_unicode`.
 
+## Status Notes
+
+2026-06-26: Marked fixed after static validation. Participant placement is centralized in `compute_participant_renders`, which reads `layout.spacing_budget().col_gap_extra_spacing_by_col()` and adds the per-column extra gap to `COL_GAP` when advancing `cursor_x`. The text and annotated renderers share this path, so the long cross-column label overlap/truncation counterexample is blocked.
+
 DEVANA-KEY: src/render/sequence.rs:30,148 | P2 | sequence-col-gap-budget-ignored
-DEVANA-SUMMARY: P2 high src/render/sequence.rs:30,148 - Sequence render uses fixed COL_GAP and ignores layout's col_gap_extra_spacing_by_col, breaking label spacing for wide diagrams.
+DEVANA-SUMMARY: fixed P2 high src/render/sequence.rs:30,148 - Sequence render uses fixed COL_GAP and ignores layout's col_gap_extra_spacing_by_col, breaking label spacing for wide diagrams.

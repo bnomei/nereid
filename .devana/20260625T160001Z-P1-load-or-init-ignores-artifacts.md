@@ -1,5 +1,6 @@
 DEVANA-FINDING: v1
-Priority: P1 | Confidence: high | Security-sensitive: no | Status: open
+DEVANA-STATE: fixed
+Priority: P1 | Confidence: high | Security-sensitive: no | Status: fixed
 Location: src/store/session_folder.rs:704-715 | Slug: load-or-init-ignores-artifacts
 
 # load_or_init_session replaces session when meta is missing despite existing diagram files
@@ -36,5 +37,9 @@ Control-flow trace: `load_or_init_session` → `load_meta` `NotFound` → `initi
 
 On meta `NotFound`, scan `diagrams/` (and walkthroughs) and rebuild meta, or return a distinct error requiring repair instead of seeding.
 
+## Status Notes
+
+2026-06-26: Marked fixed for the reported diagram-artifact counterexample after static validation. `load_or_init_session` now checks `has_existing_diagram_files()` when meta is missing and returns `MetaMissingWithExistingDiagrams` instead of seeding if `diagrams/*.mmd` exists. Caveat: the guard is diagram-specific; a folder containing only orphaned walkthrough artifacts is not covered by this report's fix.
+
 DEVANA-KEY: src/store/session_folder.rs:704-715 | P1 | load-or-init-ignores-artifacts
-DEVANA-SUMMARY: P1 high src/store/session_folder.rs:704-715 - Missing session meta triggers seed session creation, ignoring existing diagram files on disk.
+DEVANA-SUMMARY: fixed P1 high src/store/session_folder.rs:704-715 - Missing session meta triggers seed session creation, ignoring existing diagram files on disk.

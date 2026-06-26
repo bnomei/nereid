@@ -1,5 +1,6 @@
 DEVANA-FINDING: v1
-Priority: P2 | Confidence: high | Security-sensitive: no | Status: open
+DEVANA-STATE: fixed
+Priority: P2 | Confidence: high | Security-sensitive: no | Status: fixed
 Location: src/query/session_routes.rs:191-196 | Slug: route-adjacency-includes-dangling-xrefs
 
 # Route adjacency adds phantom nodes/edges from dangling xrefs, routing through deleted objects
@@ -67,5 +68,9 @@ phantom edge is the sole source of the bad route.
 In `derive_adjacency`, skip xrefs whose status is dangling/unresolved, or only
 insert an xref edge when both endpoints already exist in `adjacency`.
 
+## Status Notes
+
+2026-06-26: Marked fixed after static validation. `derive_adjacency` now materializes AST objects first and inserts xref bridge edges only when both endpoints already exist in the adjacency map. Because `insert_edge` is no longer called for missing endpoints, dangling xrefs cannot resurrect deleted objects as traversable route nodes. A stale dangling status on still-existing endpoints may still route, but that does not recreate the reported deleted-object path.
+
 DEVANA-KEY: src/query/session_routes.rs:191-196 | P2 | route-adjacency-includes-dangling-xrefs
-DEVANA-SUMMARY: P2 high src/query/session_routes.rs:191-196 - Route derivation adds edges for dangling xrefs, so route queries traverse deleted objects.
+DEVANA-SUMMARY: fixed P2 high src/query/session_routes.rs:191-196 - Route derivation adds edges for dangling xrefs, so route queries traverse deleted objects.

@@ -1,5 +1,6 @@
 DEVANA-FINDING: v1
-Priority: P3 | Confidence: high | Security-sensitive: no | Status: open
+DEVANA-STATE: fixed
+Priority: P3 | Confidence: high | Security-sensitive: no | Status: fixed
 Location: src/query/session_routes.rs:254-256,318-320 | Slug: find-route-self-fabricates-ghost
 
 # find_routes/find_route fabricate a single-node route for an unknown id when from == to
@@ -56,5 +57,9 @@ analog shows the containment guard is the intended contract.
 Return empty/`None` when `from == to` but `!adjacency.contains_key(from)`,
 mirroring `flow::paths`.
 
+## Status Notes
+
+2026-06-26: Marked fixed after static validation. `find_routes_with_adjacency` now returns a self route only if adjacency contains the endpoint, and `find_route_with_adjacency` uses the same membership guard. Unknown self-to-self refs now return empty/`None` instead of fabricating a single-node path.
+
 DEVANA-KEY: src/query/session_routes.rs:254-256 | P3 | find-route-self-fabricates-ghost
-DEVANA-SUMMARY: P3 high src/query/session_routes.rs:254-256 - Self-to-self route query for a non-existent id fabricates a single-node success path.
+DEVANA-SUMMARY: fixed P3 high src/query/session_routes.rs:254-256 - Self-to-self route query for a non-existent id fabricates a single-node success path.

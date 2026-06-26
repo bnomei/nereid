@@ -1,5 +1,6 @@
 DEVANA-FINDING: v1
-Priority: P3 | Confidence: medium | Security-sensitive: no | Status: open
+DEVANA-STATE: fixed
+Priority: P3 | Confidence: medium | Security-sensitive: no | Status: fixed
 Location: src/mcp/server/queries.rs:338-340 | Slug: flow-reachable-missing-node
 
 # flow.reachable returns empty success for unknown from_node_id
@@ -38,5 +39,9 @@ May be intentional API design for empty-graph ergonomics; no schema documents th
 
 Return `resource_not_found` from `flow.reachable` when `from_node_id` is absent, matching `flow.paths`.
 
+## Status Notes
+
+2026-06-26: Marked fixed after static validation. MCP `flow.reachable` now checks `ast.nodes().contains_key(&from_node_id_parsed)` and returns `resource_not_found` when the source node is missing, matching `flow.paths`. The lower-level query helper still returns empty for unknown ids, but the reported MCP tool path is blocked.
+
 DEVANA-KEY: src/mcp/server/queries.rs:338-340 | P3 | flow-reachable-missing-node
-DEVANA-SUMMARY: P3 medium src/mcp/server/queries.rs:338-340 - flow.reachable returns empty success for missing from_node_id while flow.paths errors, hiding invalid node refs.
+DEVANA-SUMMARY: fixed P3 medium src/mcp/server/queries.rs:338-340 - flow.reachable returns empty success for missing from_node_id while flow.paths errors, hiding invalid node refs.

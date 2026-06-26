@@ -1,5 +1,6 @@
 DEVANA-FINDING: v1
-Priority: P2 | Confidence: high | Security-sensitive: no | Status: open
+DEVANA-STATE: fixed
+Priority: P2 | Confidence: high | Security-sensitive: no | Status: fixed
 Location: src/mcp/server/diagram.rs:1008-1016,250 | Slug: diagram-apply-ops-dangling-selection
 
 # diagram.apply_ops persists dangling selected_object_refs after removals
@@ -36,5 +37,9 @@ Cross-entry mismatch: `diagram_delete` prunes selection before save; `diagram_ap
 
 Call `retain_existing_selected_object_refs(&mut candidate_session)` before `save_session` in `diagram_apply_ops`.
 
+## Status Notes
+
+2026-06-26: Marked fixed after static validation. Persistent and in-memory `diagram.apply_ops` branches now call `retain_existing_selected_object_refs` after object-removing ops and before save/state exposure. The helper retains only refs for which `session.object_ref_exists` is true, blocking the persisted dangling-selection counterexample.
+
 DEVANA-KEY: src/mcp/server/diagram.rs:1008-1016 | P2 | diagram-apply-ops-dangling-selection
-DEVANA-SUMMARY: P2 high src/mcp/server/diagram.rs:1008-1016 - diagram.apply_ops saves meta selection without pruning refs to removed objects.
+DEVANA-SUMMARY: fixed P2 high src/mcp/server/diagram.rs:1008-1016 - diagram.apply_ops saves meta selection without pruning refs to removed objects.

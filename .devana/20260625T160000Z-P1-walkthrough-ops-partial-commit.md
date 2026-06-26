@@ -1,5 +1,6 @@
 DEVANA-FINDING: v1
-Priority: P1 | Confidence: high | Security-sensitive: no | Status: open
+DEVANA-STATE: fixed
+Priority: P1 | Confidence: high | Security-sensitive: no | Status: fixed
 Location: src/mcp/server/walkthrough.rs:424-459, src/mcp/server/helpers.rs:572-888 | Slug: walkthrough-ops-partial-commit
 
 # Non-persistent walkthrough.apply_ops commits partial batch on mid-batch failure
@@ -36,5 +37,9 @@ Persistent branch clones first; failed apply discards clone. No test covers fail
 
 Mirror the persistent pattern: clone walkthrough (or full session), apply on clone, commit only after all ops succeed.
 
+## Status Notes
+
+2026-06-26: Marked fixed after static validation. The non-persistent `walkthrough.apply_ops` path now clones the walkthrough, applies the batch to the clone, bumps rev, and assigns the clone back only after `apply_walkthrough_ops` succeeds. A mid-batch error can still mutate the candidate clone, but the live walkthrough and rev remain unchanged.
+
 DEVANA-KEY: src/mcp/server/walkthrough.rs:424-459 | P1 | walkthrough-ops-partial-commit
-DEVANA-SUMMARY: P1 high src/mcp/server/walkthrough.rs:424-459 - Non-persistent walkthrough.apply_ops leaves partial mutations when a later op in the batch fails.
+DEVANA-SUMMARY: fixed P1 high src/mcp/server/walkthrough.rs:424-459 - Non-persistent walkthrough.apply_ops leaves partial mutations when a later op in the batch fails.

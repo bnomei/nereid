@@ -1,5 +1,6 @@
 DEVANA-FINDING: v1
-Priority: P2 | Confidence: high | Security-sensitive: no | Status: open
+DEVANA-STATE: invalid
+Priority: P2 | Confidence: high | Security-sensitive: no | Status: invalid
 Location: src/format/mermaid/flowchart.rs:547-548,822-892 | Slug: linkstyle-edge-index-roundtrip
 
 # linkStyle edge index differs between parse order and export sort order
@@ -45,5 +46,9 @@ Existing roundtrip tests use edges whose parse order matches export sort order (
 
 Export `linkStyle` indices using the same edge ordering as parse (declaration order stored in model), or store style keyed by edge id rather than positional index.
 
+## Status Notes
+
+2026-06-26: Marked invalid after static validation. `parse_flowchart` attaches `linkStyle` to the semantic edge, and `export_flowchart` emits each styled link index from the same sorted edge order it writes to the Mermaid output. The exact `Z --> A`, `A --> B`, `linkStyle 0` counterexample re-exports with the style index pointing at the emitted `Z --> A` edge, and the existing regression source covers that case. No code change was needed for this finding.
+
 DEVANA-KEY: src/format/mermaid/flowchart.rs:547-548,822-892 | P2 | linkstyle-edge-index-roundtrip
-DEVANA-SUMMARY: P2 high src/format/mermaid/flowchart.rs:547-548,822-892 - linkStyle indices are assigned in declaration order on parse but sorted from-order on export, corrupting styles on round-trip.
+DEVANA-SUMMARY: invalid P2 high src/format/mermaid/flowchart.rs:547-548,822-892 - linkStyle indices are assigned in declaration order on parse but sorted from-order on export, corrupting styles on round-trip.

@@ -1,5 +1,6 @@
 DEVANA-FINDING: v1
-Priority: P1 | Confidence: high | Security-sensitive: no | Status: open
+DEVANA-STATE: fixed
+Priority: P1 | Confidence: high | Security-sensitive: no | Status: fixed
 Location: src/ops/ops_impl.rs:198-209,73-97 | Slug: seq-remove-message-orphans-section
 
 # RemoveMessage/RemoveParticipant orphan section message_ids and break Mermaid export
@@ -79,5 +80,9 @@ After removing messages in `RemoveMessage`/`RemoveParticipant`, prune the remove
 ids from every `section.message_ids` (and drop sections/blocks that become
 empty), or run a normalization pass in `apply_ops` before returning.
 
+## Status Notes
+
+2026-06-26: Marked fixed after static validation. `SeqOp::RemoveMessage` and cascade `SeqOp::RemoveParticipant` now call `prune_messages_from_blocks` with the removed ids. The pruning pass removes those ids from every section and drops empty sections/blocks, so removed sequence messages no longer leave dangling `section.message_ids` that break Mermaid export.
+
 DEVANA-KEY: src/ops/ops_impl.rs:198-209 | P1 | seq-remove-message-orphans-section
-DEVANA-SUMMARY: P1 high src/ops/ops_impl.rs:198-209 - Removing a sequence message/participant leaves a dangling section message_id, making the edited diagram fail Mermaid export.
+DEVANA-SUMMARY: fixed P1 high src/ops/ops_impl.rs:198-209 - Removing a sequence message/participant leaves a dangling section message_id, making the edited diagram fail Mermaid export.

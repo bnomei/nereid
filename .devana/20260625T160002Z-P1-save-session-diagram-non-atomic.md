@@ -1,4 +1,5 @@
 DEVANA-FINDING: v1
+DEVANA-STATE: open
 Priority: P1 | Confidence: high | Security-sensitive: no | Status: open
 Location: src/store/session_folder.rs:771-835,893 | Slug: save-session-diagram-non-atomic
 
@@ -36,5 +37,9 @@ Distinct from `save-session-gc-before-meta` (walkthrough GC ordering). Retrying 
 
 Write to temp files and rename atomically per diagram, or defer `.mmd` export until sidecar and meta can commit together; add rollback on failure.
 
+## Status Notes
+
+2026-06-26: Still open after static validation. The sidecar-first ordering blocks the original "new `.mmd` plus stale sidecar" direction, but the multi-file save remains non-atomic in the reverse direction: if the sidecar write succeeds and `export_diagram_mmd` fails, disk is left with an old `.mmd` and a new sidecar while session meta has not committed. `load_session` can still reconcile old Mermaid content through a sidecar from a different revision.
+
 DEVANA-KEY: src/store/session_folder.rs:771-835,893 | P1 | save-session-diagram-non-atomic
-DEVANA-SUMMARY: P1 high src/store/session_folder.rs:771-835,893 - Partial save_session failure can leave new .mmd on disk while meta and sidecar still describe the old revision.
+DEVANA-SUMMARY: open P1 high src/store/session_folder.rs:771-835,893 - Partial save_session failure can leave new .mmd on disk while meta and sidecar still describe the old revision.

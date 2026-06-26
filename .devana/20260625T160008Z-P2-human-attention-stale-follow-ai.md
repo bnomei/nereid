@@ -1,5 +1,6 @@
 DEVANA-FINDING: v1
-Priority: P2 | Confidence: high | Security-sensitive: no | Status: open
+DEVANA-STATE: fixed
+Priority: P2 | Confidence: high | Security-sensitive: no | Status: fixed
 Location: src/tui/mod.rs:701-712,773-789 | Slug: human-attention-stale-follow-ai
 
 # UiState human attention stays stale while follow-AI tracks agent spotlight
@@ -36,5 +37,9 @@ Cross-entry mismatch: TUI session selection and diagram state update via `jump_t
 
 Publish human selection on follow-AI jumps, or add a distinct "visible" attention channel separate from ownership.
 
+## Status Notes
+
+2026-06-26: Marked fixed after static validation. `publish_focus_to_ui_state` now publishes visible human attention when either the human owns focus or follow-AI is enabled. Follow-AI jumps through `select_object_ref`, which publishes after selecting the followed target, so `attention.human.read` reflects the viewport during follow-AI instead of the pre-follow selection.
+
 DEVANA-KEY: src/tui/mod.rs:701-712 | P2 | human-attention-stale-follow-ai
-DEVANA-SUMMARY: P2 high src/tui/mod.rs:701-712 - follow-AI viewport follows agent spotlight but UiState human attention fields are not updated, stale for MCP.
+DEVANA-SUMMARY: fixed P2 high src/tui/mod.rs:701-712 - follow-AI viewport follows agent spotlight but UiState human attention fields are not updated, stale for MCP.

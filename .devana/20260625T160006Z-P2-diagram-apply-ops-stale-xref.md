@@ -1,5 +1,6 @@
 DEVANA-FINDING: v1
-Priority: P2 | Confidence: high | Security-sensitive: no | Status: open
+DEVANA-STATE: fixed
+Priority: P2 | Confidence: high | Security-sensitive: no | Status: fixed
 Location: src/mcp/server/diagram.rs:974-1021,250-251 | Slug: diagram-apply-ops-stale-xref
 
 # diagram.apply_ops does not refresh xref status after removing endpoints
@@ -36,5 +37,9 @@ TUI refreshes xrefs on its own edits (`tui/mod.rs:760-761`). Disk sync on next f
 
 Call `refresh_xref_statuses` on `candidate_session` before `save_session` in `diagram_apply_ops`, matching `diagram.delete`.
 
+## Status Notes
+
+2026-06-26: Marked fixed after static validation. Persistent and in-memory `diagram.apply_ops` branches now call `refresh_xref_statuses` after committing the updated diagram into the candidate/current session. The helper recomputes every xref status from current endpoint existence, so `xref.list` no longer reports stale `ok` after an endpoint is removed by ops.
+
 DEVANA-KEY: src/mcp/server/diagram.rs:974-1021 | P2 | diagram-apply-ops-stale-xref
-DEVANA-SUMMARY: P2 high src/mcp/server/diagram.rs:974-1021 - diagram.apply_ops leaves xref status stale after ops remove referenced objects, unlike diagram.delete.
+DEVANA-SUMMARY: fixed P2 high src/mcp/server/diagram.rs:974-1021 - diagram.apply_ops leaves xref status stale after ops remove referenced objects, unlike diagram.delete.

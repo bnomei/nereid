@@ -1,5 +1,6 @@
 DEVANA-FINDING: v1
-Priority: P2 | Confidence: high | Security-sensitive: no | Status: open
+DEVANA-STATE: fixed
+Priority: P2 | Confidence: high | Security-sensitive: no | Status: fixed
 Location: src/mcp/server/diagram.rs:974-1081, src/mcp/server/collaboration.rs:36-54 | Slug: agent-spotlight-not-pruned
 
 # Agent spotlight not cleared when apply_ops removes the target object
@@ -36,5 +37,9 @@ State lifecycle mismatch: `agent_highlights` outlives removed objects because on
 
 After successful `diagram.apply_ops`, prune `agent_highlights` refs that `object_ref_is_missing` reports; mirror `diagram.delete` retention logic.
 
+## Status Notes
+
+2026-06-26: Marked fixed after static validation. Both persistent and in-memory `diagram.apply_ops` branches now call `prune_missing_agent_highlights` after a successful apply. The helper retains only spotlight refs that still resolve in the current session, so `attention.agent.read` no longer returns a removed object after apply_ops deletes the highlighted target.
+
 DEVANA-KEY: src/mcp/server/diagram.rs:974-1081 | P2 | agent-spotlight-not-pruned
-DEVANA-SUMMARY: P2 high src/mcp/server/diagram.rs:974-1081 - diagram.apply_ops leaves agent_highlights pointing at removed objects; attention.agent.read returns stale refs.
+DEVANA-SUMMARY: fixed P2 high src/mcp/server/diagram.rs:974-1081 - diagram.apply_ops leaves agent_highlights pointing at removed objects; attention.agent.read returns stale refs.
