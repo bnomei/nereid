@@ -1532,6 +1532,7 @@ impl App {
         }
 
         disk_session.diagrams_mut().insert(pending.diagram_id.clone(), local_diagram);
+        normalize_derived_session_metadata(disk_session);
         update
             .commit()
             .map_err(|err| DiagramSyncError::Retriable(format!("sync failed (save): {err}")))
@@ -1539,33 +1540,11 @@ impl App {
     }
 
     fn retain_existing_selected_refs(&mut self) {
-        let retained = self
-            .session
-            .selected_object_refs()
-            .iter()
-            .filter(|object_ref| self.session.object_ref_exists(object_ref))
-            .cloned()
-            .collect::<BTreeSet<_>>();
-        self.session.set_selected_object_refs(retained);
+        retain_existing_selected_refs(&mut self.session);
     }
 
     fn refresh_xref_statuses(&mut self) {
-        let next_statuses = self
-            .session
-            .xrefs()
-            .iter()
-            .map(|(xref_id, xref)| {
-                let from_dangling = self.session.object_ref_is_missing(xref.from());
-                let to_dangling = self.session.object_ref_is_missing(xref.to());
-                (xref_id.clone(), XRefStatus::from_flags(from_dangling, to_dangling))
-            })
-            .collect::<Vec<_>>();
-
-        for (xref_id, status) in next_statuses {
-            if let Some(xref) = self.session.xrefs_mut().get_mut(&xref_id) {
-                xref.set_status(status);
-            }
-        }
+        refresh_xref_statuses(&mut self.session);
     }
 
     fn help_scroll_by(&mut self, delta: i32) {
@@ -2595,6 +2574,39 @@ impl Drop for TerminalSuspendGuard<'_> {
         let _ = self.terminal.clear();
         let _ = self.terminal.hide_cursor();
         let _ = ratatui::backend::Backend::flush(self.terminal.backend_mut());
+    }
+}
+
+fn normalize_derived_session_metadata(session: &mut Session) {
+    retain_existing_selected_refs(session);
+    refresh_xref_statuses(session);
+}
+
+fn retain_existing_selected_refs(session: &mut Session) {
+    let retained = session
+        .selected_object_refs()
+        .iter()
+        .filter(|object_ref| session.object_ref_exists(object_ref))
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    session.set_selected_object_refs(retained);
+}
+
+fn refresh_xref_statuses(session: &mut Session) {
+    let next_statuses = session
+        .xrefs()
+        .iter()
+        .map(|(xref_id, xref)| {
+            let from_dangling = session.object_ref_is_missing(xref.from());
+            let to_dangling = session.object_ref_is_missing(xref.to());
+            (xref_id.clone(), XRefStatus::from_flags(from_dangling, to_dangling))
+        })
+        .collect::<Vec<_>>();
+
+    for (xref_id, status) in next_statuses {
+        if let Some(xref) = session.xrefs_mut().get_mut(&xref_id) {
+            xref.set_status(status);
+        }
     }
 }
 

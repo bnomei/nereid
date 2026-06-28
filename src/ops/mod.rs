@@ -15,7 +15,7 @@ use std::collections::HashSet;
 use std::fmt;
 
 use crate::format::mermaid::flowchart::MermaidIdentError;
-use crate::model::seq_ast::SequenceBlock;
+use crate::model::seq_ast::{SequenceBlock, SequenceSection, SequenceSectionKind};
 use crate::model::{
     CategoryPath, Diagram, DiagramAst, DiagramId, DiagramKind, FlowEdge, FlowNode, FlowchartAst,
 };

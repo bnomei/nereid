@@ -869,6 +869,18 @@ fn legacy_meta_without_walkthrough_ids_scans_directory(ctx: SessionFolderTestCtx
     assert!(loaded.walkthroughs().contains_key(&w1));
 }
 
+#[rstest]
+fn save_session_recovers_preexisting_write_lock_file(ctx: SessionFolderTestCtx) {
+    let folder = &ctx.folder;
+    let lock_path = folder.root().join(".nereid-session.write.lock");
+    std::fs::write(&lock_path, "pid=999999 acquired_unix_ms=0\n").unwrap();
+
+    let session = Session::new(SessionId::new("s1").unwrap());
+    folder.save_session(&session).unwrap();
+
+    assert!(folder.meta_path().is_file());
+}
+
 #[cfg(unix)]
 #[rstest]
 fn save_session_rolls_back_diagram_when_sidecar_write_fails(ctx: SessionFolderTestCtx) {
@@ -1029,6 +1041,48 @@ fn save_session_rolls_back_diagram_artifacts_when_meta_write_fails(ctx: SessionF
     assert!(
         !ast.nodes().contains_key(&n_b),
         "failed meta commit must leave the diagram at the prior revision",
+    );
+}
+
+#[cfg(unix)]
+#[rstest]
+fn save_session_rolls_back_walkthrough_artifacts_when_meta_write_fails(ctx: SessionFolderTestCtx) {
+    let folder = &ctx.folder;
+
+    let mut session = Session::new(SessionId::new("s1").unwrap());
+    let w1 = WalkthroughId::new("w:1").unwrap();
+    session.walkthroughs_mut().insert(w1.clone(), Walkthrough::new(w1.clone(), "Before"));
+    folder.save_session(&session).unwrap();
+    folder.flush_ascii_exports();
+
+    let wt_path = folder.walkthrough_json_path(&w1);
+    let ascii_path = folder.walkthrough_ascii_path(&w1);
+    let wt_before = std::fs::read(&wt_path).unwrap();
+    let ascii_before = std::fs::read(&ascii_path).unwrap();
+
+    let meta_path = folder.meta_path();
+    let backing = folder.root().join("nereid-session.meta.json.backing");
+    std::fs::rename(&meta_path, &backing).unwrap();
+    std::os::unix::fs::symlink(&backing, &meta_path).unwrap();
+
+    {
+        let walkthrough = session.walkthroughs_mut().get_mut(&w1).unwrap();
+        walkthrough.set_title("After");
+        walkthrough.bump_rev();
+    }
+
+    let err = folder.save_session(&session).unwrap_err();
+    match err {
+        StoreError::SymlinkRefused { path } => assert_eq!(path, meta_path),
+        other => panic!("expected SymlinkRefused from meta write, got: {other:?}"),
+    }
+    folder.flush_ascii_exports();
+
+    assert_eq!(std::fs::read(&wt_path).unwrap(), wt_before, "walkthrough JSON must roll back");
+    assert_eq!(
+        std::fs::read(&ascii_path).unwrap(),
+        ascii_before,
+        "walkthrough ASCII must roll back",
     );
 }
 

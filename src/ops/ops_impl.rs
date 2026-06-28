@@ -225,11 +225,57 @@ fn prune_messages_from_blocks(ast: &mut SequenceAst, removed: &HashSet<ObjectId>
 
 fn prune_messages_from_block(block: &mut SequenceBlock, removed: &HashSet<ObjectId>) -> bool {
     block.blocks_mut().retain_mut(|nested| prune_messages_from_block(nested, removed));
-    for section in block.sections_mut().iter_mut() {
+
+    let block_id = block.block_id().clone();
+    let kind = block.kind();
+    let mut header = block.header().map(ToOwned::to_owned);
+    let mut sections = std::mem::take(block.sections_mut());
+    for section in sections.iter_mut() {
         section.message_ids_mut().retain(|message_id| !removed.contains(message_id));
     }
-    block.sections_mut().retain(|section| !section.message_ids().is_empty());
-    !block.sections().is_empty()
+    sections.retain(|section| !section.message_ids().is_empty());
+
+    if sections.first().is_some_and(|first| first.kind() != SequenceSectionKind::Main) {
+        let first = &sections[0];
+        header = first.header().map(ToOwned::to_owned);
+        let section_id = first.section_id().clone();
+        let message_ids = first.message_ids().to_vec();
+        sections[0] = SequenceSection::new(
+            section_id,
+            SequenceSectionKind::Main,
+            None::<String>,
+            message_ids,
+        );
+    } else if !block.blocks().is_empty() {
+        let mut nested_message_ids = Vec::new();
+        collect_nested_block_message_ids(block.blocks(), &mut nested_message_ids);
+        if !nested_message_ids.is_empty() {
+            sections.push(SequenceSection::new(
+                ObjectId::new(format!("{}:main", block_id.as_str())).expect("valid section id"),
+                SequenceSectionKind::Main,
+                None::<String>,
+                nested_message_ids,
+            ));
+        }
+    }
+
+    let blocks = std::mem::take(block.blocks_mut());
+    let keep = !sections.is_empty() || !blocks.is_empty();
+    *block = SequenceBlock::new(block_id, kind, header, sections, blocks);
+    keep
+}
+
+fn collect_nested_block_message_ids(blocks: &[SequenceBlock], message_ids: &mut Vec<ObjectId>) {
+    for block in blocks {
+        for section in block.sections() {
+            for message_id in section.message_ids() {
+                if !message_ids.contains(message_id) {
+                    message_ids.push(message_id.clone());
+                }
+            }
+        }
+        collect_nested_block_message_ids(block.blocks(), message_ids);
+    }
 }
 
 fn normalize_seq_raw_arrow(kind: SequenceMessageKind, raw_arrow: Option<String>) -> Option<String> {

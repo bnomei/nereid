@@ -14,11 +14,14 @@ use std::fmt;
 use std::fs;
 use std::fs::OpenOptions;
 use std::io;
+use std::io::Seek;
+use std::io::SeekFrom;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 
 use crate::format::mermaid::{
@@ -546,6 +549,14 @@ struct DiagramArtifactsSnapshot {
     meta_contents: Option<Vec<u8>>,
 }
 
+#[derive(Debug)]
+struct WalkthroughArtifactsSnapshot {
+    json_path: PathBuf,
+    ascii_path: PathBuf,
+    json_contents: Option<Vec<u8>>,
+    ascii_contents: Option<Vec<u8>>,
+}
+
 /// Scoped session mutation guarded by the folder write lock; commit persists atomically.
 #[derive(Debug)]
 pub struct SessionUpdate<'a> {
@@ -574,16 +585,26 @@ impl<'a> SessionUpdate<'a> {
 struct SessionWriteGuard<'a> {
     _meta_guard: std::sync::MutexGuard<'a, ()>,
     lock_path: PathBuf,
+    lock_file: fs::File,
 }
 
 impl Drop for SessionWriteGuard<'_> {
     fn drop(&mut self) {
-        match fs::remove_file(&self.lock_path) {
-            Ok(()) => {}
-            Err(source) if source.kind() == io::ErrorKind::NotFound => {}
-            Err(_source) => {}
+        if self.lock_file.set_len(0).is_err() {
+            let _ = &self.lock_path;
         }
+        let _ = FileExt::unlock(&self.lock_file);
     }
+}
+
+fn try_lock_session_file(file: &fs::File, path: &Path) -> Result<bool, StoreError> {
+    file.try_lock_exclusive().map(|()| true).or_else(|source| {
+        if source.kind() == io::ErrorKind::WouldBlock {
+            Ok(false)
+        } else {
+            Err(StoreError::Io { path: path.to_path_buf(), source })
+        }
+    })
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -696,30 +717,42 @@ impl SessionFolder {
             .map_err(|source| StoreError::Io { path: self.root.clone(), source })?;
 
         let lock_path = self.session_write_lock_path();
+        let mut lock_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&lock_path)
+            .map_err(|source| StoreError::Io { path: lock_path.clone(), source })?;
         let started = Instant::now();
         loop {
-            match OpenOptions::new().write(true).create_new(true).open(&lock_path) {
-                Ok(mut file) => {
-                    let _ = writeln!(
-                        file,
+            match try_lock_session_file(&lock_file, &lock_path) {
+                Ok(true) => {
+                    lock_file
+                        .set_len(0)
+                        .map_err(|source| StoreError::Io { path: lock_path.clone(), source })?;
+                    lock_file
+                        .seek(SeekFrom::Start(0))
+                        .map_err(|source| StoreError::Io { path: lock_path.clone(), source })?;
+                    writeln!(
+                        lock_file,
                         "pid={} acquired_unix_ms={}",
                         std::process::id(),
                         SystemTime::now()
                             .duration_since(UNIX_EPOCH)
                             .map(|d| d.as_millis())
                             .unwrap_or(0)
-                    );
-                    return Ok(SessionWriteGuard { _meta_guard: meta_guard, lock_path });
+                    )
+                    .map_err(|source| StoreError::Io { path: lock_path.clone(), source })?;
+                    return Ok(SessionWriteGuard { _meta_guard: meta_guard, lock_path, lock_file });
                 }
-                Err(source) if source.kind() == io::ErrorKind::AlreadyExists => {
+                Ok(false) => {
                     if started.elapsed() >= SESSION_WRITE_LOCK_TIMEOUT {
                         return Err(StoreError::SessionWriteLockTimeout { path: lock_path });
                     }
                     std::thread::sleep(SESSION_WRITE_LOCK_RETRY_DELAY);
                 }
-                Err(source) => {
-                    return Err(StoreError::Io { path: lock_path, source });
-                }
+                Err(err) => return Err(err),
             }
         }
     }
@@ -894,6 +927,20 @@ impl SessionFolder {
         })
     }
 
+    fn snapshot_walkthrough_artifacts(
+        &self,
+        walkthrough_id: &WalkthroughId,
+    ) -> Result<WalkthroughArtifactsSnapshot, StoreError> {
+        let json_path = self.walkthrough_json_path(walkthrough_id);
+        let ascii_path = self.walkthrough_ascii_path(walkthrough_id);
+        Ok(WalkthroughArtifactsSnapshot {
+            json_path: json_path.clone(),
+            ascii_path: ascii_path.clone(),
+            json_contents: Self::read_file_snapshot(&json_path)?,
+            ascii_contents: Self::read_file_snapshot(&ascii_path)?,
+        })
+    }
+
     fn restore_file_snapshot(
         &self,
         path: &Path,
@@ -932,6 +979,15 @@ impl SessionFolder {
         Ok(())
     }
 
+    fn restore_walkthrough_artifacts(
+        &self,
+        snapshot: &WalkthroughArtifactsSnapshot,
+    ) -> Result<(), StoreError> {
+        self.restore_file_snapshot(&snapshot.json_path, &snapshot.json_contents)?;
+        self.restore_file_snapshot(&snapshot.ascii_path, &snapshot.ascii_contents)?;
+        Ok(())
+    }
+
     fn rollback_diagram_artifacts(
         &self,
         snapshots: &[DiagramArtifactsSnapshot],
@@ -942,12 +998,25 @@ impl SessionFolder {
         Ok(())
     }
 
-    fn rollback_diagram_artifacts_then<T>(
+    fn rollback_session_artifacts(
         &self,
-        snapshots: &[DiagramArtifactsSnapshot],
+        diagram_snapshots: &[DiagramArtifactsSnapshot],
+        walkthrough_snapshots: &[WalkthroughArtifactsSnapshot],
+    ) -> Result<(), StoreError> {
+        self.rollback_diagram_artifacts(diagram_snapshots)?;
+        for snapshot in walkthrough_snapshots.iter().rev() {
+            self.restore_walkthrough_artifacts(snapshot)?;
+        }
+        Ok(())
+    }
+
+    fn rollback_session_artifacts_then<T>(
+        &self,
+        diagram_snapshots: &[DiagramArtifactsSnapshot],
+        walkthrough_snapshots: &[WalkthroughArtifactsSnapshot],
         err: StoreError,
     ) -> Result<T, StoreError> {
-        self.rollback_diagram_artifacts(snapshots)?;
+        self.rollback_session_artifacts(diagram_snapshots, walkthrough_snapshots)?;
         Err(err)
     }
 
@@ -1012,20 +1081,30 @@ impl SessionFolder {
             selected_object_refs: session.selected_object_refs().iter().cloned().collect(),
         };
         let mut changed_diagram_artifacts = Vec::new();
+        let mut changed_walkthrough_artifacts = Vec::new();
         let mut pending_diagram_ascii_exports = Vec::new();
+        let mut pending_walkthrough_ascii_exports = Vec::new();
 
         for (diagram_id, diagram) in session.diagrams() {
             let mmd_path = self.default_diagram_mmd_path(diagram_id);
             let ascii_path = match self.diagram_ascii_path(&mmd_path) {
                 Ok(path) => path,
                 Err(err) => {
-                    return self.rollback_diagram_artifacts_then(&changed_diagram_artifacts, err);
+                    return self.rollback_session_artifacts_then(
+                        &changed_diagram_artifacts,
+                        &changed_walkthrough_artifacts,
+                        err,
+                    );
                 }
             };
             let meta_path = match self.diagram_meta_path(&mmd_path) {
                 Ok(path) => path,
                 Err(err) => {
-                    return self.rollback_diagram_artifacts_then(&changed_diagram_artifacts, err);
+                    return self.rollback_session_artifacts_then(
+                        &changed_diagram_artifacts,
+                        &changed_walkthrough_artifacts,
+                        err,
+                    );
                 }
             };
 
@@ -1103,8 +1182,11 @@ impl SessionFolder {
                 match self.save_diagram_artifacts(diagram, &mmd_path, &meta_path, &diagram_meta) {
                     Ok(snapshot) => changed_diagram_artifacts.push(snapshot),
                     Err(err) => {
-                        return self
-                            .rollback_diagram_artifacts_then(&changed_diagram_artifacts, err);
+                        return self.rollback_session_artifacts_then(
+                            &changed_diagram_artifacts,
+                            &changed_walkthrough_artifacts,
+                            err,
+                        );
                     }
                 }
             }
@@ -1152,22 +1234,44 @@ impl SessionFolder {
                 && read_walkthrough_rev(&json_path).is_some_and(|rev| rev == walkthrough.rev());
 
             if !rev_matches {
-                if let Err(err) = self.save_walkthrough(walkthrough) {
-                    return self.rollback_diagram_artifacts_then(&changed_diagram_artifacts, err);
+                let snapshot =
+                    match self.snapshot_walkthrough_artifacts(walkthrough.walkthrough_id()) {
+                        Ok(snapshot) => snapshot,
+                        Err(err) => {
+                            return self.rollback_session_artifacts_then(
+                                &changed_diagram_artifacts,
+                                &changed_walkthrough_artifacts,
+                                err,
+                            );
+                        }
+                    };
+                changed_walkthrough_artifacts.push(snapshot);
+                if let Err(err) = self.save_walkthrough_json(walkthrough) {
+                    return self.rollback_session_artifacts_then(
+                        &changed_diagram_artifacts,
+                        &changed_walkthrough_artifacts,
+                        err,
+                    );
                 }
+                pending_walkthrough_ascii_exports.push(walkthrough.clone());
             } else if !ascii_path.is_file() {
-                if let Err(err) = self.schedule_walkthrough_ascii_export(walkthrough) {
-                    return self.rollback_diagram_artifacts_then(&changed_diagram_artifacts, err);
-                }
+                pending_walkthrough_ascii_exports.push(walkthrough.clone());
             }
         }
 
         if let Err(err) = self.save_meta(&meta) {
-            return self.rollback_diagram_artifacts_then(&changed_diagram_artifacts, err);
+            return self.rollback_session_artifacts_then(
+                &changed_diagram_artifacts,
+                &changed_walkthrough_artifacts,
+                err,
+            );
         }
 
         for (mmd_path, diagram) in pending_diagram_ascii_exports {
             self.schedule_diagram_ascii_export(&mmd_path, &diagram)?;
+        }
+        for walkthrough in pending_walkthrough_ascii_exports {
+            self.schedule_walkthrough_ascii_export(&walkthrough)?;
         }
 
         if !skip_walkthrough_gc {
@@ -1493,6 +1597,13 @@ impl SessionFolder {
     }
 
     pub fn save_walkthrough(&self, walkthrough: &Walkthrough) -> Result<(), StoreError> {
+        self.save_walkthrough_json(walkthrough)?;
+        self.schedule_walkthrough_ascii_export(walkthrough)?;
+
+        Ok(())
+    }
+
+    fn save_walkthrough_json(&self, walkthrough: &Walkthrough) -> Result<(), StoreError> {
         let wt_path = self.walkthrough_json_path(walkthrough.walkthrough_id());
 
         let wt_json = walkthrough_to_json(walkthrough);
@@ -1505,8 +1616,6 @@ impl SessionFolder {
             format!("{wt_str}\n").as_bytes(),
             self.durability,
         )?;
-
-        self.schedule_walkthrough_ascii_export(walkthrough)?;
 
         Ok(())
     }

@@ -208,7 +208,7 @@ impl NereidMcp {
                     })),
                 )
             })?;
-            state.session = candidate;
+            replace_committed_session(&mut state, candidate);
         } else {
             apply_mode(&mut state.session, mode, &applied_refs);
         }

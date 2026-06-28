@@ -20,9 +20,10 @@ use super::{
     PendingDiagramSync, SearchKind, SearchMode, SelectableObject,
 };
 use crate::format::mermaid::{parse_flowchart, parse_sequence_diagram};
+use crate::model::FlowNode;
 use crate::model::{
-    Diagram, DiagramAst, DiagramId, ObjectId, ObjectRef, Session, SessionId, XRef, XRefId,
-    XRefStatus,
+    Diagram, DiagramAst, DiagramId, FlowchartAst, ObjectId, ObjectRef, Session, SessionId, XRef,
+    XRefId, XRefStatus,
 };
 use crate::render::{diagram::render_diagram_unicode_annotated_with_options, RenderOptions};
 use crate::store::SessionFolder;
@@ -1724,6 +1725,64 @@ fn flush_pending_diagram_sync_drops_pending_on_terminal_conflict() {
         app.pending_diagram_sync.is_none(),
         "an unresolvable rev conflict must abandon the pending sync",
     );
+
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+}
+
+#[test]
+fn pending_diagram_sync_persists_normalized_selection_and_xrefs() {
+    let diagram_id = DiagramId::new("flow").expect("diagram id");
+    let node_a = ObjectId::new("n:a").expect("node id");
+    let node_b = ObjectId::new("n:b").expect("node id");
+    let ref_a: ObjectRef = "d:flow/flow/node/n:a".parse().expect("object ref");
+    let ref_b: ObjectRef = "d:flow/flow/node/n:b".parse().expect("object ref");
+    let xref_id = XRefId::new("x:flow").expect("xref id");
+
+    let mut ast = FlowchartAst::default();
+    ast.nodes_mut().insert(node_a.clone(), FlowNode::new("A"));
+    ast.nodes_mut().insert(node_b.clone(), FlowNode::new("B"));
+
+    let mut session = Session::new(SessionId::new("s:pending-normalize").expect("session id"));
+    session.diagrams_mut().insert(
+        diagram_id.clone(),
+        Diagram::new(diagram_id.clone(), "Flow", DiagramAst::Flowchart(ast)),
+    );
+    session.set_active_diagram_id(Some(diagram_id.clone()));
+    session.set_selected_object_refs([ref_a.clone(), ref_b.clone()].into_iter().collect());
+    session
+        .xrefs_mut()
+        .insert(xref_id.clone(), XRef::new(ref_a, ref_b.clone(), "relates_to", XRefStatus::Ok));
+
+    let tmp_dir = unique_temp_session_dir("pending-normalize");
+    let folder = SessionFolder::new(&tmp_dir);
+    folder.save_session(&session).expect("save session");
+
+    let mut app = App::new(session.clone());
+    let mut edited_ast = FlowchartAst::default();
+    edited_ast.nodes_mut().insert(node_b, FlowNode::new("B"));
+    let mut edited_diagram =
+        Diagram::new(diagram_id.clone(), "Flow", DiagramAst::Flowchart(edited_ast));
+    edited_diagram.bump_rev();
+    app.session.diagrams_mut().insert(diagram_id.clone(), edited_diagram);
+
+    let disk_rev = folder
+        .load_session()
+        .expect("load session")
+        .diagrams()
+        .get(&diagram_id)
+        .expect("diagram on disk")
+        .rev();
+    app.persist_pending_diagram_sync(
+        &folder,
+        &PendingDiagramSync { diagram_id: diagram_id.clone(), expected_disk_rev: disk_rev },
+    )
+    .unwrap_or_else(|err| panic!("persist pending sync: {}", err.message()));
+
+    let loaded = folder.load_session().expect("load normalized session");
+    let removed_ref: ObjectRef = "d:flow/flow/node/n:a".parse().expect("object ref");
+    assert!(!loaded.selected_object_refs().contains(&removed_ref));
+    assert!(loaded.selected_object_refs().contains(&ref_b));
+    assert_eq!(loaded.xrefs().get(&xref_id).expect("xref").status(), XRefStatus::DanglingFrom);
 
     let _ = std::fs::remove_dir_all(&tmp_dir);
 }

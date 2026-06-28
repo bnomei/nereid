@@ -228,7 +228,7 @@ impl NereidMcp {
                 (candidate, status)
             };
 
-            state.session = candidate;
+            replace_committed_session(&mut state, candidate);
             let response = Json(XRefAddResponse {
                 xref_id: xref_id_parsed.as_str().to_owned(),
                 status: status.as_str().to_owned(),
@@ -296,7 +296,7 @@ impl NereidMcp {
                     )
                 })?
             };
-            state.session = candidate;
+            replace_committed_session(&mut state, candidate);
             let response = Json(XRefRemoveResponse { removed: true });
             drop(state);
             self.notify_ui_session_changed().await;

@@ -58,7 +58,7 @@ impl NereidMcp {
                     )
                 })?
             };
-            state.session = candidate;
+            replace_committed_session(&mut state, candidate);
         } else {
             state.session.set_active_walkthrough_id(Some(parsed.clone()));
         }
@@ -428,7 +428,7 @@ impl NereidMcp {
                 (candidate_session, history, response)
             };
 
-            state.session = candidate_session;
+            replace_committed_session(&mut state, candidate_session);
             state.walkthrough_delta_history.insert(parsed, history);
             drop(state);
             self.notify_ui_session_changed().await;

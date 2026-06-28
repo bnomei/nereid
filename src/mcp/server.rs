@@ -230,24 +230,26 @@ impl NereidMcp {
             return Ok(());
         }
 
-        let previous = state.session.clone();
-        state.session = disk_session;
-
-        state.delta_history.retain(|diagram_id, _| {
-            previous.diagrams().get(diagram_id).map(|diagram| diagram.rev())
-                == state.session.diagrams().get(diagram_id).map(|diagram| diagram.rev())
-        });
-        state.walkthrough_delta_history.retain(|walkthrough_id, _| {
-            previous.walkthroughs().get(walkthrough_id).map(|walkthrough| walkthrough.rev())
-                == state
-                    .session
-                    .walkthroughs()
-                    .get(walkthrough_id)
-                    .map(|walkthrough| walkthrough.rev())
-        });
+        replace_committed_session(state, disk_session);
 
         Ok(())
     }
+}
+
+fn replace_committed_session(state: &mut McpState, session: Session) {
+    let previous = std::mem::replace(&mut state.session, session);
+    reconcile_delta_history_after_session_swap(state, &previous);
+}
+
+fn reconcile_delta_history_after_session_swap(state: &mut McpState, previous: &Session) {
+    state.delta_history.retain(|diagram_id, _| {
+        previous.diagrams().get(diagram_id).map(|diagram| diagram.rev())
+            == state.session.diagrams().get(diagram_id).map(|diagram| diagram.rev())
+    });
+    state.walkthrough_delta_history.retain(|walkthrough_id, _| {
+        previous.walkthroughs().get(walkthrough_id).map(|walkthrough| walkthrough.rev())
+            == state.session.walkthroughs().get(walkthrough_id).map(|walkthrough| walkthrough.rev())
+    });
 }
 
 #[tool_handler(router = self.tool_router)]

@@ -554,9 +554,7 @@ pub fn parse_sequence_diagram(input: &str) -> Result<SequenceAst, MermaidSequenc
                     .participants_mut()
                     .entry(participant_id)
                     .or_insert_with(|| SequenceParticipant::new(name.to_owned()));
-                if let Some(role) = role {
-                    participant.set_role(Some(role));
-                }
+                participant.set_role(role);
                 continue;
             }
         }
@@ -1112,6 +1110,24 @@ mod tests {
             "actor role must survive the round-trip; export was:\n{out}",
         );
         assert_eq!(role_of(&ast2, "Bob"), None);
+    }
+
+    #[test]
+    fn participant_redeclaration_clears_previous_role() {
+        let role_of = |ast: &SequenceAst, name: &str| -> Option<String> {
+            ast.participants()
+                .values()
+                .find(|participant| participant.mermaid_name() == name)
+                .and_then(|participant| participant.role().map(ToOwned::to_owned))
+        };
+
+        let input = "sequenceDiagram\nactor Alice\nparticipant Alice\nAlice->>Alice: hi\n";
+        let ast = parse_sequence_diagram(input).expect("parse");
+        assert_eq!(role_of(&ast, "Alice"), None);
+
+        let out = export_sequence_diagram(&ast).expect("export");
+        assert!(out.contains("participant Alice"), "export must clear actor role:\n{out}");
+        assert!(!out.contains("actor Alice"), "export must not preserve stale actor role:\n{out}");
     }
 
     #[test]
