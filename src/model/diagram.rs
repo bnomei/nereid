@@ -6,18 +6,21 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Diagram envelope: kind tag, revision counter, and typed flowchart or sequence AST.
+
 use super::flow_ast::FlowchartAst;
 use super::ids::DiagramId;
 use super::seq_ast::SequenceAst;
 use std::fmt;
 
-/// The type of diagram.
+/// Supported diagram kinds stored in a session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DiagramKind {
     Sequence,
     Flowchart,
 }
 
+/// Kind-tagged diagram AST wrapper used by [`Diagram`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DiagramAst {
     Sequence(SequenceAst),

@@ -6,8 +6,9 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Diagram format parsing/export.
+//! Diagram format parsing and export.
 //!
-//! Currently this module focuses on a Mermaid-ish syntax for flowcharts and sequence diagrams.
+//! Converts between on-disk Mermaid sidecars and the internal flowchart/sequence ASTs used by
+//! layout, render, and mutation layers.
 
 pub mod mermaid;

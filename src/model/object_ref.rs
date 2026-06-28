@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Canonical `ObjectRef` paths and category segments for stable UI/MCP addressing.
+
 use std::fmt;
 use std::str::FromStr;
 

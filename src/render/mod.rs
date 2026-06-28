@@ -33,6 +33,7 @@ pub use sequence::{
 };
 pub use walkthrough::{render_walkthrough_unicode, WalkthroughRenderError};
 
+/// Per-render toggles for notes, object labels, and flowchart column spacing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct RenderOptions {
     pub show_notes: bool,

@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Mermaid-ish flowchart parser and exporter for the internal flowchart AST.
+
 use std::fmt;
 
 use super::ident::validate_mermaid_ident;
@@ -1005,6 +1007,34 @@ mod tests {
         let node_b = ast.nodes().get(&ObjectId::new("n:B").expect("node id")).expect("node B");
         assert_eq!(node_a.mermaid_id(), Some("A"));
         assert_eq!(node_b.mermaid_id(), Some("B"));
+    }
+
+    #[test]
+    fn linkstyle_roundtrips_to_same_edge_when_declaration_differs_from_sort_order() {
+        let input = "flowchart\nZ --> A\nA --> B\nlinkStyle 0 stroke:#ff0000;\n";
+
+        let style_of = |ast: &FlowchartAst, from: &str, to: &str| -> Option<String> {
+            ast.edges()
+                .values()
+                .find(|edge| {
+                    edge.from_node_id().as_str() == from && edge.to_node_id().as_str() == to
+                })
+                .and_then(|edge| edge.style().map(ToOwned::to_owned))
+        };
+
+        let ast1 = parse_flowchart(input).expect("parse 1");
+        assert_eq!(style_of(&ast1, "n:Z", "n:A").as_deref(), Some("stroke:#ff0000;"));
+        assert_eq!(style_of(&ast1, "n:A", "n:B"), None);
+
+        let out = export_flowchart(&ast1).expect("export");
+        let ast2 = parse_flowchart(&out).expect("parse 2");
+
+        assert_eq!(
+            style_of(&ast2, "n:Z", "n:A").as_deref(),
+            Some("stroke:#ff0000;"),
+            "linkStyle drifted to the wrong edge on round-trip; export:\n{out}",
+        );
+        assert_eq!(style_of(&ast2, "n:A", "n:B"), None, "export:\n{out}");
     }
 
     #[test]

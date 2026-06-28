@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Op application regression tests: revision conflicts, kind mismatches, and deltas.
+
 use crate::model::{
     DiagramAst, DiagramId, FlowchartAst, ObjectId, SequenceAst, SequenceParticipant,
 };
@@ -972,4 +974,220 @@ fn apply_seq_remove_participant_records_cascading_message_removal_in_delta() {
     assert!(!ast.participants().contains_key(&alice));
     assert!(ast.participants().contains_key(&bob));
     assert!(ast.messages().is_empty());
+}
+
+#[test]
+fn remove_message_prunes_section_membership_and_keeps_export_valid() {
+    use crate::format::mermaid::sequence::export_sequence_diagram;
+    use crate::model::seq_ast::{
+        SequenceBlock, SequenceBlockKind, SequenceMessage, SequenceMessageKind, SequenceSection,
+        SequenceSectionKind,
+    };
+    use crate::model::Diagram;
+
+    let a = ObjectId::new("p:a").expect("id");
+    let b = ObjectId::new("p:b").expect("id");
+    let m1 = ObjectId::new("m:0001").expect("id");
+    let m2 = ObjectId::new("m:0002").expect("id");
+
+    let mut ast = SequenceAst::default();
+    ast.participants_mut().insert(a.clone(), SequenceParticipant::new("A"));
+    ast.participants_mut().insert(b.clone(), SequenceParticipant::new("B"));
+    ast.messages_mut().push(SequenceMessage::new(
+        m1.clone(),
+        a.clone(),
+        b.clone(),
+        SequenceMessageKind::Sync,
+        "One",
+        1000,
+    ));
+    ast.messages_mut().push(SequenceMessage::new(
+        m2.clone(),
+        b.clone(),
+        a.clone(),
+        SequenceMessageKind::Sync,
+        "Two",
+        2000,
+    ));
+    ast.blocks_mut().push(SequenceBlock::new(
+        ObjectId::new("b:0001").expect("id"),
+        SequenceBlockKind::Alt,
+        Some("X".to_owned()),
+        vec![
+            SequenceSection::new(
+                ObjectId::new("sec:0001:00").expect("id"),
+                SequenceSectionKind::Main,
+                Some("X".to_owned()),
+                vec![m1.clone()],
+            ),
+            SequenceSection::new(
+                ObjectId::new("sec:0001:01").expect("id"),
+                SequenceSectionKind::Else,
+                Some("Y".to_owned()),
+                vec![m2.clone()],
+            ),
+        ],
+        Vec::new(),
+    ));
+
+    let mut diagram =
+        Diagram::new(DiagramId::new("d:1").expect("id"), "seq", DiagramAst::Sequence(ast));
+
+    let DiagramAst::Sequence(ast) = diagram.ast() else { panic!("sequence") };
+    export_sequence_diagram(ast).expect("export before edit");
+
+    apply_ops(&mut diagram, 0, &[Op::Seq(SeqOp::RemoveMessage { message_id: m2.clone() })])
+        .expect("remove message");
+
+    let DiagramAst::Sequence(ast) = diagram.ast() else { panic!("sequence") };
+    fn assert_message_pruned(blocks: &[SequenceBlock], message_id: &ObjectId) {
+        for block in blocks {
+            for section in block.sections() {
+                assert!(
+                    !section.message_ids().contains(message_id),
+                    "section still references removed message {message_id}",
+                );
+            }
+            assert_message_pruned(block.blocks(), message_id);
+        }
+    }
+
+    assert_message_pruned(ast.blocks(), &m2);
+    export_sequence_diagram(ast).expect("export after removing a section's message must succeed");
+}
+
+#[test]
+fn remove_message_relabels_first_surviving_alt_branch() {
+    use crate::format::mermaid::sequence::export_sequence_diagram;
+    use crate::model::seq_ast::{
+        SequenceBlock, SequenceBlockKind, SequenceMessage, SequenceMessageKind, SequenceSection,
+        SequenceSectionKind,
+    };
+    use crate::model::Diagram;
+
+    let a = ObjectId::new("p:a").expect("id");
+    let b = ObjectId::new("p:b").expect("id");
+    let m1 = ObjectId::new("m:0001").expect("id");
+    let m2 = ObjectId::new("m:0002").expect("id");
+
+    let mut ast = SequenceAst::default();
+    ast.participants_mut().insert(a.clone(), SequenceParticipant::new("A"));
+    ast.participants_mut().insert(b.clone(), SequenceParticipant::new("B"));
+    ast.messages_mut().push(SequenceMessage::new(
+        m1.clone(),
+        a.clone(),
+        b.clone(),
+        SequenceMessageKind::Sync,
+        "ok",
+        1000,
+    ));
+    ast.messages_mut().push(SequenceMessage::new(
+        m2.clone(),
+        b.clone(),
+        a.clone(),
+        SequenceMessageKind::Sync,
+        "fail",
+        2000,
+    ));
+    ast.blocks_mut().push(SequenceBlock::new(
+        ObjectId::new("b:0001").expect("id"),
+        SequenceBlockKind::Alt,
+        Some("ok".to_owned()),
+        vec![
+            SequenceSection::new(
+                ObjectId::new("sec:0001:00").expect("id"),
+                SequenceSectionKind::Main,
+                None,
+                vec![m1.clone()],
+            ),
+            SequenceSection::new(
+                ObjectId::new("sec:0001:01").expect("id"),
+                SequenceSectionKind::Else,
+                Some("fail".to_owned()),
+                vec![m2.clone()],
+            ),
+        ],
+        Vec::new(),
+    ));
+
+    let mut diagram =
+        Diagram::new(DiagramId::new("d:1").expect("id"), "seq", DiagramAst::Sequence(ast));
+
+    apply_ops(&mut diagram, 0, &[Op::Seq(SeqOp::RemoveMessage { message_id: m1 })])
+        .expect("remove message");
+
+    let DiagramAst::Sequence(ast) = diagram.ast() else { panic!("sequence") };
+    let out = export_sequence_diagram(ast).expect("export after pruning first branch");
+    assert!(out.contains("alt fail"), "remaining branch header should become opener:\n{out}");
+    assert!(!out.contains("alt ok"), "removed branch header must not be reused:\n{out}");
+    assert!(!out.contains("else fail"), "first surviving branch should not export as else:\n{out}");
+}
+
+#[test]
+fn remove_message_keeps_parent_block_when_nested_content_survives() {
+    use crate::format::mermaid::sequence::export_sequence_diagram;
+    use crate::model::seq_ast::{
+        SequenceBlock, SequenceBlockKind, SequenceMessage, SequenceMessageKind, SequenceSection,
+        SequenceSectionKind,
+    };
+    use crate::model::Diagram;
+
+    let a = ObjectId::new("p:a").expect("id");
+    let b = ObjectId::new("p:b").expect("id");
+    let m1 = ObjectId::new("m:0001").expect("id");
+    let m2 = ObjectId::new("m:0002").expect("id");
+
+    let mut ast = SequenceAst::default();
+    ast.participants_mut().insert(a.clone(), SequenceParticipant::new("A"));
+    ast.participants_mut().insert(b.clone(), SequenceParticipant::new("B"));
+    ast.messages_mut().push(SequenceMessage::new(
+        m1.clone(),
+        a.clone(),
+        b.clone(),
+        SequenceMessageKind::Sync,
+        "outer",
+        1000,
+    ));
+    ast.messages_mut().push(SequenceMessage::new(
+        m2.clone(),
+        b.clone(),
+        a.clone(),
+        SequenceMessageKind::Sync,
+        "inner",
+        2000,
+    ));
+    ast.blocks_mut().push(SequenceBlock::new(
+        ObjectId::new("b:0001").expect("id"),
+        SequenceBlockKind::Alt,
+        Some("outer".to_owned()),
+        vec![SequenceSection::new(
+            ObjectId::new("sec:0001:00").expect("id"),
+            SequenceSectionKind::Main,
+            None,
+            vec![m1.clone()],
+        )],
+        vec![SequenceBlock::new(
+            ObjectId::new("b:0002").expect("id"),
+            SequenceBlockKind::Loop,
+            Some("inner".to_owned()),
+            vec![SequenceSection::new(
+                ObjectId::new("sec:0002:00").expect("id"),
+                SequenceSectionKind::Main,
+                None,
+                vec![m2.clone()],
+            )],
+            Vec::new(),
+        )],
+    ));
+
+    let mut diagram =
+        Diagram::new(DiagramId::new("d:1").expect("id"), "seq", DiagramAst::Sequence(ast));
+
+    apply_ops(&mut diagram, 0, &[Op::Seq(SeqOp::RemoveMessage { message_id: m1 })])
+        .expect("remove message");
+
+    let DiagramAst::Sequence(ast) = diagram.ast() else { panic!("sequence") };
+    assert_eq!(ast.blocks().len(), 1, "parent block should keep surviving nested block");
+    assert_eq!(ast.blocks()[0].blocks().len(), 1, "nested block should be preserved");
+    export_sequence_diagram(ast).expect("export after pruning parent section");
 }

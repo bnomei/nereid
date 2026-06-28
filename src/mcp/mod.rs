@@ -8,7 +8,8 @@
 
 //! Model Context Protocol (MCP) server surface.
 //!
-//! The MCP layer provides a programmatic interface for inspecting and mutating sessions.
+//! Exposes diagram, walkthrough, xref, query, and collaboration tools over stdio or HTTP,
+//! sharing session revisions and UI attention state with the TUI when co-hosted.
 
 mod server;
 mod types;

@@ -8,8 +8,8 @@
 
 //! Persistence for sessions on disk.
 //!
-//! The store module reads/writes the session folder format (meta file plus diagram/walkthrough
-//! files) used by both the TUI and MCP server.
+//! The session folder format bundles meta JSON, per-diagram `.mmd` sidecars, walkthrough JSON,
+//! cached ASCII exports, and cross-process write locking for TUI/MCP cohabitation.
 
 pub mod session_folder;
 

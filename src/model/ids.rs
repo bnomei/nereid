@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Newtype identifiers for sessions, diagrams, objects, and protocol-stable refs.
+
 use std::borrow::Borrow;
 use std::fmt;
 use std::marker::PhantomData;
@@ -99,26 +101,32 @@ fn validate_id_segment(value: &str) -> Result<(), IdError> {
     Ok(())
 }
 
+/// Session container identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum SessionIdTag {}
 pub type SessionId = Id<SessionIdTag>;
 
+/// Diagram identifier within a session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum DiagramIdTag {}
 pub type DiagramId = Id<DiagramIdTag>;
 
+/// Walkthrough graph identifier within a session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum WalkthroughIdTag {}
 pub type WalkthroughId = Id<WalkthroughIdTag>;
 
+/// Node identifier within a walkthrough graph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum WalkthroughNodeIdTag {}
 pub type WalkthroughNodeId = Id<WalkthroughNodeIdTag>;
 
+/// Cross-reference link identifier within a session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum XRefIdTag {}
 pub type XRefId = Id<XRefIdTag>;
 
+/// Diagram object identifier (node, edge, message, participant, etc.).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ObjectIdTag {}
 pub type ObjectId = Id<ObjectIdTag>;

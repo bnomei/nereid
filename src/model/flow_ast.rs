@@ -6,10 +6,13 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Flowchart AST: nodes, edges, groups, and default edge styling.
+
 use std::collections::BTreeMap;
 
 use super::ids::ObjectId;
 
+/// Mutable flowchart diagram content keyed by stable object IDs.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct FlowchartAst {
     nodes: BTreeMap<ObjectId, FlowNode>,
@@ -65,6 +68,7 @@ impl FlowchartAst {
     }
 }
 
+/// Flowchart node with optional Mermaid id, display label, shape, and note.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowNode {
     mermaid_id: Option<String>,
@@ -119,6 +123,7 @@ impl FlowNode {
     }
 }
 
+/// Directed edge between two flow nodes with optional label, connector, and style.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowEdge {
     from_node_id: ObjectId,
@@ -128,6 +133,7 @@ pub struct FlowEdge {
     style: Option<String>,
 }
 
+/// Subgraph grouping label for clustered flowchart nodes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowGroup {
     mermaid_id: Option<String>,

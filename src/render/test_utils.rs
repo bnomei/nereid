@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Shared render test helpers and golden-output comparison utilities.
+
 pub(super) fn collect_spanned_text(text: &str, spans: &[(usize, usize, usize)]) -> String {
     let lines = text.split('\n').collect::<Vec<_>>();
     let mut out = String::new();

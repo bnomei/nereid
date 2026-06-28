@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! TUI regression tests for input handling, rendering, and session interaction.
+
 use super::{
     apply_highlight_flags, category_path, demo_session, demo_session_fallback,
     diagram_bottom_title, diagram_counter_label, diagram_note_title, diagram_view_title,
@@ -15,12 +17,13 @@ use super::{
     ranked_search_results, search_candidates_from_session, search_footer_line,
     stack_main_panes_vertically, style_for_diagram_cell, xref_involves_selected, xref_item_style,
     xrefs_cursor_highlight_style, App, ExternalAction, Focus, FocusOwner, HintKind, HintMode,
-    SearchKind, SearchMode, SelectableObject,
+    PendingDiagramSync, SearchKind, SearchMode, SelectableObject,
 };
 use crate::format::mermaid::{parse_flowchart, parse_sequence_diagram};
+use crate::model::FlowNode;
 use crate::model::{
-    Diagram, DiagramAst, DiagramId, ObjectId, ObjectRef, Session, SessionId, XRef, XRefId,
-    XRefStatus,
+    Diagram, DiagramAst, DiagramId, FlowchartAst, ObjectId, ObjectRef, Session, SessionId, XRef,
+    XRefId, XRefStatus,
 };
 use crate::render::{diagram::render_diagram_unicode_annotated_with_options, RenderOptions};
 use crate::store::SessionFolder;
@@ -783,6 +786,33 @@ fn enabling_follow_ai_jumps_to_agent_highlight_diagram() {
 }
 
 #[test]
+fn follow_ai_publishes_followed_target_as_human_attention() {
+    use crate::ui::UiState;
+    use std::sync::Arc;
+    use tokio::sync::Mutex;
+
+    let ui_state = Arc::new(Mutex::new(UiState::default()));
+    let mut app = App::new(demo_session());
+    app.ui_state = Some(ui_state.clone());
+
+    let target: ObjectRef = "d:demo-seq/seq/participant/p:alice".parse().expect("object ref");
+    app.agent_highlights.blocking_lock().insert(target.clone());
+    app.follow_ai = true;
+
+    app.sync_from_ui_state();
+
+    assert_eq!(app.selected_ref(), Some(&target), "viewport should follow the agent target");
+
+    let ui = ui_state.blocking_lock();
+    assert_eq!(
+        ui.human_active_object_ref(),
+        Some(&target),
+        "human attention must reflect the followed target during follow-AI",
+    );
+    assert_eq!(ui.human_active_diagram_id().map(ToString::to_string).as_deref(), Some("demo-seq"),);
+}
+
+#[test]
 fn sync_ignores_agent_highlight_when_follow_ai_is_disabled() {
     let mut app = App::new(demo_session());
     let target: ObjectRef = "d:demo-seq/seq/participant/p:alice".parse().expect("object ref");
@@ -1035,8 +1065,11 @@ fn sequence_message_focus_highlights_spaces_inside_label() {
         .find(|cells| cells.iter().map(|(ch, _)| *ch).collect::<String>().contains("Can I"))
         .expect("message row with phrase");
 
-    let line_text = line.iter().map(|(ch, _)| *ch).collect::<String>();
-    let phrase_start = line_text.find("Can I").expect("phrase start");
+    let phrase_chars: Vec<char> = "Can I".chars().collect();
+    let phrase_start = line
+        .windows(phrase_chars.len())
+        .position(|window| window.iter().map(|(ch, _)| *ch).eq(phrase_chars.iter().copied()))
+        .expect("phrase start");
     let space_x = phrase_start + 3;
     assert_eq!(line[space_x].0, ' ');
     assert_eq!(line[space_x].1.bg, Some(Color::LightGreen));
@@ -1064,8 +1097,11 @@ fn sequence_message_selected_highlights_spaces_inside_label() {
         .find(|cells| cells.iter().map(|(ch, _)| *ch).collect::<String>().contains("Can I"))
         .expect("message row with phrase");
 
-    let line_text = line.iter().map(|(ch, _)| *ch).collect::<String>();
-    let phrase_start = line_text.find("Can I").expect("phrase start");
+    let phrase_chars: Vec<char> = "Can I".chars().collect();
+    let phrase_start = line
+        .windows(phrase_chars.len())
+        .position(|window| window.iter().map(|(ch, _)| *ch).eq(phrase_chars.iter().copied()))
+        .expect("phrase start");
     let space_x = phrase_start + 3;
     assert_eq!(line[space_x].0, ' ');
     assert_eq!(line[space_x].1.bg, Some(Color::DarkGray));
@@ -1619,6 +1655,136 @@ fn diagram_switching_updates_active_diagram_and_objects() {
     app.handle_key_code(KeyCode::Char('['));
     let back_diagram = app.active_diagram_id().map(ToString::to_string);
     assert_eq!(before_diagram, back_diagram);
+}
+
+fn unique_temp_session_dir(tag: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!(
+        "nereid-tui-{tag}-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).expect("create temp session dir");
+    dir
+}
+
+#[cfg(unix)]
+#[test]
+fn flush_pending_diagram_sync_retains_pending_on_retriable_error() {
+    let session = demo_session();
+    let tmp_dir = unique_temp_session_dir("pending-retain");
+    let folder = SessionFolder::new(&tmp_dir);
+    folder.save_session(&session).expect("save session");
+
+    let mut app = App::new(session);
+    let diagram_id = app.active_diagram_id().cloned().expect("active diagram");
+    app.session_folder = Some(folder.clone());
+
+    let disk_rev = folder
+        .load_session()
+        .expect("load session")
+        .diagrams()
+        .get(&diagram_id)
+        .expect("diagram on disk")
+        .rev();
+    app.pending_diagram_sync = Some(PendingDiagramSync { diagram_id, expected_disk_rev: disk_rev });
+
+    let meta_path = folder.meta_path();
+    let backing = meta_path.with_extension("json.backing");
+    std::fs::rename(&meta_path, &backing).expect("move meta");
+    std::os::unix::fs::symlink(&backing, &meta_path).expect("symlink meta");
+
+    app.flush_pending_diagram_sync();
+
+    assert!(
+        app.pending_diagram_sync.is_some(),
+        "retriable failure must retain the pending sync so the next tick retries",
+    );
+
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+}
+
+#[test]
+fn flush_pending_diagram_sync_drops_pending_on_terminal_conflict() {
+    let session = demo_session();
+    let tmp_dir = unique_temp_session_dir("pending-drop");
+    let folder = SessionFolder::new(&tmp_dir);
+    folder.save_session(&session).expect("save session");
+
+    let mut app = App::new(session);
+    let diagram_id = app.active_diagram_id().cloned().expect("active diagram");
+    app.session_folder = Some(folder.clone());
+
+    app.pending_diagram_sync = Some(PendingDiagramSync { diagram_id, expected_disk_rev: 9999 });
+
+    app.flush_pending_diagram_sync();
+
+    assert!(
+        app.pending_diagram_sync.is_none(),
+        "an unresolvable rev conflict must abandon the pending sync",
+    );
+
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+}
+
+#[test]
+fn pending_diagram_sync_persists_normalized_selection_and_xrefs() {
+    let diagram_id = DiagramId::new("flow").expect("diagram id");
+    let node_a = ObjectId::new("n:a").expect("node id");
+    let node_b = ObjectId::new("n:b").expect("node id");
+    let ref_a: ObjectRef = "d:flow/flow/node/n:a".parse().expect("object ref");
+    let ref_b: ObjectRef = "d:flow/flow/node/n:b".parse().expect("object ref");
+    let xref_id = XRefId::new("x:flow").expect("xref id");
+
+    let mut ast = FlowchartAst::default();
+    ast.nodes_mut().insert(node_a.clone(), FlowNode::new("A"));
+    ast.nodes_mut().insert(node_b.clone(), FlowNode::new("B"));
+
+    let mut session = Session::new(SessionId::new("s:pending-normalize").expect("session id"));
+    session.diagrams_mut().insert(
+        diagram_id.clone(),
+        Diagram::new(diagram_id.clone(), "Flow", DiagramAst::Flowchart(ast)),
+    );
+    session.set_active_diagram_id(Some(diagram_id.clone()));
+    session.set_selected_object_refs([ref_a.clone(), ref_b.clone()].into_iter().collect());
+    session
+        .xrefs_mut()
+        .insert(xref_id.clone(), XRef::new(ref_a, ref_b.clone(), "relates_to", XRefStatus::Ok));
+
+    let tmp_dir = unique_temp_session_dir("pending-normalize");
+    let folder = SessionFolder::new(&tmp_dir);
+    folder.save_session(&session).expect("save session");
+
+    let mut app = App::new(session.clone());
+    let mut edited_ast = FlowchartAst::default();
+    edited_ast.nodes_mut().insert(node_b, FlowNode::new("B"));
+    let mut edited_diagram =
+        Diagram::new(diagram_id.clone(), "Flow", DiagramAst::Flowchart(edited_ast));
+    edited_diagram.bump_rev();
+    app.session.diagrams_mut().insert(diagram_id.clone(), edited_diagram);
+
+    let disk_rev = folder
+        .load_session()
+        .expect("load session")
+        .diagrams()
+        .get(&diagram_id)
+        .expect("diagram on disk")
+        .rev();
+    app.persist_pending_diagram_sync(
+        &folder,
+        &PendingDiagramSync { diagram_id: diagram_id.clone(), expected_disk_rev: disk_rev },
+    )
+    .unwrap_or_else(|err| panic!("persist pending sync: {}", err.message()));
+
+    let loaded = folder.load_session().expect("load normalized session");
+    let removed_ref: ObjectRef = "d:flow/flow/node/n:a".parse().expect("object ref");
+    assert!(!loaded.selected_object_refs().contains(&removed_ref));
+    assert!(loaded.selected_object_refs().contains(&ref_b));
+    assert_eq!(loaded.xrefs().get(&xref_id).expect("xref").status(), XRefStatus::DanglingFrom);
+
+    let _ = std::fs::remove_dir_all(&tmp_dir);
 }
 
 #[test]

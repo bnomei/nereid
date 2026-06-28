@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! TUI color theme: environment overrides and ratatui style mapping.
+
 use std::{env, error::Error, fmt};
 
 use ratatui::style::{Color, Modifier, Style};

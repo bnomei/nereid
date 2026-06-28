@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Query MCP tools: route finding, message search, and flow reachability.
+
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::{tool, tool_router};
 
@@ -336,7 +338,13 @@ impl NereidMcp {
         };
 
         if !ast.nodes().contains_key(&from_node_id_parsed) {
-            return Ok(Json(FlowReachableResponse { nodes: Vec::new() }));
+            return Err(ErrorData::resource_not_found(
+                "from node not found",
+                Some(serde_json::json!({
+                    "diagram_id": diagram_id.as_str(),
+                    "from_node_id": from_node_id,
+                })),
+            ));
         }
 
         let reachable =

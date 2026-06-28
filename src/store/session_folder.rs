@@ -6,16 +6,22 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Session folder persistence: meta JSON, Mermaid sidecars, ASCII exports, and write locking.
+
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::fmt;
 use std::fs;
+use std::fs::OpenOptions;
 use std::io;
+use std::io::Seek;
+use std::io::SeekFrom;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 
 use crate::format::mermaid::{
@@ -37,6 +43,9 @@ use crate::render::{
 
 const SESSION_META_FILENAME: &str = "nereid-session.meta.json";
 const LEGACY_SESSION_META_FILENAME: &str = "session.meta.json";
+const SESSION_WRITE_LOCK_FILENAME: &str = ".nereid-session.write.lock";
+const SESSION_WRITE_LOCK_RETRY_DELAY: Duration = Duration::from_millis(10);
+const SESSION_WRITE_LOCK_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Debug)]
 enum AsciiExportTask {
@@ -217,6 +226,7 @@ fn ascii_exports() -> &'static AsciiExportManager {
     ASCII_EXPORTS.get_or_init(AsciiExportManager::new)
 }
 
+/// Filesystem, parse, layout/render, and validation errors from session persistence.
 #[derive(Debug)]
 pub enum StoreError {
     Io {
@@ -292,6 +302,13 @@ pub enum StoreError {
     },
     SymlinkRefused {
         path: PathBuf,
+    },
+    SessionWriteLockTimeout {
+        path: PathBuf,
+    },
+    MetaMissingWithExistingDiagrams {
+        meta_path: PathBuf,
+        diagrams_dir: PathBuf,
     },
 }
 
@@ -392,6 +409,14 @@ impl fmt::Display for StoreError {
             Self::SymlinkRefused { path } => {
                 write!(f, "refusing to write through symlink at {path:?}")
             }
+            Self::SessionWriteLockTimeout { path } => {
+                write!(f, "timed out waiting for session write lock at {path:?}")
+            }
+            Self::MetaMissingWithExistingDiagrams { meta_path, diagrams_dir } => write!(
+                f,
+                "session meta {meta_path:?} is missing but diagram files exist in {diagrams_dir:?}; \
+                 refusing to seed a fresh session and orphan them (restore the meta index to repair)"
+            ),
         }
     }
 }
@@ -415,6 +440,8 @@ impl std::error::Error for StoreError {
             Self::InvalidRelativePath { .. } => None,
             Self::PathOutsideSession { .. } => None,
             Self::SymlinkRefused { .. } => None,
+            Self::SessionWriteLockTimeout { .. } => None,
+            Self::MetaMissingWithExistingDiagrams { .. } => None,
         }
     }
 }
@@ -503,10 +530,81 @@ pub enum XRefStatus {
     DanglingBoth,
 }
 
+/// Filesystem adapter for the session folder format under a single root directory.
+///
+/// Coordinates meta JSON, per-diagram Mermaid sidecars, walkthrough JSON, ASCII exports,
+/// and cross-process write locking.
 #[derive(Debug, Clone)]
 pub struct SessionFolder {
     root: PathBuf,
     durability: WriteDurability,
+    meta_lock: Arc<Mutex<()>>,
+}
+
+#[derive(Debug)]
+struct DiagramArtifactsSnapshot {
+    mmd_path: PathBuf,
+    meta_path: PathBuf,
+    mmd_contents: Option<Vec<u8>>,
+    meta_contents: Option<Vec<u8>>,
+}
+
+#[derive(Debug)]
+struct WalkthroughArtifactsSnapshot {
+    json_path: PathBuf,
+    ascii_path: PathBuf,
+    json_contents: Option<Vec<u8>>,
+    ascii_contents: Option<Vec<u8>>,
+}
+
+/// Scoped session mutation guarded by the folder write lock; commit persists atomically.
+#[derive(Debug)]
+pub struct SessionUpdate<'a> {
+    folder: &'a SessionFolder,
+    _guard: SessionWriteGuard<'a>,
+    session: Option<Session>,
+}
+
+impl<'a> SessionUpdate<'a> {
+    pub fn session(&self) -> &Session {
+        self.session.as_ref().expect("session update is committed")
+    }
+
+    pub fn session_mut(&mut self) -> &mut Session {
+        self.session.as_mut().expect("session update is committed")
+    }
+
+    pub fn commit(mut self) -> Result<Session, StoreError> {
+        let session = self.session.take().expect("session update is committed once");
+        self.folder.save_session_locked(&session)?;
+        Ok(session)
+    }
+}
+
+#[derive(Debug)]
+struct SessionWriteGuard<'a> {
+    _meta_guard: std::sync::MutexGuard<'a, ()>,
+    lock_path: PathBuf,
+    lock_file: fs::File,
+}
+
+impl Drop for SessionWriteGuard<'_> {
+    fn drop(&mut self) {
+        if self.lock_file.set_len(0).is_err() {
+            let _ = &self.lock_path;
+        }
+        let _ = FileExt::unlock(&self.lock_file);
+    }
+}
+
+fn try_lock_session_file(file: &fs::File, path: &Path) -> Result<bool, StoreError> {
+    file.try_lock_exclusive().map(|()| true).or_else(|source| {
+        if source.kind() == io::ErrorKind::WouldBlock {
+            Ok(false)
+        } else {
+            Err(StoreError::Io { path: path.to_path_buf(), source })
+        }
+    })
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -598,7 +696,65 @@ fn is_windows_device_name(base: &str) -> bool {
 
 impl SessionFolder {
     pub fn new(root: impl Into<PathBuf>) -> Self {
-        Self { root: root.into(), durability: WriteDurability::default() }
+        Self {
+            root: root.into(),
+            durability: WriteDurability::default(),
+            meta_lock: Arc::new(Mutex::new(())),
+        }
+    }
+
+    fn lock_meta(&self) -> std::sync::MutexGuard<'_, ()> {
+        self.meta_lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    fn session_write_lock_path(&self) -> PathBuf {
+        self.root.join(SESSION_WRITE_LOCK_FILENAME)
+    }
+
+    fn lock_session_write(&self) -> Result<SessionWriteGuard<'_>, StoreError> {
+        let meta_guard = self.lock_meta();
+        fs::create_dir_all(&self.root)
+            .map_err(|source| StoreError::Io { path: self.root.clone(), source })?;
+
+        let lock_path = self.session_write_lock_path();
+        let mut lock_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&lock_path)
+            .map_err(|source| StoreError::Io { path: lock_path.clone(), source })?;
+        let started = Instant::now();
+        loop {
+            match try_lock_session_file(&lock_file, &lock_path) {
+                Ok(true) => {
+                    lock_file
+                        .set_len(0)
+                        .map_err(|source| StoreError::Io { path: lock_path.clone(), source })?;
+                    lock_file
+                        .seek(SeekFrom::Start(0))
+                        .map_err(|source| StoreError::Io { path: lock_path.clone(), source })?;
+                    writeln!(
+                        lock_file,
+                        "pid={} acquired_unix_ms={}",
+                        std::process::id(),
+                        SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .map(|d| d.as_millis())
+                            .unwrap_or(0)
+                    )
+                    .map_err(|source| StoreError::Io { path: lock_path.clone(), source })?;
+                    return Ok(SessionWriteGuard { _meta_guard: meta_guard, lock_path, lock_file });
+                }
+                Ok(false) => {
+                    if started.elapsed() >= SESSION_WRITE_LOCK_TIMEOUT {
+                        return Err(StoreError::SessionWriteLockTimeout { path: lock_path });
+                    }
+                    std::thread::sleep(SESSION_WRITE_LOCK_RETRY_DELAY);
+                }
+                Err(err) => return Err(err),
+            }
+        }
     }
 
     pub fn with_durability(mut self, durability: WriteDurability) -> Self {
@@ -707,6 +863,12 @@ impl SessionFolder {
             Err(StoreError::Io { path, source })
                 if source.kind() == io::ErrorKind::NotFound && path == self.meta_path() =>
             {
+                if self.has_existing_diagram_files()? {
+                    return Err(StoreError::MetaMissingWithExistingDiagrams {
+                        meta_path: self.meta_path(),
+                        diagrams_dir: self.root.join("diagrams"),
+                    });
+                }
                 let session = self.initial_session();
                 self.save_session(&session)?;
                 Ok(session)
@@ -715,7 +877,170 @@ impl SessionFolder {
         }
     }
 
+    fn has_existing_diagram_files(&self) -> Result<bool, StoreError> {
+        let diagrams_dir = self.root.join("diagrams");
+        let entries = match fs::read_dir(&diagrams_dir) {
+            Ok(entries) => entries,
+            Err(source) if source.kind() == io::ErrorKind::NotFound => return Ok(false),
+            Err(source) => return Err(StoreError::Io { path: diagrams_dir, source }),
+        };
+        for entry in entries {
+            let entry =
+                entry.map_err(|source| StoreError::Io { path: diagrams_dir.clone(), source })?;
+            let path = entry.path();
+            if path.extension().and_then(|ext| ext.to_str()) == Some("mmd") && path.is_file() {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
     pub fn save_session(&self, session: &Session) -> Result<(), StoreError> {
+        let _guard = self.lock_session_write()?;
+        self.save_session_locked(session)
+    }
+
+    pub fn begin_session_update(&self) -> Result<SessionUpdate<'_>, StoreError> {
+        let guard = self.lock_session_write()?;
+        let session = self.load_session()?;
+        Ok(SessionUpdate { folder: self, _guard: guard, session: Some(session) })
+    }
+
+    fn read_file_snapshot(path: &Path) -> Result<Option<Vec<u8>>, StoreError> {
+        match fs::read(path) {
+            Ok(contents) => Ok(Some(contents)),
+            Err(source) if source.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(source) => Err(StoreError::Io { path: path.to_path_buf(), source }),
+        }
+    }
+
+    fn snapshot_diagram_artifacts(
+        &self,
+        mmd_path: &Path,
+        meta_path: &Path,
+    ) -> Result<DiagramArtifactsSnapshot, StoreError> {
+        Ok(DiagramArtifactsSnapshot {
+            mmd_path: mmd_path.to_path_buf(),
+            meta_path: meta_path.to_path_buf(),
+            mmd_contents: Self::read_file_snapshot(mmd_path)?,
+            meta_contents: Self::read_file_snapshot(meta_path)?,
+        })
+    }
+
+    fn snapshot_walkthrough_artifacts(
+        &self,
+        walkthrough_id: &WalkthroughId,
+    ) -> Result<WalkthroughArtifactsSnapshot, StoreError> {
+        let json_path = self.walkthrough_json_path(walkthrough_id);
+        let ascii_path = self.walkthrough_ascii_path(walkthrough_id);
+        Ok(WalkthroughArtifactsSnapshot {
+            json_path: json_path.clone(),
+            ascii_path: ascii_path.clone(),
+            json_contents: Self::read_file_snapshot(&json_path)?,
+            ascii_contents: Self::read_file_snapshot(&ascii_path)?,
+        })
+    }
+
+    fn restore_file_snapshot(
+        &self,
+        path: &Path,
+        contents: &Option<Vec<u8>>,
+    ) -> Result<(), StoreError> {
+        match contents {
+            Some(contents) => {
+                write_atomic_in_session(self.root(), path, contents, self.durability)?;
+            }
+            None => match fs::remove_file(path) {
+                Ok(()) => {}
+                Err(source) if source.kind() == io::ErrorKind::NotFound => {}
+                Err(source) => return Err(StoreError::Io { path: path.to_path_buf(), source }),
+            },
+        }
+        Ok(())
+    }
+
+    fn restore_file_snapshot_unless_symlink(
+        &self,
+        path: &Path,
+        contents: &Option<Vec<u8>>,
+    ) -> Result<(), StoreError> {
+        match fs::symlink_metadata(path) {
+            Ok(metadata) if metadata.file_type().is_symlink() => Ok(()),
+            Ok(_) | Err(_) => self.restore_file_snapshot(path, contents),
+        }
+    }
+
+    fn restore_diagram_artifacts(
+        &self,
+        snapshot: &DiagramArtifactsSnapshot,
+    ) -> Result<(), StoreError> {
+        self.restore_file_snapshot(&snapshot.mmd_path, &snapshot.mmd_contents)?;
+        self.restore_file_snapshot(&snapshot.meta_path, &snapshot.meta_contents)?;
+        Ok(())
+    }
+
+    fn restore_walkthrough_artifacts(
+        &self,
+        snapshot: &WalkthroughArtifactsSnapshot,
+    ) -> Result<(), StoreError> {
+        self.restore_file_snapshot(&snapshot.json_path, &snapshot.json_contents)?;
+        self.restore_file_snapshot(&snapshot.ascii_path, &snapshot.ascii_contents)?;
+        Ok(())
+    }
+
+    fn rollback_diagram_artifacts(
+        &self,
+        snapshots: &[DiagramArtifactsSnapshot],
+    ) -> Result<(), StoreError> {
+        for snapshot in snapshots.iter().rev() {
+            self.restore_diagram_artifacts(snapshot)?;
+        }
+        Ok(())
+    }
+
+    fn rollback_session_artifacts(
+        &self,
+        diagram_snapshots: &[DiagramArtifactsSnapshot],
+        walkthrough_snapshots: &[WalkthroughArtifactsSnapshot],
+    ) -> Result<(), StoreError> {
+        self.rollback_diagram_artifacts(diagram_snapshots)?;
+        for snapshot in walkthrough_snapshots.iter().rev() {
+            self.restore_walkthrough_artifacts(snapshot)?;
+        }
+        Ok(())
+    }
+
+    fn rollback_session_artifacts_then<T>(
+        &self,
+        diagram_snapshots: &[DiagramArtifactsSnapshot],
+        walkthrough_snapshots: &[WalkthroughArtifactsSnapshot],
+        err: StoreError,
+    ) -> Result<T, StoreError> {
+        self.rollback_session_artifacts(diagram_snapshots, walkthrough_snapshots)?;
+        Err(err)
+    }
+
+    fn save_diagram_artifacts(
+        &self,
+        diagram: &Diagram,
+        mmd_path: &Path,
+        meta_path: &Path,
+        diagram_meta: &DiagramMeta,
+    ) -> Result<DiagramArtifactsSnapshot, StoreError> {
+        let snapshot = self.snapshot_diagram_artifacts(mmd_path, meta_path)?;
+
+        self.save_diagram_meta(diagram_meta)?;
+
+        if let Err(err) = export_diagram_mmd(self, diagram, mmd_path) {
+            self.restore_file_snapshot(&snapshot.meta_path, &snapshot.meta_contents)?;
+            self.restore_file_snapshot_unless_symlink(&snapshot.mmd_path, &snapshot.mmd_contents)?;
+            return Err(err);
+        }
+
+        Ok(snapshot)
+    }
+
+    fn save_session_locked(&self, session: &Session) -> Result<(), StoreError> {
         #[derive(Debug, Deserialize)]
         struct WalkthroughRevJson {
             #[serde(default)]
@@ -755,11 +1080,33 @@ impl SessionFolder {
             xrefs: Vec::new(),
             selected_object_refs: session.selected_object_refs().iter().cloned().collect(),
         };
+        let mut changed_diagram_artifacts = Vec::new();
+        let mut changed_walkthrough_artifacts = Vec::new();
+        let mut pending_diagram_ascii_exports = Vec::new();
+        let mut pending_walkthrough_ascii_exports = Vec::new();
 
         for (diagram_id, diagram) in session.diagrams() {
             let mmd_path = self.default_diagram_mmd_path(diagram_id);
-            let ascii_path = self.diagram_ascii_path(&mmd_path)?;
-            let meta_path = self.diagram_meta_path(&mmd_path)?;
+            let ascii_path = match self.diagram_ascii_path(&mmd_path) {
+                Ok(path) => path,
+                Err(err) => {
+                    return self.rollback_session_artifacts_then(
+                        &changed_diagram_artifacts,
+                        &changed_walkthrough_artifacts,
+                        err,
+                    );
+                }
+            };
+            let meta_path = match self.diagram_meta_path(&mmd_path) {
+                Ok(path) => path,
+                Err(err) => {
+                    return self.rollback_session_artifacts_then(
+                        &changed_diagram_artifacts,
+                        &changed_walkthrough_artifacts,
+                        err,
+                    );
+                }
+            };
 
             let diagram_rev_unchanged = existing_diagram_revs
                 .get(diagram_id)
@@ -769,8 +1116,6 @@ impl SessionFolder {
                 && meta_path.is_file();
 
             if !diagram_rev_unchanged {
-                export_diagram_mmd(self, diagram, &mmd_path)?;
-
                 let flow_edges = match diagram.ast() {
                     DiagramAst::Flowchart(ast) => ast
                         .edges()
@@ -823,7 +1168,7 @@ impl SessionFolder {
                     DiagramAst::Flowchart(_) => BTreeMap::new(),
                 };
 
-                self.save_diagram_meta(&DiagramMeta {
+                let diagram_meta = DiagramMeta {
                     diagram_id: diagram_id.clone(),
                     mmd_path: mmd_path.clone(),
                     stable_id_map: stable_id_map_from_ast(diagram.ast()),
@@ -832,11 +1177,22 @@ impl SessionFolder {
                     sequence_messages,
                     flow_node_notes,
                     sequence_participant_notes,
-                })?;
+                };
+
+                match self.save_diagram_artifacts(diagram, &mmd_path, &meta_path, &diagram_meta) {
+                    Ok(snapshot) => changed_diagram_artifacts.push(snapshot),
+                    Err(err) => {
+                        return self.rollback_session_artifacts_then(
+                            &changed_diagram_artifacts,
+                            &changed_walkthrough_artifacts,
+                            err,
+                        );
+                    }
+                }
             }
 
             if !diagram_rev_unchanged || !ascii_path.is_file() {
-                self.schedule_diagram_ascii_export(&mmd_path, diagram)?;
+                pending_diagram_ascii_exports.push((mmd_path.clone(), diagram.clone()));
             }
 
             meta.diagrams.push(SessionMetaDiagram {
@@ -878,10 +1234,44 @@ impl SessionFolder {
                 && read_walkthrough_rev(&json_path).is_some_and(|rev| rev == walkthrough.rev());
 
             if !rev_matches {
-                self.save_walkthrough(walkthrough)?;
+                let snapshot =
+                    match self.snapshot_walkthrough_artifacts(walkthrough.walkthrough_id()) {
+                        Ok(snapshot) => snapshot,
+                        Err(err) => {
+                            return self.rollback_session_artifacts_then(
+                                &changed_diagram_artifacts,
+                                &changed_walkthrough_artifacts,
+                                err,
+                            );
+                        }
+                    };
+                changed_walkthrough_artifacts.push(snapshot);
+                if let Err(err) = self.save_walkthrough_json(walkthrough) {
+                    return self.rollback_session_artifacts_then(
+                        &changed_diagram_artifacts,
+                        &changed_walkthrough_artifacts,
+                        err,
+                    );
+                }
+                pending_walkthrough_ascii_exports.push(walkthrough.clone());
             } else if !ascii_path.is_file() {
-                self.schedule_walkthrough_ascii_export(walkthrough)?;
+                pending_walkthrough_ascii_exports.push(walkthrough.clone());
             }
+        }
+
+        if let Err(err) = self.save_meta(&meta) {
+            return self.rollback_session_artifacts_then(
+                &changed_diagram_artifacts,
+                &changed_walkthrough_artifacts,
+                err,
+            );
+        }
+
+        for (mmd_path, diagram) in pending_diagram_ascii_exports {
+            self.schedule_diagram_ascii_export(&mmd_path, &diagram)?;
+        }
+        for walkthrough in pending_walkthrough_ascii_exports {
+            self.schedule_walkthrough_ascii_export(&walkthrough)?;
         }
 
         if !skip_walkthrough_gc {
@@ -890,7 +1280,6 @@ impl SessionFolder {
             }
         }
 
-        self.save_meta(&meta)?;
         Ok(())
     }
 
@@ -1153,6 +1542,7 @@ impl SessionFolder {
     }
 
     pub fn save_selected_object_refs(&self, session: &Session) -> Result<(), StoreError> {
+        let _guard = self.lock_session_write()?;
         match self.load_meta() {
             Ok(mut meta) => {
                 meta.selected_object_refs =
@@ -1161,13 +1551,14 @@ impl SessionFolder {
                 Ok(())
             }
             Err(StoreError::Io { source, .. }) if source.kind() == io::ErrorKind::NotFound => {
-                self.save_session(session)
+                self.save_session_locked(session)
             }
             Err(err) => Err(err),
         }
     }
 
     pub fn save_active_diagram_id(&self, session: &Session) -> Result<(), StoreError> {
+        let _guard = self.lock_session_write()?;
         match self.load_meta() {
             Ok(mut meta) => {
                 meta.active_diagram_id = session.active_diagram_id().cloned();
@@ -1175,7 +1566,7 @@ impl SessionFolder {
                 Ok(())
             }
             Err(StoreError::Io { source, .. }) if source.kind() == io::ErrorKind::NotFound => {
-                self.save_session(session)
+                self.save_session_locked(session)
             }
             Err(err) => Err(err),
         }
@@ -1206,6 +1597,13 @@ impl SessionFolder {
     }
 
     pub fn save_walkthrough(&self, walkthrough: &Walkthrough) -> Result<(), StoreError> {
+        self.save_walkthrough_json(walkthrough)?;
+        self.schedule_walkthrough_ascii_export(walkthrough)?;
+
+        Ok(())
+    }
+
+    fn save_walkthrough_json(&self, walkthrough: &Walkthrough) -> Result<(), StoreError> {
         let wt_path = self.walkthrough_json_path(walkthrough.walkthrough_id());
 
         let wt_json = walkthrough_to_json(walkthrough);
@@ -1218,8 +1616,6 @@ impl SessionFolder {
             format!("{wt_str}\n").as_bytes(),
             self.durability,
         )?;
-
-        self.schedule_walkthrough_ascii_export(walkthrough)?;
 
         Ok(())
     }

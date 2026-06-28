@@ -6,8 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-/// MCP server helper functions:
-/// diagram/walkthrough mapping, Mermaid export, delta accumulation, and ID parsing.
+// MCP server helpers: ID parsing, Mermaid export, delta history, and context assembly.
+
 fn diagram_kind_label(kind: DiagramKind) -> &'static str {
     match kind {
         DiagramKind::Sequence => "Sequence",

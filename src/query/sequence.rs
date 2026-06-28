@@ -6,10 +6,13 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Sequence-diagram message search by substring or regex.
+
 use crate::model::ids::ObjectId;
 use crate::model::seq_ast::{SequenceAst, SequenceMessage};
 use regex::RegexBuilder;
 
+/// Text match strategy for sequence message search.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MessageSearchMode {
     Substring,

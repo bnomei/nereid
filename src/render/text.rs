@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Text measurement and canvas trimming helpers for Unicode render output.
+
 use super::Canvas;
 
 pub(crate) fn truncate_with_ellipsis(text: &str, max_len: usize) -> String {

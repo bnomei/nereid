@@ -6,8 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-/// Sequence/flow mutation implementation helpers used by `apply_ops`.
-/// Keeps `ops::mod` focused on public op types and orchestration.
+// Sequence and flowchart op application: validation, AST mutation, and delta recording.
+
 fn apply_seq_op(
     diagram_id: &DiagramId,
     ast: &mut SequenceAst,
@@ -89,6 +89,7 @@ fn apply_seq_op(
             ast.messages_mut().retain(|m| {
                 m.from_participant_id() != participant_id && m.to_participant_id() != participant_id
             });
+            prune_messages_from_blocks(ast, &removed_message_ids.iter().cloned().collect());
             for message_id in removed_message_ids {
                 delta.record_removed(seq_message_ref(diagram_id, &message_id));
             }
@@ -204,6 +205,7 @@ fn apply_seq_op(
                     object_id: message_id.clone(),
                 });
             }
+            prune_messages_from_blocks(ast, &HashSet::from([message_id.clone()]));
             delta.record_removed(seq_message_ref(diagram_id, message_id));
             Ok(())
         }
@@ -212,6 +214,68 @@ fn apply_seq_op(
 
 fn sort_seq_messages(ast: &mut SequenceAst) {
     ast.messages_mut().sort_by(SequenceMessage::cmp_in_order);
+}
+
+fn prune_messages_from_blocks(ast: &mut SequenceAst, removed: &HashSet<ObjectId>) {
+    if removed.is_empty() {
+        return;
+    }
+    ast.blocks_mut().retain_mut(|block| prune_messages_from_block(block, removed));
+}
+
+fn prune_messages_from_block(block: &mut SequenceBlock, removed: &HashSet<ObjectId>) -> bool {
+    block.blocks_mut().retain_mut(|nested| prune_messages_from_block(nested, removed));
+
+    let block_id = block.block_id().clone();
+    let kind = block.kind();
+    let mut header = block.header().map(ToOwned::to_owned);
+    let mut sections = std::mem::take(block.sections_mut());
+    for section in sections.iter_mut() {
+        section.message_ids_mut().retain(|message_id| !removed.contains(message_id));
+    }
+    sections.retain(|section| !section.message_ids().is_empty());
+
+    if sections.first().is_some_and(|first| first.kind() != SequenceSectionKind::Main) {
+        let first = &sections[0];
+        header = first.header().map(ToOwned::to_owned);
+        let section_id = first.section_id().clone();
+        let message_ids = first.message_ids().to_vec();
+        sections[0] = SequenceSection::new(
+            section_id,
+            SequenceSectionKind::Main,
+            None::<String>,
+            message_ids,
+        );
+    } else if !block.blocks().is_empty() {
+        let mut nested_message_ids = Vec::new();
+        collect_nested_block_message_ids(block.blocks(), &mut nested_message_ids);
+        if !nested_message_ids.is_empty() {
+            sections.push(SequenceSection::new(
+                ObjectId::new(format!("{}:main", block_id.as_str())).expect("valid section id"),
+                SequenceSectionKind::Main,
+                None::<String>,
+                nested_message_ids,
+            ));
+        }
+    }
+
+    let blocks = std::mem::take(block.blocks_mut());
+    let keep = !sections.is_empty() || !blocks.is_empty();
+    *block = SequenceBlock::new(block_id, kind, header, sections, blocks);
+    keep
+}
+
+fn collect_nested_block_message_ids(blocks: &[SequenceBlock], message_ids: &mut Vec<ObjectId>) {
+    for block in blocks {
+        for section in block.sections() {
+            for message_id in section.message_ids() {
+                if !message_ids.contains(message_id) {
+                    message_ids.push(message_id.clone());
+                }
+            }
+        }
+        collect_nested_block_message_ids(block.blocks(), message_ids);
+    }
 }
 
 fn normalize_seq_raw_arrow(kind: SequenceMessageKind, raw_arrow: Option<String>) -> Option<String> {

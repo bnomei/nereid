@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Mermaid-ish sequence-diagram parser and exporter for the internal sequence AST.
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
@@ -47,7 +49,7 @@ impl fmt::Display for MermaidSequenceParseError {
             Self::InvalidParticipantDecl { line_no, line } => {
                 write!(
                     f,
-                    "invalid participant declaration on line {line_no}: {line} (expected 'participant <name>')"
+                    "invalid participant declaration on line {line_no}: {line} (expected 'participant <name>' or '<role> <name>')"
                 )
             }
             Self::InvalidParticipantName {
@@ -116,6 +118,7 @@ impl std::error::Error for MermaidSequenceParseError {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MermaidSequenceExportError {
     MissingParticipant { participant_id: ObjectId },
+    InvalidParticipantRole { participant_id: ObjectId, role: String },
     InvalidMessageText { message_id: ObjectId, text: String },
     InvalidBlockMembership { block_id: ObjectId, reason: String },
 }
@@ -126,6 +129,13 @@ impl fmt::Display for MermaidSequenceExportError {
             Self::MissingParticipant { participant_id } => {
                 write!(f, "message references missing participant id: {participant_id}")
             }
+            Self::InvalidParticipantRole {
+                participant_id,
+                role,
+            } => write!(
+                f,
+                "cannot export participant {participant_id} with unsupported role keyword: {role:?}"
+            ),
             Self::InvalidMessageText { message_id, text } => write!(
                 f,
                 "cannot export message text for {message_id}: contains unsupported characters: {text:?}"
@@ -220,6 +230,71 @@ fn split_once_any<'a>(
 
 fn is_comment_line(trimmed: &str) -> bool {
     trimmed.starts_with("%%")
+}
+
+fn is_reserved_sequence_keyword(keyword: &str) -> bool {
+    matches!(
+        keyword,
+        "alt"
+            | "and"
+            | "activate"
+            | "autonumber"
+            | "break"
+            | "box"
+            | "critical"
+            | "create"
+            | "deactivate"
+            | "destroy"
+            | "else"
+            | "end"
+            | "loop"
+            | "note"
+            | "opt"
+            | "option"
+            | "par"
+            | "rect"
+    )
+}
+
+fn participant_declaration(
+    trimmed: &str,
+    line_no: usize,
+) -> Result<Option<(Option<&str>, &str)>, MermaidSequenceParseError> {
+    let mut parts = trimmed.split_whitespace();
+    let Some(keyword) = parts.next() else {
+        return Ok(None);
+    };
+    if is_reserved_sequence_keyword(keyword) {
+        return Ok(None);
+    }
+
+    let Some(name) = parts.next() else {
+        if keyword == "participant" || keyword == "actor" {
+            return Err(MermaidSequenceParseError::InvalidParticipantDecl {
+                line_no,
+                line: trimmed.to_owned(),
+            });
+        }
+        return Ok(None);
+    };
+    if parts.next().is_some() {
+        if keyword == "participant" || keyword == "actor" {
+            return Err(MermaidSequenceParseError::InvalidParticipantDecl {
+                line_no,
+                line: trimmed.to_owned(),
+            });
+        }
+        return Ok(None);
+    }
+
+    if keyword == "participant" {
+        return Ok(Some((None, name)));
+    }
+    if validate_mermaid_ident(keyword).is_err() {
+        return Ok(None);
+    }
+
+    Ok(Some((Some(keyword), name)))
 }
 
 fn ensure_participant(
@@ -331,7 +406,7 @@ fn keyword_header(trimmed: &str, keyword: &str) -> Option<String> {
 /// Parse a deliberately limited `sequenceDiagram` Mermaid subset.
 ///
 /// Supported lines (after `sequenceDiagram`):
-/// - `participant <name>` (identifier must not contain whitespace or `/`)
+/// - `participant <name>` or `<role> <name>`
 /// - `<from><arrow><to>: <text>` where `<arrow>` is one of Mermaid's documented message arrows
 ///   (normalized internally; export uses `->>`, `-)`, `-->>`)
 /// - `alt [header...]` / `opt [header...]` / `loop [header...]` / `par [header...]`
@@ -363,43 +438,6 @@ pub fn parse_sequence_diagram(input: &str) -> Result<SequenceAst, MermaidSequenc
         }
 
         if let Some(keyword) = trimmed.split_whitespace().next() {
-            if keyword == "participant" {
-                let mut parts = trimmed.split_whitespace();
-                parts.next(); // keyword
-                let Some(name) = parts.next() else {
-                    return Err(MermaidSequenceParseError::InvalidParticipantDecl {
-                        line_no,
-                        line: trimmed.to_owned(),
-                    });
-                };
-                if parts.next().is_some() {
-                    return Err(MermaidSequenceParseError::InvalidParticipantDecl {
-                        line_no,
-                        line: trimmed.to_owned(),
-                    });
-                }
-
-                validate_mermaid_ident(name).map_err(|reason| {
-                    MermaidSequenceParseError::InvalidParticipantName {
-                        line_no,
-                        name: name.to_owned(),
-                        reason,
-                    }
-                })?;
-
-                let participant_id = participant_id_from_mermaid_name(name).map_err(|reason| {
-                    MermaidSequenceParseError::InvalidParticipantName {
-                        line_no,
-                        name: name.to_owned(),
-                        reason,
-                    }
-                })?;
-                ast.participants_mut()
-                    .entry(participant_id)
-                    .or_insert_with(|| SequenceParticipant::new(name.to_owned()));
-                continue;
-            }
-
             match keyword {
                 "alt" | "opt" | "loop" | "par" => {
                     if open_blocks.len() >= MAX_BLOCK_NEST_DEPTH {
@@ -494,6 +532,30 @@ pub fn parse_sequence_diagram(input: &str) -> Result<SequenceAst, MermaidSequenc
                     continue;
                 }
                 _ => {}
+            }
+
+            if let Some((role, name)) = participant_declaration(trimmed, line_no)? {
+                validate_mermaid_ident(name).map_err(|reason| {
+                    MermaidSequenceParseError::InvalidParticipantName {
+                        line_no,
+                        name: name.to_owned(),
+                        reason,
+                    }
+                })?;
+
+                let participant_id = participant_id_from_mermaid_name(name).map_err(|reason| {
+                    MermaidSequenceParseError::InvalidParticipantName {
+                        line_no,
+                        name: name.to_owned(),
+                        reason,
+                    }
+                })?;
+                let participant = ast
+                    .participants_mut()
+                    .entry(participant_id)
+                    .or_insert_with(|| SequenceParticipant::new(name.to_owned()));
+                participant.set_role(role);
+                continue;
             }
         }
 
@@ -597,6 +659,22 @@ pub fn parse_sequence_diagram(input: &str) -> Result<SequenceAst, MermaidSequenc
 
 fn validate_export_message_text(text: &str) -> bool {
     !text.contains('\n') && !text.contains('\r')
+}
+
+fn validate_export_participant_role(
+    participant_id: &ObjectId,
+    role: &str,
+) -> Result<(), MermaidSequenceExportError> {
+    if role == "participant"
+        || is_reserved_sequence_keyword(role)
+        || validate_mermaid_ident(role).is_err()
+    {
+        return Err(MermaidSequenceExportError::InvalidParticipantRole {
+            participant_id: participant_id.clone(),
+            role: role.to_owned(),
+        });
+    }
+    Ok(())
 }
 
 fn validate_export_arrow_token(raw: &str, expected_kind: SequenceMessageKind) -> Option<&str> {
@@ -844,8 +922,9 @@ pub fn export_sequence_diagram(ast: &SequenceAst) -> Result<String, MermaidSeque
     let mut out = String::new();
     out.push_str("sequenceDiagram\n");
 
-    for participant in ast.participants().values() {
+    for (participant_id, participant) in ast.participants() {
         if let Some(role) = participant.role() {
+            validate_export_participant_role(participant_id, role)?;
             out.push_str(role);
             out.push(' ');
             out.push_str(participant.mermaid_name());
@@ -986,10 +1065,10 @@ pub fn export_sequence_diagram(ast: &SequenceAst) -> Result<String, MermaidSeque
 #[cfg(test)]
 mod tests {
     use super::{
-        export_sequence_diagram, parse_sequence_diagram, MermaidSequenceExportError,
-        MermaidSequenceParseError,
+        export_sequence_diagram, parse_sequence_diagram, participant_id_from_mermaid_name,
+        MermaidSequenceExportError, MermaidSequenceParseError,
     };
-    use crate::model::seq_ast::{SequenceAst, SequenceMessageKind};
+    use crate::model::seq_ast::{SequenceAst, SequenceMessageKind, SequenceParticipant};
     use crate::model::seq_ast::{SequenceBlockKind, SequenceMessage, SequenceSectionKind};
     use std::collections::BTreeSet;
 
@@ -1004,6 +1083,97 @@ mod tests {
         let ast2 = parse_sequence_diagram(&out1).expect("parse 2");
         let out2 = export_sequence_diagram(&ast2).expect("export 2");
         assert_eq!(out2, expected);
+    }
+
+    #[test]
+    fn actor_role_round_trips_through_export_and_parse() {
+        let role_of = |ast: &SequenceAst, name: &str| -> Option<String> {
+            ast.participants()
+                .values()
+                .find(|participant| participant.mermaid_name() == name)
+                .and_then(|participant| participant.role().map(ToOwned::to_owned))
+        };
+
+        let input = "sequenceDiagram\nactor Alice\nparticipant Bob\nAlice->>Bob: hi\n";
+        let ast1 = parse_sequence_diagram(input).expect("parse 1");
+        assert_eq!(role_of(&ast1, "Alice").as_deref(), Some("actor"));
+        assert_eq!(role_of(&ast1, "Bob"), None);
+
+        let out = export_sequence_diagram(&ast1).expect("export");
+        assert!(out.contains("actor Alice"), "export must emit the actor keyword:\n{out}");
+        assert!(out.contains("participant Bob"), "export:\n{out}");
+
+        let ast2 = parse_sequence_diagram(&out).expect("parse 2");
+        assert_eq!(
+            role_of(&ast2, "Alice").as_deref(),
+            Some("actor"),
+            "actor role must survive the round-trip; export was:\n{out}",
+        );
+        assert_eq!(role_of(&ast2, "Bob"), None);
+    }
+
+    #[test]
+    fn participant_redeclaration_clears_previous_role() {
+        let role_of = |ast: &SequenceAst, name: &str| -> Option<String> {
+            ast.participants()
+                .values()
+                .find(|participant| participant.mermaid_name() == name)
+                .and_then(|participant| participant.role().map(ToOwned::to_owned))
+        };
+
+        let input = "sequenceDiagram\nactor Alice\nparticipant Alice\nAlice->>Alice: hi\n";
+        let ast = parse_sequence_diagram(input).expect("parse");
+        assert_eq!(role_of(&ast, "Alice"), None);
+
+        let out = export_sequence_diagram(&ast).expect("export");
+        assert!(out.contains("participant Alice"), "export must clear actor role:\n{out}");
+        assert!(!out.contains("actor Alice"), "export must not preserve stale actor role:\n{out}");
+    }
+
+    #[test]
+    fn custom_participant_role_round_trips_through_export_and_parse() {
+        let role_of = |ast: &SequenceAst, name: &str| -> Option<String> {
+            ast.participants()
+                .values()
+                .find(|participant| participant.mermaid_name() == name)
+                .and_then(|participant| participant.role().map(ToOwned::to_owned))
+        };
+
+        let alice_id = participant_id_from_mermaid_name("Alice").unwrap();
+        let mut alice = SequenceParticipant::new("Alice");
+        alice.set_role(Some("boundary"));
+
+        let mut ast = SequenceAst::default();
+        ast.participants_mut().insert(alice_id, alice);
+
+        let out = export_sequence_diagram(&ast).expect("export");
+        assert!(out.contains("boundary Alice"), "export must emit the custom role:\n{out}");
+
+        let parsed = parse_sequence_diagram(&out).expect("parse exported role");
+        assert_eq!(role_of(&parsed, "Alice").as_deref(), Some("boundary"));
+    }
+
+    #[test]
+    fn unsupported_directive_is_not_parsed_as_custom_role() {
+        let err = parse_sequence_diagram("sequenceDiagram\nactivate Alice\n").unwrap_err();
+        assert!(matches!(err, MermaidSequenceParseError::UnsupportedSyntax { .. }));
+    }
+
+    #[test]
+    fn export_rejects_reserved_participant_role_keyword() {
+        let alice_id = participant_id_from_mermaid_name("Alice").unwrap();
+        let mut alice = SequenceParticipant::new("Alice");
+        alice.set_role(Some("activate"));
+
+        let mut ast = SequenceAst::default();
+        ast.participants_mut().insert(alice_id.clone(), alice);
+
+        let err = export_sequence_diagram(&ast).unwrap_err();
+        assert!(matches!(
+            err,
+            MermaidSequenceExportError::InvalidParticipantRole { participant_id, role }
+                if participant_id == alice_id && role == "activate"
+        ));
     }
 
     fn semantic_view(

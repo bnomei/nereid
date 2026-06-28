@@ -6,7 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-/// Layout, title, footer, help, and style helpers used by TUI rendering.
+// TUI chrome: pane layout, titles, footers, focus cycling, and style helpers.
+
 fn stack_main_panes_vertically(area: Rect, sidebar_panel_count: usize) -> bool {
     if sidebar_panel_count >= 3 {
         area.width < 110

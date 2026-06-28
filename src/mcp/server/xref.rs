@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Cross-reference MCP tools: list, add, remove, and neighbor exploration.
+
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::{tool, tool_router};
 
@@ -193,37 +195,40 @@ impl NereidMcp {
 
         let mut state = self.lock_state_synced().await?;
         if let Some(session_folder) = &self.session_folder {
-            let mut candidate = state.session.clone();
-            if candidate.xrefs().contains_key(&xref_id_parsed) {
-                return Err(ErrorData::invalid_params(
-                    "xref_id already exists",
-                    Some(serde_json::json!({ "xref_id": xref_id })),
-                ));
-            }
+            let (candidate, status) = {
+                let mut update = session_folder.begin_session_update().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to reload session before save: {err}"),
+                        Some(serde_json::json!({ "xref_id": xref_id })),
+                    )
+                })?;
+                let candidate = update.session_mut();
+                if candidate.xrefs().contains_key(&xref_id_parsed) {
+                    return Err(ErrorData::invalid_params(
+                        "xref_id already exists",
+                        Some(serde_json::json!({ "xref_id": xref_id })),
+                    ));
+                }
 
-            let from_missing = object_ref_is_missing(&candidate, &from);
-            let to_missing = object_ref_is_missing(&candidate, &to);
-            let status = XRefStatus::from_flags(from_missing, to_missing);
+                let from_missing = object_ref_is_missing(candidate, &from);
+                let to_missing = object_ref_is_missing(candidate, &to);
+                let status = XRefStatus::from_flags(from_missing, to_missing);
 
-            let mut xref = XRef::new(from, to, kind, status);
-            xref.set_label(label);
-            candidate.xrefs_mut().insert(xref_id_parsed.clone(), xref);
-            let meta = session_folder.load_meta().map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to load session meta: {err}"),
-                    Some(serde_json::json!({ "xref_id": xref_id })),
-                )
-            })?;
-            candidate.set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
+                let mut xref = XRef::new(from, to, kind, status);
+                xref.set_label(label);
+                candidate.xrefs_mut().insert(xref_id_parsed.clone(), xref);
 
-            session_folder.save_session(&candidate).map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to persist session: {err}"),
-                    Some(serde_json::json!({ "xref_id": xref_id })),
-                )
-            })?;
+                let candidate = update.commit().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to persist session: {err}"),
+                        Some(serde_json::json!({ "xref_id": xref_id })),
+                    )
+                })?;
 
-            state.session = candidate;
+                (candidate, status)
+            };
+
+            replace_committed_session(&mut state, candidate);
             let response = Json(XRefAddResponse {
                 xref_id: xref_id_parsed.as_str().to_owned(),
                 status: status.as_str().to_owned(),
@@ -268,29 +273,30 @@ impl NereidMcp {
 
         let mut state = self.lock_state_synced().await?;
         if let Some(session_folder) = &self.session_folder {
-            let mut candidate = state.session.clone();
-            let removed = candidate.xrefs_mut().remove(&xref_id_parsed).is_some();
-            if !removed {
-                return Err(ErrorData::resource_not_found(
-                    "xref not found",
-                    Some(serde_json::json!({ "xref_id": xref_id })),
-                ));
-            }
+            let candidate = {
+                let mut update = session_folder.begin_session_update().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to reload session before save: {err}"),
+                        Some(serde_json::json!({ "xref_id": xref_id })),
+                    )
+                })?;
+                let candidate = update.session_mut();
+                let removed = candidate.xrefs_mut().remove(&xref_id_parsed).is_some();
+                if !removed {
+                    return Err(ErrorData::resource_not_found(
+                        "xref not found",
+                        Some(serde_json::json!({ "xref_id": xref_id })),
+                    ));
+                }
 
-            let meta = session_folder.load_meta().map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to load session meta: {err}"),
-                    Some(serde_json::json!({ "xref_id": xref_id })),
-                )
-            })?;
-            candidate.set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
-            session_folder.save_session(&candidate).map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to persist session: {err}"),
-                    Some(serde_json::json!({ "xref_id": xref_id })),
-                )
-            })?;
-            state.session = candidate;
+                update.commit().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to persist session: {err}"),
+                        Some(serde_json::json!({ "xref_id": xref_id })),
+                    )
+                })?
+            };
+            replace_committed_session(&mut state, candidate);
             let response = Json(XRefRemoveResponse { removed: true });
             drop(state);
             self.notify_ui_session_changed().await;

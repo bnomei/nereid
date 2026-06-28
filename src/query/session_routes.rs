@@ -6,11 +6,14 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Session-wide route finding over diagram structure and cross-diagram xrefs.
+
 use std::cmp::{Ordering, Reverse};
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque};
 
 use crate::model::{CategoryPath, DiagramAst, DiagramId, ObjectId, ObjectRef, Session};
 
+/// Precomputed adjacency over session diagrams and xrefs for route queries.
 #[derive(Clone, Debug)]
 pub struct SessionRouteAdjacency {
     adjacency: BTreeMap<ObjectRef, BTreeSet<ObjectRef>>,
@@ -191,6 +194,9 @@ fn derive_adjacency(session: &Session) -> BTreeMap<ObjectRef, BTreeSet<ObjectRef
     for xref in session.xrefs().values() {
         let a = xref.from().clone();
         let b = xref.to().clone();
+        if !adjacency.contains_key(&a) || !adjacency.contains_key(&b) {
+            continue;
+        }
         insert_edge(&mut adjacency, a.clone(), b.clone());
         insert_edge(&mut adjacency, b, a);
     }
@@ -215,6 +221,7 @@ fn reconstruct_path(
     reversed
 }
 
+/// Tie-breaking strategy when multiple routes share the same hop count.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RoutesOrdering {
     FewestHops,
@@ -252,7 +259,11 @@ pub fn find_routes_with_adjacency(
     }
 
     if from == to {
-        return vec![vec![from.clone()]];
+        return if adjacency.adjacency.contains_key(from) {
+            vec![vec![from.clone()]]
+        } else {
+            Vec::new()
+        };
     }
 
     let max_hops = max_hops.unwrap_or(u64::MAX);
@@ -316,7 +327,7 @@ pub fn find_route_with_adjacency(
     to: &ObjectRef,
 ) -> Option<Vec<ObjectRef>> {
     if from == to {
-        return Some(vec![from.clone()]);
+        return adjacency.adjacency.contains_key(from).then(|| vec![from.clone()]);
     }
 
     let start = from.clone();
@@ -450,6 +461,78 @@ mod tests {
                 "d:seq/seq/message/m:2",
             ]
         );
+    }
+
+    #[test]
+    fn dangling_xref_endpoints_do_not_create_phantom_route() {
+        let mut session = Session::new(SessionId::new("s-dangling").expect("session id"));
+
+        let flow_id = DiagramId::new("flow").expect("diagram id");
+        let mut flow_ast = FlowchartAst::default();
+        flow_ast.nodes_mut().insert(oid("n:a"), FlowNode::new("A"));
+        session.diagrams_mut().insert(
+            flow_id.clone(),
+            Diagram::new(flow_id.clone(), "Flow", DiagramAst::Flowchart(flow_ast)),
+        );
+
+        let x1_from: ObjectRef = "d:flow/flow/node/n:a".parse().expect("ref");
+        let x1_to: ObjectRef = "d:flow/flow/node/n:gone".parse().expect("ref");
+        session.xrefs_mut().insert(
+            XRefId::new("x:1").expect("xref id"),
+            XRef::new(x1_from, x1_to, "relates", XRefStatus::DanglingTo),
+        );
+        let x2_from: ObjectRef = "d:flow/flow/node/n:gone".parse().expect("ref");
+        let x2_to: ObjectRef = "d:flow/flow/node/n:also_gone".parse().expect("ref");
+        session.xrefs_mut().insert(
+            XRefId::new("x:2").expect("xref id"),
+            XRef::new(x2_from, x2_to, "relates", XRefStatus::DanglingFrom),
+        );
+
+        let start: ObjectRef = "d:flow/flow/node/n:a".parse().expect("start ref");
+        let goal: ObjectRef = "d:flow/flow/node/n:also_gone".parse().expect("goal ref");
+
+        assert_eq!(find_route(&session, &start, &goal), None);
+
+        let adjacency = SessionRouteAdjacency::derive(&session);
+        assert_eq!(find_route_with_adjacency(&adjacency, &start, &goal), None);
+    }
+
+    #[test]
+    fn self_route_for_unknown_id_returns_no_route() {
+        let session = Session::new(SessionId::new("s-empty").expect("session id"));
+        let ghost: ObjectRef = "d:none/none/node/n:ghost".parse().expect("ghost ref");
+
+        assert_eq!(find_route(&session, &ghost, &ghost), None);
+        assert!(
+            find_routes(&session, &ghost, &ghost, 1, None, RoutesOrdering::FewestHops).is_empty()
+        );
+
+        let adjacency = SessionRouteAdjacency::derive(&session);
+        assert_eq!(find_route_with_adjacency(&adjacency, &ghost, &ghost), None);
+        assert!(find_routes_with_adjacency(
+            &adjacency,
+            &ghost,
+            &ghost,
+            1,
+            None,
+            RoutesOrdering::FewestHops
+        )
+        .is_empty());
+    }
+
+    #[test]
+    fn self_route_for_existing_id_returns_single_node() {
+        let mut session = Session::new(SessionId::new("s-real").expect("session id"));
+        let flow_id = DiagramId::new("flow").expect("diagram id");
+        let mut flow_ast = FlowchartAst::default();
+        flow_ast.nodes_mut().insert(oid("n:a"), FlowNode::new("A"));
+        session.diagrams_mut().insert(
+            flow_id.clone(),
+            Diagram::new(flow_id, "Flow", DiagramAst::Flowchart(flow_ast)),
+        );
+
+        let node: ObjectRef = "d:flow/flow/node/n:a".parse().expect("node ref");
+        assert_eq!(find_route(&session, &node, &node), Some(vec![node.clone()]));
     }
 
     #[test]

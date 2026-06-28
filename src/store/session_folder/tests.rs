@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Session folder persistence regression tests and round-trip fixtures.
+
 use std::env;
 use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -176,6 +178,35 @@ fn load_or_init_session_creates_seed_diagram_when_meta_is_missing(ctx: SessionFo
 }
 
 #[rstest]
+fn load_or_init_session_refuses_to_seed_when_diagram_files_exist(ctx: SessionFolderTestCtx) {
+    let folder = &ctx.folder;
+
+    let mut session = Session::new(SessionId::new("s:prior").unwrap());
+    let d1 = DiagramId::new("d1").unwrap();
+    let mut ast = FlowchartAst::default();
+    ast.nodes_mut().insert(ObjectId::new("n:keep").unwrap(), FlowNode::new("Keep"));
+    session
+        .diagrams_mut()
+        .insert(d1.clone(), Diagram::new(d1.clone(), "Prior", DiagramAst::Flowchart(ast)));
+    folder.save_session(&session).unwrap();
+
+    let meta_path = folder.meta_path();
+    assert!(meta_path.is_file());
+    std::fs::remove_file(&meta_path).unwrap();
+    assert!(ctx.session_dir.join("diagrams/d1.mmd").is_file());
+
+    let err = folder.load_or_init_session().unwrap_err();
+    match err {
+        StoreError::MetaMissingWithExistingDiagrams { meta_path: reported, .. } => {
+            assert_eq!(reported, meta_path);
+        }
+        other => panic!("expected MetaMissingWithExistingDiagrams, got: {other:?}"),
+    }
+
+    assert!(!meta_path.exists(), "load_or_init must not write a seed meta when diagrams exist");
+}
+
+#[rstest]
 fn load_or_init_session_does_not_hide_missing_diagram_errors(ctx: SessionFolderTestCtx) {
     let missing_mmd_path = ctx.session_dir.join("diagrams/missing.mmd");
     let meta = SessionMeta {
@@ -236,6 +267,143 @@ fn save_active_diagram_id_updates_meta_and_loads_back(ctx: SessionFolderTestCtx)
 
     let loaded = folder.load_session().unwrap();
     assert_eq!(loaded.active_diagram_id(), Some(&d2));
+}
+
+#[rstest]
+fn save_active_diagram_id_does_not_drop_concurrent_save_session_additions(
+    ctx: SessionFolderTestCtx,
+) {
+    use std::sync::Arc;
+    use std::sync::Barrier;
+
+    const DIAGRAMS: usize = 60;
+
+    fn diagram(id: &DiagramId, node: &str) -> Diagram {
+        let mut ast = FlowchartAst::default();
+        ast.nodes_mut().insert(ObjectId::new(node).unwrap(), FlowNode::new("N"));
+        Diagram::new(id.clone(), "D", DiagramAst::Flowchart(ast))
+    }
+
+    let mut session = Session::new(SessionId::new("s:concurrent").unwrap());
+    let first = DiagramId::new("d-000").unwrap();
+    session.diagrams_mut().insert(first.clone(), diagram(&first, "n:000"));
+    session.set_active_diagram_id(Some(first));
+    ctx.folder.save_session(&session).unwrap();
+
+    let writer_folder = SessionFolder::new(&ctx.session_dir);
+    let patcher_folder = SessionFolder::new(&ctx.session_dir);
+    let observer_folder = SessionFolder::new(&ctx.session_dir);
+    let barrier = Arc::new(Barrier::new(3));
+    let writer_barrier = barrier.clone();
+    let observer_barrier = barrier.clone();
+    let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let observer_done = done.clone();
+
+    let writer = std::thread::spawn(move || {
+        writer_barrier.wait();
+        let mut session = session;
+        for i in 1..DIAGRAMS {
+            let id = DiagramId::new(format!("d-{i:03}")).unwrap();
+            session.diagrams_mut().insert(id.clone(), diagram(&id, &format!("n:{i:03}")));
+            session.set_active_diagram_id(Some(id));
+            writer_folder.save_session(&session).unwrap();
+        }
+    });
+
+    let patcher = std::thread::spawn(move || {
+        barrier.wait();
+        for _ in 0..DIAGRAMS * 4 {
+            let on_disk = patcher_folder.load_session().unwrap();
+            patcher_folder.save_active_diagram_id(&on_disk).unwrap();
+        }
+    });
+
+    let observer = std::thread::spawn(move || {
+        observer_barrier.wait();
+        let mut high_water = 0usize;
+        while !observer_done.load(std::sync::atomic::Ordering::Relaxed) {
+            let count = observer_folder.load_meta().unwrap().diagrams.len();
+            assert!(
+                count >= high_water,
+                "meta diagram count dropped from {high_water} to {count} during concurrent saves",
+            );
+            high_water = count;
+        }
+    });
+
+    writer.join().unwrap();
+    patcher.join().unwrap();
+    done.store(true, std::sync::atomic::Ordering::Relaxed);
+    observer.join().unwrap();
+
+    let meta = ctx.folder.load_meta().unwrap();
+    let indexed: std::collections::BTreeSet<_> =
+        meta.diagrams.iter().map(|d| d.diagram_id.clone()).collect();
+    for i in 0..DIAGRAMS {
+        let id = DiagramId::new(format!("d-{i:03}")).unwrap();
+        assert!(
+            indexed.contains(&id),
+            "diagram {id} missing from meta index after concurrent saves"
+        );
+    }
+    let loaded = ctx.folder.load_session().unwrap();
+    assert_eq!(loaded.diagrams().len(), DIAGRAMS);
+}
+
+#[rstest]
+fn session_update_waits_to_load_until_prior_writer_commits(ctx: SessionFolderTestCtx) {
+    fn diagram(id: &DiagramId, node_id: &str, label: &str) -> Diagram {
+        let mut ast = FlowchartAst::default();
+        ast.nodes_mut().insert(ObjectId::new(node_id).unwrap(), FlowNode::new(label));
+        Diagram::new(id.clone(), label, DiagramAst::Flowchart(ast))
+    }
+
+    fn add_node(session: &mut Session, diagram_id: &DiagramId, node_id: &str, label: &str) {
+        let mut diagram = session.diagrams().get(diagram_id).cloned().expect("diagram");
+        let DiagramAst::Flowchart(mut ast) = diagram.ast().clone() else {
+            panic!("expected flowchart");
+        };
+        ast.nodes_mut().insert(ObjectId::new(node_id).unwrap(), FlowNode::new(label));
+        diagram.set_ast(DiagramAst::Flowchart(ast)).unwrap();
+        diagram.bump_rev();
+        session.diagrams_mut().insert(diagram_id.clone(), diagram);
+    }
+
+    let d_a = DiagramId::new("d-a").unwrap();
+    let d_b = DiagramId::new("d-b").unwrap();
+    let mut session = Session::new(SessionId::new("s:tx").unwrap());
+    session.diagrams_mut().insert(d_a.clone(), diagram(&d_a, "n:a0", "A"));
+    session.diagrams_mut().insert(d_b.clone(), diagram(&d_b, "n:b0", "B"));
+    ctx.folder.save_session(&session).unwrap();
+
+    let first_folder = SessionFolder::new(&ctx.session_dir);
+    let mut first_update = first_folder.begin_session_update().unwrap();
+    add_node(first_update.session_mut(), &d_b, "n:b1", "B1");
+
+    let second_folder = SessionFolder::new(&ctx.session_dir);
+    let d_a_for_thread = d_a.clone();
+    let (started_tx, started_rx) = std::sync::mpsc::channel();
+    let second_writer = std::thread::spawn(move || {
+        started_tx.send(()).unwrap();
+        let mut second_update = second_folder.begin_session_update().unwrap();
+        add_node(second_update.session_mut(), &d_a_for_thread, "n:a1", "A1");
+        second_update.commit().unwrap();
+    });
+
+    started_rx.recv().unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    first_update.commit().unwrap();
+    second_writer.join().unwrap();
+
+    let loaded = ctx.folder.load_session().unwrap();
+    let DiagramAst::Flowchart(ast_a) = loaded.diagrams().get(&d_a).unwrap().ast() else {
+        panic!("expected d-a flowchart");
+    };
+    assert!(ast_a.nodes().contains_key(&ObjectId::new("n:a1").unwrap()));
+    let DiagramAst::Flowchart(ast_b) = loaded.diagrams().get(&d_b).unwrap().ast() else {
+        panic!("expected d-b flowchart");
+    };
+    assert!(ast_b.nodes().contains_key(&ObjectId::new("n:b1").unwrap()));
 }
 
 #[rstest]
@@ -699,6 +867,261 @@ fn legacy_meta_without_walkthrough_ids_scans_directory(ctx: SessionFolderTestCtx
     let loaded = folder.load_session().unwrap();
     let w1 = WalkthroughId::new("w1").unwrap();
     assert!(loaded.walkthroughs().contains_key(&w1));
+}
+
+#[rstest]
+fn save_session_recovers_preexisting_write_lock_file(ctx: SessionFolderTestCtx) {
+    let folder = &ctx.folder;
+    let lock_path = folder.root().join(".nereid-session.write.lock");
+    std::fs::write(&lock_path, "pid=999999 acquired_unix_ms=0\n").unwrap();
+
+    let session = Session::new(SessionId::new("s1").unwrap());
+    folder.save_session(&session).unwrap();
+
+    assert!(folder.meta_path().is_file());
+}
+
+#[cfg(unix)]
+#[rstest]
+fn save_session_rolls_back_diagram_when_sidecar_write_fails(ctx: SessionFolderTestCtx) {
+    let folder = &ctx.folder;
+
+    let d1 = DiagramId::new("d1").unwrap();
+    let n_a = ObjectId::new("n:a").unwrap();
+    let n_b = ObjectId::new("n:b").unwrap();
+
+    let mut session = Session::new(SessionId::new("s1").unwrap());
+    let mut ast0 = FlowchartAst::default();
+    ast0.nodes_mut().insert(n_a.clone(), FlowNode::new("A"));
+    session
+        .diagrams_mut()
+        .insert(d1.clone(), Diagram::new(d1.clone(), "D", DiagramAst::Flowchart(ast0)));
+    folder.save_session(&session).unwrap();
+
+    let mmd_path = folder.default_diagram_mmd_path(&d1);
+    let sidecar_path = folder.diagram_meta_path(&mmd_path).unwrap();
+    assert!(mmd_path.is_file() && sidecar_path.is_file());
+
+    let sidecar_backing = sidecar_path.with_extension("json.backing");
+    std::fs::rename(&sidecar_path, &sidecar_backing).unwrap();
+    std::os::unix::fs::symlink(&sidecar_backing, &sidecar_path).unwrap();
+
+    {
+        let diagram = session.diagrams_mut().get_mut(&d1).unwrap();
+        let DiagramAst::Flowchart(mut ast1) = diagram.ast().clone() else { panic!() };
+        ast1.nodes_mut().insert(n_b.clone(), FlowNode::new("B"));
+        diagram.set_ast(DiagramAst::Flowchart(ast1)).unwrap();
+        diagram.bump_rev();
+    }
+    let err = folder.save_session(&session).unwrap_err();
+    match err {
+        StoreError::SymlinkRefused { .. } => {}
+        other => panic!("expected SymlinkRefused from sidecar write, got: {other:?}"),
+    }
+
+    std::fs::remove_file(&sidecar_path).unwrap();
+    std::fs::rename(&sidecar_backing, &sidecar_path).unwrap();
+
+    let loaded = folder.load_session().unwrap();
+    let diagram = loaded.diagrams().get(&d1).expect("diagram");
+    let DiagramAst::Flowchart(ast) = diagram.ast() else { panic!() };
+    assert!(ast.nodes().contains_key(&n_a), "n:a must survive");
+    assert!(
+        !ast.nodes().contains_key(&n_b),
+        "sidecar-first ordering must not have written the new .mmd; n:b leaked from a failed save",
+    );
+}
+
+#[cfg(unix)]
+#[rstest]
+fn save_session_restores_sidecar_when_mmd_write_fails(ctx: SessionFolderTestCtx) {
+    let folder = &ctx.folder;
+
+    let d1 = DiagramId::new("d1").unwrap();
+    let n_a = ObjectId::new("n:a").unwrap();
+    let n_b = ObjectId::new("n:b").unwrap();
+
+    let mut session = Session::new(SessionId::new("s1").unwrap());
+    let mut ast0 = FlowchartAst::default();
+    ast0.nodes_mut().insert(n_a.clone(), FlowNode::new("A"));
+    session
+        .diagrams_mut()
+        .insert(d1.clone(), Diagram::new(d1.clone(), "D", DiagramAst::Flowchart(ast0)));
+    folder.save_session(&session).unwrap();
+
+    let mmd_path = folder.default_diagram_mmd_path(&d1);
+    let sidecar_path = folder.diagram_meta_path(&mmd_path).unwrap();
+    let sidecar_before = std::fs::read(&sidecar_path).unwrap();
+
+    let mmd_backing = mmd_path.with_extension("mmd.backing");
+    std::fs::rename(&mmd_path, &mmd_backing).unwrap();
+    std::os::unix::fs::symlink(&mmd_backing, &mmd_path).unwrap();
+
+    {
+        let diagram = session.diagrams_mut().get_mut(&d1).unwrap();
+        let DiagramAst::Flowchart(mut ast1) = diagram.ast().clone() else { panic!() };
+        ast1.nodes_mut().insert(n_b.clone(), FlowNode::new("B"));
+        diagram.set_ast(DiagramAst::Flowchart(ast1)).unwrap();
+        diagram.bump_rev();
+    }
+
+    let err = folder.save_session(&session).unwrap_err();
+    match err {
+        StoreError::SymlinkRefused { path } => assert_eq!(path, mmd_path),
+        other => panic!("expected SymlinkRefused from mmd write, got: {other:?}"),
+    }
+
+    let sidecar_after = std::fs::read(&sidecar_path).unwrap();
+    assert_eq!(sidecar_after, sidecar_before, "failed mmd write must restore old sidecar");
+
+    std::fs::remove_file(&mmd_path).unwrap();
+    std::fs::rename(&mmd_backing, &mmd_path).unwrap();
+
+    let loaded = folder.load_session().unwrap();
+    let diagram = loaded.diagrams().get(&d1).expect("diagram");
+    let DiagramAst::Flowchart(ast) = diagram.ast() else { panic!() };
+    assert!(ast.nodes().contains_key(&n_a), "n:a must survive");
+    assert!(
+        !ast.nodes().contains_key(&n_b),
+        "failed .mmd write must leave the diagram at the prior revision",
+    );
+}
+
+#[cfg(unix)]
+#[rstest]
+fn save_session_rolls_back_diagram_artifacts_when_meta_write_fails(ctx: SessionFolderTestCtx) {
+    let folder = &ctx.folder;
+
+    let d1 = DiagramId::new("d1").unwrap();
+    let n_a = ObjectId::new("n:a").unwrap();
+    let n_b = ObjectId::new("n:b").unwrap();
+
+    let mut session = Session::new(SessionId::new("s1").unwrap());
+    let mut ast0 = FlowchartAst::default();
+    ast0.nodes_mut().insert(n_a.clone(), FlowNode::new("A"));
+    session
+        .diagrams_mut()
+        .insert(d1.clone(), Diagram::new(d1.clone(), "D", DiagramAst::Flowchart(ast0)));
+    folder.save_session(&session).unwrap();
+
+    let mmd_path = folder.default_diagram_mmd_path(&d1);
+    let sidecar_path = folder.diagram_meta_path(&mmd_path).unwrap();
+    let mmd_before = std::fs::read(&mmd_path).unwrap();
+    let sidecar_before = std::fs::read(&sidecar_path).unwrap();
+
+    let meta_path = folder.meta_path();
+    let meta_backing = folder.root().join("nereid-session.meta.json.backing");
+    std::fs::rename(&meta_path, &meta_backing).unwrap();
+    std::os::unix::fs::symlink(&meta_backing, &meta_path).unwrap();
+
+    {
+        let diagram = session.diagrams_mut().get_mut(&d1).unwrap();
+        let DiagramAst::Flowchart(mut ast1) = diagram.ast().clone() else { panic!() };
+        ast1.nodes_mut().insert(n_b.clone(), FlowNode::new("B"));
+        diagram.set_ast(DiagramAst::Flowchart(ast1)).unwrap();
+        diagram.bump_rev();
+    }
+
+    let err = folder.save_session(&session).unwrap_err();
+    match err {
+        StoreError::SymlinkRefused { path } => assert_eq!(path, meta_path),
+        other => panic!("expected SymlinkRefused from meta write, got: {other:?}"),
+    }
+
+    assert_eq!(std::fs::read(&mmd_path).unwrap(), mmd_before, "mmd must roll back");
+    assert_eq!(std::fs::read(&sidecar_path).unwrap(), sidecar_before, "sidecar must roll back",);
+
+    std::fs::remove_file(&meta_path).unwrap();
+    std::fs::rename(&meta_backing, &meta_path).unwrap();
+
+    let loaded = folder.load_session().unwrap();
+    let diagram = loaded.diagrams().get(&d1).expect("diagram");
+    let DiagramAst::Flowchart(ast) = diagram.ast() else { panic!() };
+    assert!(ast.nodes().contains_key(&n_a), "n:a must survive");
+    assert!(
+        !ast.nodes().contains_key(&n_b),
+        "failed meta commit must leave the diagram at the prior revision",
+    );
+}
+
+#[cfg(unix)]
+#[rstest]
+fn save_session_rolls_back_walkthrough_artifacts_when_meta_write_fails(ctx: SessionFolderTestCtx) {
+    let folder = &ctx.folder;
+
+    let mut session = Session::new(SessionId::new("s1").unwrap());
+    let w1 = WalkthroughId::new("w:1").unwrap();
+    session.walkthroughs_mut().insert(w1.clone(), Walkthrough::new(w1.clone(), "Before"));
+    folder.save_session(&session).unwrap();
+    folder.flush_ascii_exports();
+
+    let wt_path = folder.walkthrough_json_path(&w1);
+    let ascii_path = folder.walkthrough_ascii_path(&w1);
+    let wt_before = std::fs::read(&wt_path).unwrap();
+    let ascii_before = std::fs::read(&ascii_path).unwrap();
+
+    let meta_path = folder.meta_path();
+    let backing = folder.root().join("nereid-session.meta.json.backing");
+    std::fs::rename(&meta_path, &backing).unwrap();
+    std::os::unix::fs::symlink(&backing, &meta_path).unwrap();
+
+    {
+        let walkthrough = session.walkthroughs_mut().get_mut(&w1).unwrap();
+        walkthrough.set_title("After");
+        walkthrough.bump_rev();
+    }
+
+    let err = folder.save_session(&session).unwrap_err();
+    match err {
+        StoreError::SymlinkRefused { path } => assert_eq!(path, meta_path),
+        other => panic!("expected SymlinkRefused from meta write, got: {other:?}"),
+    }
+    folder.flush_ascii_exports();
+
+    assert_eq!(std::fs::read(&wt_path).unwrap(), wt_before, "walkthrough JSON must roll back");
+    assert_eq!(
+        std::fs::read(&ascii_path).unwrap(),
+        ascii_before,
+        "walkthrough ASCII must roll back",
+    );
+}
+
+#[cfg(unix)]
+#[rstest]
+fn save_session_keeps_removed_walkthrough_loadable_when_meta_commit_fails(
+    ctx: SessionFolderTestCtx,
+) {
+    let folder = &ctx.folder;
+
+    let mut session = Session::new(SessionId::new("s1").unwrap());
+    let w1 = WalkthroughId::new("w:1").unwrap();
+    let w2 = WalkthroughId::new("w:2").unwrap();
+    session.walkthroughs_mut().insert(w1.clone(), Walkthrough::new(w1.clone(), "One"));
+    session.walkthroughs_mut().insert(w2.clone(), Walkthrough::new(w2.clone(), "Two"));
+    folder.save_session(&session).unwrap();
+
+    let w2_path = folder.walkthrough_json_path(&w2);
+    assert!(w2_path.is_file(), "precondition: w2 file written");
+
+    let meta_path = folder.meta_path();
+    let backing = folder.root().join("nereid-session.meta.json.backing");
+    std::fs::rename(&meta_path, &backing).unwrap();
+    std::os::unix::fs::symlink(&backing, &meta_path).unwrap();
+
+    session.walkthroughs_mut().remove(&w2);
+    let err = folder.save_session(&session).unwrap_err();
+    match err {
+        StoreError::SymlinkRefused { .. } => {}
+        other => panic!("expected SymlinkRefused from meta write, got: {other:?}"),
+    }
+
+    assert!(
+        w2_path.is_file(),
+        "removed walkthrough file must not be deleted before the meta commit succeeds",
+    );
+
+    let loaded = folder.load_session().unwrap();
+    assert!(loaded.walkthroughs().contains_key(&w2));
 }
 
 #[test]

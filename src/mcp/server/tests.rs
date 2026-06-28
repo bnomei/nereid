@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! MCP server unit tests for tool handlers, persistence, and error contracts.
+
 use super::*;
 use rmcp::handler::server::wrapper::{Json, Parameters};
 
@@ -782,6 +784,33 @@ async fn attention_agent_set_read_clear_validates_refs() {
 }
 
 #[tokio::test]
+async fn diagram_apply_ops_prunes_agent_spotlight_for_removed_object() {
+    let server = NereidMcp::new(demo_session());
+
+    server
+        .attention_agent_set(Parameters(AttentionAgentSetParams {
+            object_ref: "d:d-flow/flow/node/n:a".to_owned(),
+        }))
+        .await
+        .expect("set spotlight");
+
+    server
+        .diagram_apply_ops(Parameters(ApplyOpsParams {
+            diagram_id: Some("d-flow".into()),
+            base_rev: 0,
+            ops: vec![McpOp::FlowRemoveNode { node_id: "n:a".into() }],
+        }))
+        .await
+        .expect("apply ops");
+
+    let Json(read) = server.attention_agent_read().await.expect("attention.agent.read");
+    assert_eq!(
+        read.object_ref, None,
+        "agent spotlight must be pruned once apply_ops removes its target object",
+    );
+}
+
+#[tokio::test]
 async fn attention_agent_set_overwrites_previous_value() {
     let server = NereidMcp::new(demo_session());
 
@@ -1211,6 +1240,36 @@ async fn walkthrough_apply_ops_bumps_rev_and_returns_delta_for_add_update_remove
 }
 
 #[tokio::test]
+async fn walkthrough_apply_ops_rolls_back_partial_batch_on_failure_non_persistent() {
+    let server = NereidMcp::new(demo_session_with_walkthroughs());
+
+    let add_new = || McpWalkthroughOp::AddNode {
+        node_id: "wn:new".into(),
+        title: "Dup".into(),
+        body_md: None,
+        refs: None,
+        tags: None,
+        status: None,
+    };
+
+    let result = server
+        .walkthrough_apply_ops(Parameters(WalkthroughApplyOpsParams {
+            walkthrough_id: "w:1".into(),
+            base_rev: 0,
+            ops: vec![add_new(), add_new()],
+        }))
+        .await;
+    assert!(result.is_err(), "duplicate node id in batch should error");
+
+    let Json(stat) = server
+        .walkthrough_stat(Parameters(WalkthroughGetParams { walkthrough_id: "w:1".into() }))
+        .await
+        .expect("walkthrough stat");
+    assert_eq!(stat.digest.rev, 0, "failed batch must not bump rev");
+    assert_eq!(stat.digest.counts.nodes, 2, "failed batch must not leave wn:new behind");
+}
+
+#[tokio::test]
 async fn walkthrough_diff_spans_multiple_revisions() {
     let server = NereidMcp::new(demo_session_with_walkthroughs());
 
@@ -1430,6 +1489,32 @@ async fn xref_list_returns_all_xrefs_ordered_by_id() {
     let ids = result.xrefs.iter().map(|x| x.xref_id.as_str()).collect::<Vec<_>>();
     assert_eq!(ids, vec!["x:1", "x:2"]);
     assert_eq!(result.xrefs.len(), 2);
+}
+
+#[tokio::test]
+async fn diagram_apply_ops_refreshes_xref_status_after_removing_endpoint() {
+    let server = NereidMcp::new(demo_session_with_xrefs());
+
+    let Json(before) = server.xref_list(Parameters(xref_list_params())).await.expect("xref list");
+    let status_before =
+        before.xrefs.iter().find(|x| x.xref_id == "x:2").expect("x:2").status.clone();
+    assert_eq!(status_before, "ok");
+
+    server
+        .diagram_apply_ops(Parameters(ApplyOpsParams {
+            diagram_id: Some("d-flow".into()),
+            base_rev: 0,
+            ops: vec![McpOp::FlowRemoveNode { node_id: "n:a".into() }],
+        }))
+        .await
+        .expect("apply ops");
+
+    let Json(after) = server.xref_list(Parameters(xref_list_params())).await.expect("xref list");
+    let status_after = after.xrefs.iter().find(|x| x.xref_id == "x:2").expect("x:2").status.clone();
+    assert_ne!(
+        status_after, "ok",
+        "xref status must refresh to dangling after its endpoint node is removed",
+    );
 }
 
 #[tokio::test]
@@ -2142,6 +2227,24 @@ async fn flow_reachable_rejects_invalid_direction() {
     };
 
     assert_eq!(err.code, rmcp::model::ErrorCode::INVALID_PARAMS);
+}
+
+#[tokio::test]
+async fn flow_reachable_returns_not_found_for_missing_from_node() {
+    let server = NereidMcp::new(demo_session_for_flow_reachable());
+    let err = match server
+        .flow_reachable(Parameters(FlowReachableParams {
+            diagram_id: None,
+            from_node_id: "n:does-not-exist".into(),
+            direction: Some("out".into()),
+        }))
+        .await
+    {
+        Ok(_) => panic!("expected resource_not_found for missing from_node_id"),
+        Err(err) => err,
+    };
+
+    assert_eq!(err.code, rmcp::model::ErrorCode::RESOURCE_NOT_FOUND);
 }
 
 #[tokio::test]
@@ -3840,6 +3943,62 @@ async fn diagram_apply_ops_persists_new_rev_to_session_folder() {
 }
 
 #[tokio::test]
+async fn diagram_apply_ops_preserves_concurrent_edit_to_other_diagram() {
+    let dir = temp_session_dir("mcp-apply-ops-preserves-other-diagram");
+    let dir_str = dir.to_string_lossy().to_string();
+    let folder = SessionFolder::new(dir_str.clone());
+
+    let session = demo_session();
+    folder.save_session(&session).expect("save initial session");
+
+    let server = NereidMcp::new_persistent(session, folder);
+
+    let flow_id = DiagramId::new("d-flow").expect("diagram id");
+    let mut external =
+        SessionFolder::new(dir_str.clone()).load_session().expect("load session externally");
+    {
+        let mut diagram = external.diagrams().get(&flow_id).cloned().expect("d-flow");
+        let DiagramAst::Flowchart(mut ast) = diagram.ast().clone() else {
+            panic!("d-flow should be a flowchart");
+        };
+        ast.nodes_mut().insert(oid("n:external"), FlowNode::new("External"));
+        diagram.set_ast(DiagramAst::Flowchart(ast)).expect("set flowchart ast");
+        diagram.bump_rev();
+        external.diagrams_mut().insert(flow_id.clone(), diagram);
+    }
+    SessionFolder::new(dir_str.clone())
+        .save_session(&external)
+        .expect("persist external edit to d-flow");
+
+    let Json(result) = server
+        .diagram_apply_ops(Parameters(ApplyOpsParams {
+            diagram_id: Some("d-seq".into()),
+            base_rev: 0,
+            ops: vec![McpOp::SeqAddParticipant {
+                participant_id: "p:new".into(),
+                mermaid_name: "New".into(),
+            }],
+        }))
+        .await
+        .expect("apply ops");
+    assert_eq!(result.new_rev, 1);
+
+    let loaded = SessionFolder::new(dir_str).load_session().expect("load session");
+    let seq = loaded.diagrams().get(&DiagramId::new("d-seq").unwrap()).expect("d-seq");
+    assert_eq!(seq.rev(), 1, "edited diagram persists its new rev");
+
+    let flow = loaded.diagrams().get(&flow_id).expect("d-flow");
+    assert_eq!(flow.rev(), 1, "concurrent d-flow rev must not be regressed");
+    let DiagramAst::Flowchart(ast) = flow.ast() else {
+        panic!("d-flow should be a flowchart");
+    };
+    assert!(
+        ast.nodes().contains_key(&oid("n:external")),
+        "concurrent d-flow edit must survive the MCP save",
+    );
+}
+
+#[tokio::test]
 async fn diagram_diff_history_survives_external_selection_only_updates() {
     let dir = temp_session_dir("mcp-delta-history-survives-selection-updates");
     let dir_str = dir.to_string_lossy().to_string();
@@ -3929,6 +4088,41 @@ async fn diagram_open_persists_to_session_folder() {
 
     let loaded = SessionFolder::new(dir_str).load_session().expect("load session");
     assert_eq!(loaded.active_diagram_id().map(|diagram_id| diagram_id.as_str()), Some("d-flow"));
+}
+
+#[tokio::test]
+async fn diagram_apply_ops_prunes_dangling_selection_from_persisted_meta() {
+    let dir = temp_session_dir("mcp-apply-ops-prune-selection");
+    let dir_str = dir.to_string_lossy().to_string();
+    let folder = SessionFolder::new(dir_str.clone());
+
+    let mut session = demo_session();
+    let ref_a = ObjectRef::from_str("d:d-flow/flow/node/n:a").expect("object ref");
+    let ref_b = ObjectRef::from_str("d:d-flow/flow/node/n:b").expect("object ref");
+    session.set_selected_object_refs([ref_a.clone(), ref_b.clone()].into_iter().collect());
+    folder.save_session(&session).expect("save session");
+
+    let server = NereidMcp::new_persistent(session, folder);
+
+    server
+        .diagram_apply_ops(Parameters(ApplyOpsParams {
+            diagram_id: Some("d-flow".into()),
+            base_rev: 0,
+            ops: vec![McpOp::FlowRemoveNode { node_id: "n:a".into() }],
+        }))
+        .await
+        .expect("apply ops");
+
+    let loaded = SessionFolder::new(dir_str).load_session().expect("load session");
+    let refs = loaded.selected_object_refs().iter().map(ToString::to_string).collect::<Vec<_>>();
+    assert!(
+        refs.iter().any(|r| r == "d:d-flow/flow/node/n:b"),
+        "selection ref to surviving node must be retained: {refs:?}",
+    );
+    assert!(
+        !refs.iter().any(|r| r == "d:d-flow/flow/node/n:a"),
+        "dangling selection ref to removed node must be pruned from persisted meta: {refs:?}",
+    );
 }
 
 #[tokio::test]

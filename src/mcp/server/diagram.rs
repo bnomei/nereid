@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Diagram MCP tools: list, open, render, mutate, and bootstrap from Mermaid.
+
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::{tool, tool_router};
 
@@ -80,62 +82,90 @@ impl NereidMcp {
         let kind_label = diagram_kind_label(kind).to_owned();
         let make_active = make_active.unwrap_or(true);
 
-        let mut state = self.lock_state_synced().await?;
-        let diagram_id = match diagram_id {
-            Some(diagram_id) => {
-                let parsed = DiagramId::new(diagram_id.clone()).map_err(|err| {
+        let requested_diagram_id = diagram_id
+            .map(|diagram_id| {
+                DiagramId::new(diagram_id.clone()).map_err(|err| {
                     ErrorData::invalid_params(
                         format!("invalid diagram_id: {err}"),
                         Some(serde_json::json!({ "diagram_id": diagram_id })),
                     )
+                })
+            })
+            .transpose()?;
+        let requested_name = name;
+
+        let mut state = self.lock_state_synced().await?;
+        let diagram_id;
+        let name;
+        if let Some(session_folder) = &self.session_folder {
+            let (candidate, committed_diagram_id, committed_name) = {
+                let mut update = session_folder.begin_session_update().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to reload session before save: {err}"),
+                        requested_diagram_id.as_ref().map(
+                            |diagram_id| serde_json::json!({ "diagram_id": diagram_id.as_str() }),
+                        ),
+                    )
                 })?;
-                if state.session.diagrams().contains_key(&parsed) {
+                let candidate = update.session_mut();
+                let diagram_id = requested_diagram_id
+                    .clone()
+                    .unwrap_or_else(|| allocate_diagram_id(candidate, kind));
+                if candidate.diagrams().contains_key(&diagram_id) {
                     return Err(ErrorData::invalid_params(
                         "diagram_id already exists",
-                        Some(serde_json::json!({ "diagram_id": parsed.as_str() })),
+                        Some(serde_json::json!({ "diagram_id": diagram_id.as_str() })),
                     ));
                 }
-                parsed
-            }
-            None => allocate_diagram_id(&state.session, kind),
-        };
+                let name = requested_name.clone().unwrap_or_else(|| diagram_id.as_str().to_owned());
+                let diagram = Diagram::new(diagram_id.clone(), name.clone(), ast.clone());
+                render_diagram_unicode(&diagram).map_err(|err| {
+                    ErrorData::invalid_params(
+                        format!("cannot render Mermaid diagram: {err}"),
+                        Some(serde_json::json!({
+                            "diagram_id": diagram_id.as_str(),
+                            "kind": kind_label.clone(),
+                            "render_error": err.to_string(),
+                        })),
+                    )
+                })?;
+                candidate.diagrams_mut().insert(diagram_id.clone(), diagram);
+                if make_active {
+                    candidate.set_active_diagram_id(Some(diagram_id.clone()));
+                }
 
-        let name = name.unwrap_or_else(|| diagram_id.as_str().to_owned());
-        let diagram = Diagram::new(diagram_id.clone(), name.clone(), ast);
-        render_diagram_unicode(&diagram).map_err(|err| {
-            ErrorData::invalid_params(
-                format!("cannot render Mermaid diagram: {err}"),
-                Some(serde_json::json!({
-                    "diagram_id": diagram_id.as_str(),
-                    "kind": kind_label.clone(),
-                    "render_error": err.to_string(),
-                })),
-            )
-        })?;
-
-        if let Some(session_folder) = &self.session_folder {
-            let mut candidate = state.session.clone();
-            candidate.diagrams_mut().insert(diagram_id.clone(), diagram);
-            if make_active {
-                candidate.set_active_diagram_id(Some(diagram_id.clone()));
-            }
-
-            let meta = session_folder.load_meta().map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to load session meta: {err}"),
-                    Some(serde_json::json!({ "diagram_id": diagram_id.as_str() })),
-                )
-            })?;
-            candidate.set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
-            session_folder.save_session(&candidate).map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to persist session: {err}"),
-                    Some(serde_json::json!({ "diagram_id": diagram_id.as_str() })),
-                )
-            })?;
-
-            state.session = candidate;
+                let candidate = update.commit().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to persist session: {err}"),
+                        Some(serde_json::json!({ "diagram_id": diagram_id.as_str() })),
+                    )
+                })?;
+                (candidate, diagram_id, name)
+            };
+            replace_committed_session(&mut state, candidate);
+            diagram_id = committed_diagram_id;
+            name = committed_name;
         } else {
+            diagram_id =
+                requested_diagram_id.unwrap_or_else(|| allocate_diagram_id(&state.session, kind));
+            if state.session.diagrams().contains_key(&diagram_id) {
+                return Err(ErrorData::invalid_params(
+                    "diagram_id already exists",
+                    Some(serde_json::json!({ "diagram_id": diagram_id.as_str() })),
+                ));
+            }
+            name = requested_name.unwrap_or_else(|| diagram_id.as_str().to_owned());
+            let diagram = Diagram::new(diagram_id.clone(), name.clone(), ast);
+            render_diagram_unicode(&diagram).map_err(|err| {
+                ErrorData::invalid_params(
+                    format!("cannot render Mermaid diagram: {err}"),
+                    Some(serde_json::json!({
+                        "diagram_id": diagram_id.as_str(),
+                        "kind": kind_label.clone(),
+                        "render_error": err.to_string(),
+                    })),
+                )
+            })?;
             state.session.diagrams_mut().insert(diagram_id.clone(), diagram);
             if make_active {
                 state.session.set_active_diagram_id(Some(diagram_id.clone()));
@@ -183,22 +213,29 @@ impl NereidMcp {
         }
 
         if let Some(session_folder) = &self.session_folder {
-            let mut candidate = state.session.clone();
-            candidate.set_active_diagram_id(Some(parsed.clone()));
-            let meta = session_folder.load_meta().map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to load session meta: {err}"),
-                    Some(serde_json::json!({ "diagram_id": diagram_id })),
-                )
-            })?;
-            candidate.set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
-            session_folder.save_session(&candidate).map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to persist session: {err}"),
-                    Some(serde_json::json!({ "diagram_id": diagram_id })),
-                )
-            })?;
-            state.session = candidate;
+            let candidate = {
+                let mut update = session_folder.begin_session_update().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to reload session before save: {err}"),
+                        Some(serde_json::json!({ "diagram_id": diagram_id })),
+                    )
+                })?;
+                let candidate = update.session_mut();
+                if !candidate.diagrams().contains_key(&parsed) {
+                    return Err(ErrorData::resource_not_found(
+                        "diagram not found",
+                        Some(serde_json::json!({ "diagram_id": diagram_id })),
+                    ));
+                }
+                candidate.set_active_diagram_id(Some(parsed.clone()));
+                update.commit().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to persist session: {err}"),
+                        Some(serde_json::json!({ "diagram_id": diagram_id })),
+                    )
+                })?
+            };
+            replace_committed_session(&mut state, candidate);
         } else {
             state.session.set_active_diagram_id(Some(parsed.clone()));
         }
@@ -232,31 +269,38 @@ impl NereidMcp {
         }
 
         if let Some(session_folder) = &self.session_folder {
-            let mut candidate = state.session.clone();
-            candidate.diagrams_mut().remove(&parsed);
+            let candidate = {
+                let mut update = session_folder.begin_session_update().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to reload session before save: {err}"),
+                        Some(serde_json::json!({ "diagram_id": diagram_id })),
+                    )
+                })?;
+                let candidate = update.session_mut();
+                if !candidate.diagrams().contains_key(&parsed) {
+                    return Err(ErrorData::resource_not_found(
+                        "diagram not found",
+                        Some(serde_json::json!({ "diagram_id": diagram_id })),
+                    ));
+                }
+                candidate.diagrams_mut().remove(&parsed);
 
-            if candidate.active_diagram_id().is_some_and(|active| active == &parsed) {
-                let next_active = candidate.diagrams().keys().next().cloned();
-                candidate.set_active_diagram_id(next_active);
-            }
+                if candidate.active_diagram_id().is_some_and(|active| active == &parsed) {
+                    let next_active = candidate.diagrams().keys().next().cloned();
+                    candidate.set_active_diagram_id(next_active);
+                }
 
-            let meta = session_folder.load_meta().map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to load session meta: {err}"),
-                    Some(serde_json::json!({ "diagram_id": diagram_id })),
-                )
-            })?;
-            candidate.set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
-            retain_existing_selected_object_refs(&mut candidate);
-            refresh_xref_statuses(&mut candidate);
+                retain_existing_selected_object_refs(candidate);
+                refresh_xref_statuses(candidate);
 
-            session_folder.save_session(&candidate).map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to persist session: {err}"),
-                    Some(serde_json::json!({ "diagram_id": diagram_id })),
-                )
-            })?;
-            state.session = candidate;
+                update.commit().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to persist session: {err}"),
+                        Some(serde_json::json!({ "diagram_id": diagram_id })),
+                    )
+                })?
+            };
+            replace_committed_session(&mut state, candidate);
         } else {
             state.session.diagrams_mut().remove(&parsed);
             if state.session.active_diagram_id().is_some_and(|active| active == &parsed) {
@@ -937,17 +981,116 @@ impl NereidMcp {
         &self,
         params: Parameters<ApplyOpsParams>,
     ) -> Result<Json<ApplyOpsResponse>, ErrorData> {
+        let ApplyOpsParams { diagram_id: requested_diagram_id, base_rev, ops } = params.0;
+        let ops = ops.iter().map(mcp_op_to_internal).collect::<Result<Vec<_>, _>>()?;
+
         let mut state = self.lock_state_synced().await?;
-        let diagram_id = resolve_diagram_id(&state.session, params.0.diagram_id.as_deref())?;
+
+        if let Some(session_folder) = &self.session_folder {
+            let (candidate_session, diagram_id, history, response) = {
+                let mut update = session_folder.begin_session_update().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to reload session before save: {err}"),
+                        Some(serde_json::json!({
+                            "diagram_id": requested_diagram_id.as_deref(),
+                            "base_rev": base_rev
+                        })),
+                    )
+                })?;
+                let candidate_session = update.session_mut();
+                let diagram_id =
+                    resolve_diagram_id(candidate_session, requested_diagram_id.as_deref())?;
+                let mut candidate_diagram = candidate_session
+                    .diagrams()
+                    .get(&diagram_id)
+                    .cloned()
+                    .ok_or_else(|| ErrorData::resource_not_found("diagram not found", None))?;
+
+                let current_rev = candidate_diagram.rev();
+                if base_rev != current_rev {
+                    let digest = digest_for_diagram(&candidate_diagram);
+                    return Err(ErrorData::invalid_request(
+                        "conflict: stale base_rev",
+                        Some(serde_json::json!({
+                            "base_rev": base_rev,
+                            "current_rev": current_rev,
+                            "snapshot_tool": "diagram.stat",
+                            "digest": {
+                                "rev": digest.rev,
+                                "counts": {
+                                    "participants": digest.counts.participants,
+                                    "messages": digest.counts.messages,
+                                    "nodes": digest.counts.nodes,
+                                    "edges": digest.counts.edges,
+                                },
+                                "key_names": digest.key_names,
+                            },
+                        })),
+                    ));
+                }
+
+                let result =
+                    apply_ops(&mut candidate_diagram, base_rev, &ops).map_err(map_apply_error)?;
+                render_diagram_unicode(&candidate_diagram).map_err(|err| {
+                    ErrorData::invalid_request(
+                        format!("cannot render diagram after apply_ops: {err}"),
+                        Some(serde_json::json!({
+                            "diagram_id": diagram_id.as_str(),
+                            "base_rev": base_rev,
+                            "op_count": ops.len() as u64,
+                            "render_error": err.to_string(),
+                        })),
+                    )
+                })?;
+                candidate_session.diagrams_mut().insert(diagram_id.clone(), candidate_diagram);
+                retain_existing_selected_object_refs(candidate_session);
+                refresh_xref_statuses(candidate_session);
+
+                let mut history =
+                    state.delta_history.get(&diagram_id).cloned().unwrap_or_else(VecDeque::new);
+                history.push_back(LastDelta {
+                    from_rev: base_rev,
+                    to_rev: result.new_rev,
+                    delta: result.delta.clone(),
+                });
+                while history.len() > DELTA_HISTORY_LIMIT {
+                    history.pop_front();
+                }
+
+                let candidate_session = update.commit().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to persist session: {err}"),
+                        Some(serde_json::json!({ "diagram_id": diagram_id.as_str(), "base_rev": base_rev })),
+                    )
+                })?;
+
+                let response = Json(ApplyOpsResponse {
+                    new_rev: result.new_rev,
+                    applied: result.applied as u64,
+                    delta: DeltaSummary {
+                        added: result.delta.added.iter().map(ToString::to_string).collect(),
+                        removed: result.delta.removed.iter().map(ToString::to_string).collect(),
+                        updated: result.delta.updated.iter().map(ToString::to_string).collect(),
+                    },
+                });
+
+                (candidate_session, diagram_id, history, response)
+            };
+            replace_committed_session(&mut state, candidate_session);
+            state.delta_history.insert(diagram_id, history);
+            self.prune_missing_agent_highlights(&state.session).await;
+            drop(state);
+            self.notify_ui_session_changed().await;
+            return Ok(response);
+        }
+
+        let diagram_id = resolve_diagram_id(&state.session, requested_diagram_id.as_deref())?;
         let diagram = state
             .session
             .diagrams()
             .get(&diagram_id)
             .ok_or_else(|| ErrorData::resource_not_found("diagram not found", None))?;
 
-        let ops = params.0.ops.iter().map(mcp_op_to_internal).collect::<Result<Vec<_>, _>>()?;
-
-        let base_rev = params.0.base_rev;
         let current_rev = diagram.rev();
         if base_rev != current_rev {
             let digest = digest_for_diagram(diagram);
@@ -971,72 +1114,6 @@ impl NereidMcp {
             ));
         }
 
-        if let Some(session_folder) = &self.session_folder {
-            let mut candidate_session = state.session.clone();
-            let mut candidate_diagram = candidate_session
-                .diagrams()
-                .get(&diagram_id)
-                .cloned()
-                .ok_or_else(|| ErrorData::resource_not_found("diagram not found", None))?;
-
-            let result =
-                apply_ops(&mut candidate_diagram, base_rev, &ops).map_err(map_apply_error)?;
-            render_diagram_unicode(&candidate_diagram).map_err(|err| {
-                ErrorData::invalid_request(
-                    format!("cannot render diagram after apply_ops: {err}"),
-                    Some(serde_json::json!({
-                        "diagram_id": diagram_id.as_str(),
-                        "base_rev": base_rev,
-                        "op_count": ops.len() as u64,
-                        "render_error": err.to_string(),
-                    })),
-                )
-            })?;
-            candidate_session.diagrams_mut().insert(diagram_id.clone(), candidate_diagram);
-
-            let mut history =
-                state.delta_history.get(&diagram_id).cloned().unwrap_or_else(VecDeque::new);
-            history.push_back(LastDelta {
-                from_rev: base_rev,
-                to_rev: result.new_rev,
-                delta: result.delta.clone(),
-            });
-            while history.len() > DELTA_HISTORY_LIMIT {
-                history.pop_front();
-            }
-
-            let meta = session_folder.load_meta().map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to load session meta: {err}"),
-                    Some(serde_json::json!({ "diagram_id": diagram_id.as_str(), "base_rev": base_rev })),
-                )
-            })?;
-            candidate_session
-                .set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
-            session_folder.save_session(&candidate_session).map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to persist session: {err}"),
-                    Some(serde_json::json!({ "diagram_id": diagram_id.as_str(), "base_rev": base_rev })),
-                )
-            })?;
-
-            state.session = candidate_session;
-            state.delta_history.insert(diagram_id, history);
-
-            let response = Json(ApplyOpsResponse {
-                new_rev: result.new_rev,
-                applied: result.applied as u64,
-                delta: DeltaSummary {
-                    added: result.delta.added.iter().map(ToString::to_string).collect(),
-                    removed: result.delta.removed.iter().map(ToString::to_string).collect(),
-                    updated: result.delta.updated.iter().map(ToString::to_string).collect(),
-                },
-            });
-            drop(state);
-            self.notify_ui_session_changed().await;
-            return Ok(response);
-        }
-
         let mut candidate_diagram = state
             .session
             .diagrams()
@@ -1057,6 +1134,8 @@ impl NereidMcp {
             )
         })?;
         state.session.diagrams_mut().insert(diagram_id.clone(), candidate_diagram);
+        retain_existing_selected_object_refs(&mut state.session);
+        refresh_xref_statuses(&mut state.session);
         let history = state.delta_history.entry(diagram_id).or_insert_with(VecDeque::new);
         history.push_back(LastDelta {
             from_rev: base_rev,
@@ -1076,6 +1155,7 @@ impl NereidMcp {
                 updated: result.delta.updated.iter().map(ToString::to_string).collect(),
             },
         });
+        self.prune_missing_agent_highlights(&state.session).await;
         drop(state);
         self.notify_ui_session_changed().await;
         Ok(response)

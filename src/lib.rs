@@ -6,9 +6,11 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Nereid — Rust Diagram TUI (AST + MCP + Walkthroughs).
+//! Nereid — diagram session editor with terminal UI and MCP integration.
 //!
-//! This crate starts as a single-crate layout per `specs/01-diagram-tui-rust/design.md`.
+//! The crate layers a typed session model (diagrams, walkthroughs, cross-references) over
+//! Mermaid-ish import/export, layout/render pipelines, and folder persistence. The TUI and
+//! MCP server share session state, selection, and revision-tracked mutations.
 
 pub mod format;
 pub mod layout;

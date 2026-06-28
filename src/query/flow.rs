@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Flowchart graph queries: node degrees and directed reachability.
+
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use crate::model::{FlowchartAst, ObjectId};
@@ -17,6 +19,7 @@ pub(crate) enum ReachDirection {
     Both,
 }
 
+/// In- and out-degree counts for a flowchart node.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct FlowNodeDegree {
     pub in_degree: u64,

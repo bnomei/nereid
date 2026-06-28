@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Deterministic diagram AST fixtures for tests and benchmarks.
+
 use super::flow_ast::{FlowEdge, FlowNode, FlowchartAst};
 use super::ids::ObjectId;
 

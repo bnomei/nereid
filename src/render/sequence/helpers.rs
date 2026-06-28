@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+// Sequence render helpers: lifeline boxes, message arrows, and block framing.
+
 /// Sequence rendering internals:
 /// row/column placement, block decoration, overlays, and text composition.
 fn seq_box_height(options: RenderOptions) -> usize {
@@ -25,6 +27,47 @@ fn participants_in_col_order(layout: &SequenceLayout) -> Vec<(usize, &ObjectId)>
     participants
         .sort_by(|(a_col, a_id), (b_col, b_id)| a_col.cmp(b_col).then_with(|| a_id.cmp(b_id)));
     participants
+}
+
+fn compute_participant_renders<'a>(
+    ast: &'a SequenceAst,
+    layout: &'a SequenceLayout,
+    options: RenderOptions,
+) -> Result<Vec<ParticipantRender<'a>>, SequenceRenderError> {
+    let participants = participants_in_col_order(layout);
+    let col_gap_budget = layout.spacing_budget().col_gap_extra_spacing_by_col();
+
+    let mut participant_renders = Vec::<ParticipantRender>::with_capacity(participants.len());
+    let mut cursor_x = PARTICIPANT_LEFT_MARGIN;
+
+    for (col, participant_id) in participants {
+        let participant = ast.participants().get(participant_id).ok_or_else(|| {
+            SequenceRenderError::MissingParticipant { participant_id: participant_id.clone() }
+        })?;
+        let name = participant.mermaid_name();
+        let note = if options.show_notes { participant.note() } else { None };
+
+        let (box_inner_width, box_total_width) = box_widths_prefixed(name, options);
+        let box_x0 = cursor_x;
+        let box_x1 = box_x0 + box_total_width - 1;
+        let lifeline_x = box_x0 + (box_total_width / 2);
+
+        participant_renders.push(ParticipantRender {
+            col,
+            participant_id,
+            name,
+            note,
+            box_x0,
+            box_x1,
+            box_inner_width,
+            lifeline_x,
+        });
+
+        let col_gap_extra = col_gap_budget.get(&col).copied().unwrap_or(0);
+        cursor_x = box_x1 + 1 + COL_GAP + col_gap_extra;
+    }
+
+    Ok(participant_renders)
 }
 
 fn next_lifeline_x_by_col(participant_renders: &[ParticipantRender<'_>]) -> BTreeMap<usize, usize> {
@@ -823,8 +866,7 @@ fn section_row_ranges<'a>(
             });
         }
 
-        let mut min_row = None::<usize>;
-        let mut max_row = None::<usize>;
+        let mut rows = Vec::<usize>::with_capacity(section.message_ids().len());
         for message_id in section.message_ids() {
             let row = message_row_by_id.get(message_id).copied().ok_or_else(|| {
                 SequenceRenderError::InvalidBlockMembership {
@@ -836,15 +878,27 @@ fn section_row_ranges<'a>(
                     ),
                 }
             })?;
+            rows.push(row);
+        }
+        rows.sort_unstable();
+        rows.dedup();
 
-            min_row = Some(min_row.map_or(row, |prev| prev.min(row)));
-            max_row = Some(max_row.map_or(row, |prev| prev.max(row)));
+        for window in rows.windows(2) {
+            if window[1] != window[0] + 1 {
+                return Err(SequenceRenderError::InvalidBlockMembership {
+                    block_id: block.block_id().clone(),
+                    reason: format!(
+                        "section {} message membership is not contiguous",
+                        section.section_id()
+                    ),
+                });
+            }
         }
 
         ranges.push(SectionRowRange {
             section,
-            start_row: min_row.unwrap_or(0),
-            end_row: max_row.unwrap_or(0),
+            start_row: rows.first().copied().unwrap_or(0),
+            end_row: rows.last().copied().unwrap_or(0),
         });
     }
 

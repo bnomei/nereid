@@ -564,6 +564,19 @@ struct PendingDiagramSync {
     expected_disk_rev: u64,
 }
 
+enum DiagramSyncError {
+    Retriable(String),
+    Terminal(String),
+}
+
+impl DiagramSyncError {
+    fn message(&self) -> &str {
+        match self {
+            Self::Retriable(message) | Self::Terminal(message) => message,
+        }
+    }
+}
+
 struct App {
     session: Session,
     session_folder: Option<SessionFolder>,
@@ -705,7 +718,7 @@ impl App {
 
         let mut ui_state = ui_state.blocking_lock();
         ui_state.set_follow_ai(self.follow_ai);
-        if self.focus_owner == FocusOwner::Human {
+        if self.focus_owner == FocusOwner::Human || self.follow_ai {
             let active_diagram_id = self.session.active_diagram_id().cloned();
             let active_object_ref = self.selected_ref().cloned();
             ui_state.set_human_selection(active_diagram_id, active_object_ref);
@@ -1476,8 +1489,12 @@ impl App {
             Ok(()) => {
                 self.set_toast(format!("Synced edited diagram: {}", pending.diagram_id));
             }
-            Err(err) => {
-                self.set_toast(err);
+            Err(err @ DiagramSyncError::Retriable(_)) => {
+                self.set_toast(err.message().to_owned());
+                self.pending_diagram_sync = Some(pending);
+            }
+            Err(err @ DiagramSyncError::Terminal(_)) => {
+                self.set_toast(err.message().to_owned());
             }
         }
     }
@@ -1486,63 +1503,48 @@ impl App {
         &self,
         session_folder: &SessionFolder,
         pending: &PendingDiagramSync,
-    ) -> Result<(), String> {
+    ) -> Result<(), DiagramSyncError> {
         let Some(local_diagram) = self.session.diagrams().get(&pending.diagram_id).cloned() else {
-            return Err(format!(
+            return Err(DiagramSyncError::Terminal(format!(
                 "sync skipped: edited diagram no longer exists: {}",
                 pending.diagram_id
-            ));
+            )));
         };
 
-        let mut disk_session =
-            session_folder.load_session().map_err(|err| format!("sync failed (load): {err}"))?;
+        let mut update = session_folder
+            .begin_session_update()
+            .map_err(|err| DiagramSyncError::Retriable(format!("sync failed (load): {err}")))?;
+        let disk_session = update.session_mut();
         let Some(disk_diagram) = disk_session.diagrams().get(&pending.diagram_id) else {
-            return Err(format!("sync conflict: diagram removed on disk: {}", pending.diagram_id));
+            return Err(DiagramSyncError::Terminal(format!(
+                "sync conflict: diagram removed on disk: {}",
+                pending.diagram_id
+            )));
         };
 
         if disk_diagram.rev() != pending.expected_disk_rev {
-            return Err(format!(
+            return Err(DiagramSyncError::Terminal(format!(
                 "sync conflict for {}: disk rev {} != expected {}",
                 pending.diagram_id,
                 disk_diagram.rev(),
                 pending.expected_disk_rev
-            ));
+            )));
         }
 
         disk_session.diagrams_mut().insert(pending.diagram_id.clone(), local_diagram);
-        session_folder
-            .save_session(&disk_session)
-            .map_err(|err| format!("sync failed (save): {err}"))
+        normalize_derived_session_metadata(disk_session);
+        update
+            .commit()
+            .map_err(|err| DiagramSyncError::Retriable(format!("sync failed (save): {err}")))
+            .map(|_| ())
     }
 
     fn retain_existing_selected_refs(&mut self) {
-        let retained = self
-            .session
-            .selected_object_refs()
-            .iter()
-            .filter(|object_ref| self.session.object_ref_exists(object_ref))
-            .cloned()
-            .collect::<BTreeSet<_>>();
-        self.session.set_selected_object_refs(retained);
+        retain_existing_selected_refs(&mut self.session);
     }
 
     fn refresh_xref_statuses(&mut self) {
-        let next_statuses = self
-            .session
-            .xrefs()
-            .iter()
-            .map(|(xref_id, xref)| {
-                let from_dangling = self.session.object_ref_is_missing(xref.from());
-                let to_dangling = self.session.object_ref_is_missing(xref.to());
-                (xref_id.clone(), XRefStatus::from_flags(from_dangling, to_dangling))
-            })
-            .collect::<Vec<_>>();
-
-        for (xref_id, status) in next_statuses {
-            if let Some(xref) = self.session.xrefs_mut().get_mut(&xref_id) {
-                xref.set_status(status);
-            }
-        }
+        refresh_xref_statuses(&mut self.session);
     }
 
     fn help_scroll_by(&mut self, delta: i32) {
@@ -2572,6 +2574,39 @@ impl Drop for TerminalSuspendGuard<'_> {
         let _ = self.terminal.clear();
         let _ = self.terminal.hide_cursor();
         let _ = ratatui::backend::Backend::flush(self.terminal.backend_mut());
+    }
+}
+
+fn normalize_derived_session_metadata(session: &mut Session) {
+    retain_existing_selected_refs(session);
+    refresh_xref_statuses(session);
+}
+
+fn retain_existing_selected_refs(session: &mut Session) {
+    let retained = session
+        .selected_object_refs()
+        .iter()
+        .filter(|object_ref| session.object_ref_exists(object_ref))
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    session.set_selected_object_refs(retained);
+}
+
+fn refresh_xref_statuses(session: &mut Session) {
+    let next_statuses = session
+        .xrefs()
+        .iter()
+        .map(|(xref_id, xref)| {
+            let from_dangling = session.object_ref_is_missing(xref.from());
+            let to_dangling = session.object_ref_is_missing(xref.to());
+            (xref_id.clone(), XRefStatus::from_flags(from_dangling, to_dangling))
+        })
+        .collect::<Vec<_>>();
+
+    for (xref_id, status) in next_statuses {
+        if let Some(xref) = session.xrefs_mut().get_mut(&xref_id) {
+            xref.set_status(status);
+        }
     }
 }
 

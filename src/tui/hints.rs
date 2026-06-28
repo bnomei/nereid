@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Keyboard hint label generation for single-key object selection in the TUI.
+
 use std::collections::HashSet;
 
 pub(crate) fn gen_labels(n: usize, hint_chars: &str) -> Vec<String> {

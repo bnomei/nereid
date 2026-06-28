@@ -6,6 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
+//! Collaboration MCP tools: human/agent attention, selection, and UI state sync.
+
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::{tool, tool_router};
 
@@ -206,7 +208,7 @@ impl NereidMcp {
                     })),
                 )
             })?;
-            state.session = candidate;
+            replace_committed_session(&mut state, candidate);
         } else {
             apply_mode(&mut state.session, mode, &applied_refs);
         }
