@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-06-28
+- Hardened persisted session writes against concurrent updates, stale lock files, and failed meta commits.
+- Made MCP diagram and walkthrough updates more consistent when disk-backed sessions change concurrently.
+- Improved TUI pending diagram sync metadata normalization for selections and cross-reference statuses.
+- Fixed Mermaid sequence participant redeclarations and message pruning inside branch/nested blocks.
+
 ## [0.4.0] - 2026-06-17
 - Improved manual CLI parser help, version output, and actionable parse errors.
 - Added a reviewable MCP tool schema snapshot and snapshot freshness test.
