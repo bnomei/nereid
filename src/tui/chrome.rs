@@ -288,7 +288,7 @@ fn footer_help_line(app: &App, toast_suffix: &str, compact: bool) -> Line<'stati
                     push_footer_entry_maybe_disabled(
                         &mut spans,
                         "DIAGRAM",
-                        "[]",
+                        "[]:",
                         diagram_hotkeys_disabled,
                     );
                     push_footer_entry_maybe_disabled(
@@ -376,12 +376,12 @@ fn footer_help_line(app: &App, toast_suffix: &str, compact: bool) -> Line<'stati
                 push_footer_entry(&mut spans, "CHAIN", "c");
                 push_footer_entry(&mut spans, "YANK", "y");
                 push_footer_entry(&mut spans, "JUMP", "g/t");
-                push_footer_entry(&mut spans, "DIAGRAM", "[]");
+                push_footer_entry(&mut spans, "DIAGRAM", "[]:");
             }
             Focus::XRefs => {
                 push_footer_entry(&mut spans, "FILTER", "-/I");
                 push_footer_entry(&mut spans, "JUMP", "g/t");
-                push_footer_entry(&mut spans, "DIAGRAM", "[]");
+                push_footer_entry(&mut spans, "DIAGRAM", "[]:");
             }
         }
 
@@ -605,6 +605,12 @@ fn render_help(frame: &mut Frame<'_>, app: &mut App, main_area: Rect) {
     lines.push(help_kv(
         "[/]",
         "Previous/next diagram",
+        key_col_width,
+        key_style,
+    ));
+    lines.push(help_kv(
+        ":",
+        "Open diagram switcher",
         key_col_width,
         key_style,
     ));

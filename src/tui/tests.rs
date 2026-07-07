@@ -518,6 +518,7 @@ fn capital_n_toggles_notes_panel_when_search_inactive() {
 fn footer_toggle_entries_use_square_glyphs_without_parentheses() {
     let mut app = App::new(demo_session());
     let inactive = line_to_string(&footer_help_line(&app, "", false));
+    assert!(inactive.contains("Diagram:[]:"));
     assert!(inactive.contains("Notes:n◼ "));
     assert!(!inactive.contains("5/N"));
     assert!(inactive.contains("Ai:a◼ "));
@@ -556,7 +557,7 @@ fn footer_diagram_hotkeys_dim_when_follow_ai_is_active() {
     app.show_notes = true;
 
     let line = footer_help_line(&app, "", false);
-    for hotkey in ["[]", "f", "c", "e", "⏡", "y", "g/t", "n◼ "] {
+    for hotkey in ["[]:", "f", "c", "e", "⏡", "y", "g/t", "n◼ "] {
         let span = line
             .spans
             .iter()
