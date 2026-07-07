@@ -1819,11 +1819,9 @@ impl App {
                 }
             }
             KeyCode::Tab => self.complete_diagram_prompt(),
-            KeyCode::Char(ch) => {
-                if !ch.is_control() {
-                    self.diagram_prompt_query.push(ch);
-                    self.update_diagram_prompt_matches();
-                }
+            KeyCode::Char(ch) if !ch.is_control() => {
+                self.diagram_prompt_query.push(ch);
+                self.update_diagram_prompt_matches();
             }
             _ => {}
         }
