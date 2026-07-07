@@ -17,6 +17,7 @@ pub mod ids;
 pub mod object_ref;
 pub mod seq_ast;
 pub mod session;
+pub mod symbol;
 pub mod walkthrough;
 pub mod xref;
 
@@ -30,5 +31,6 @@ pub use seq_ast::{
     SequenceAst, SequenceMessage, SequenceMessageKind, SequenceNote, SequenceParticipant,
 };
 pub use session::Session;
+pub use symbol::{SymbolAnchor, SymbolAnchorError};
 pub use walkthrough::{Walkthrough, WalkthroughEdge, WalkthroughNode};
 pub use xref::{ParseXRefStatusError, XRef, XRefStatus};

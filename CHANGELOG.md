@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-07-07
+- Added a Vim/Helix-style `:` diagram prompt in the TUI for fuzzy diagram switching, with `Tab` completion and `[SEQ]`/`[FLO]` match rows.
+- Added typed Frigg symbol anchors for sequence participants and flow nodes, persisted in diagram sidecar metadata and exposed through MCP reads and apply ops.
+
 ## [0.6.0] - 2026-07-07
 - Renamed MCP tool names from dotted namespaces to underscore names for CallMcpTool bridge compatibility.
 - Regenerated the MCP tool schema snapshot and updated Nereid playbooks, skill docs, and README tool references.

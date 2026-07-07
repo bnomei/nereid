@@ -70,6 +70,21 @@ fn apply_seq_op(
             delta.record_updated(seq_participant_ref(diagram_id, participant_id));
             Ok(())
         }
+        SeqOp::SetParticipantSymbol {
+            participant_id,
+            symbol,
+        } => {
+            let Some(existing) = ast.participants_mut().get_mut(participant_id) else {
+                return Err(ApplyError::NotFound {
+                    kind: ObjectKind::SeqParticipant,
+                    object_id: participant_id.clone(),
+                });
+            };
+
+            existing.set_symbol(symbol.clone());
+            delta.record_updated(seq_participant_ref(diagram_id, participant_id));
+            Ok(())
+        }
         SeqOp::RemoveParticipant { participant_id } => {
             if ast.participants_mut().remove(participant_id).is_none() {
                 return Err(ApplyError::NotFound {
@@ -495,6 +510,18 @@ fn apply_flow_op(
             };
 
             existing.set_note(note.as_deref());
+            delta.record_updated(flow_node_ref(diagram_id, node_id));
+            Ok(())
+        }
+        FlowOp::SetNodeSymbol { node_id, symbol } => {
+            let Some(existing) = ast.nodes_mut().get_mut(node_id) else {
+                return Err(ApplyError::NotFound {
+                    kind: ObjectKind::FlowNode,
+                    object_id: node_id.clone(),
+                });
+            };
+
+            existing.set_symbol(symbol.clone());
             delta.record_updated(flow_node_ref(diagram_id, node_id));
             Ok(())
         }

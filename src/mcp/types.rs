@@ -323,7 +323,16 @@ pub struct DiagramGetAstResponse {
     pub diagram_id: String,
     pub kind: String,
     pub rev: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_symbol_repository_id: Option<String>,
     pub ast: McpDiagramAst,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct McpSymbolAnchor {
+    pub stable_symbol_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -346,6 +355,8 @@ pub struct McpSeqParticipantAst {
     pub mermaid_name: String,
     pub role: Option<String>,
     pub note: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub symbol: Option<McpSymbolAnchor>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -400,6 +411,8 @@ pub struct McpFlowNodeAst {
     pub shape: String,
     pub mermaid_id: Option<String>,
     pub note: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub symbol: Option<McpSymbolAnchor>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -720,6 +733,9 @@ pub enum McpObject {
     SeqParticipant {
         mermaid_name: String,
         role: Option<String>,
+        note: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        symbol: Option<McpSymbolAnchor>,
     },
     SeqBlock {
         kind: McpSeqBlockKind,
@@ -744,6 +760,9 @@ pub enum McpObject {
         label: String,
         shape: String,
         mermaid_id: Option<String>,
+        note: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        symbol: Option<McpSymbolAnchor>,
     },
     FlowEdge {
         from_node_id: String,
@@ -768,6 +787,10 @@ pub enum McpOp {
     SeqSetParticipantNote {
         participant_id: String,
         note: Option<String>,
+    },
+    SeqSetParticipantSymbol {
+        participant_id: String,
+        symbol: Option<McpSymbolAnchor>,
     },
     SeqRemoveParticipant {
         participant_id: String,
@@ -810,6 +833,10 @@ pub enum McpOp {
     FlowSetNodeNote {
         node_id: String,
         note: Option<String>,
+    },
+    FlowSetNodeSymbol {
+        node_id: String,
+        symbol: Option<McpSymbolAnchor>,
     },
     FlowRemoveNode {
         node_id: String,

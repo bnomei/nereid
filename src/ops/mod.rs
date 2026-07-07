@@ -20,7 +20,7 @@ use crate::model::{
     CategoryPath, Diagram, DiagramAst, DiagramId, DiagramKind, FlowEdge, FlowNode, FlowchartAst,
 };
 use crate::model::{ObjectId, ObjectRef, SequenceAst, SequenceMessage, SequenceMessageKind};
-use crate::model::{SequenceParticipant, XRefId};
+use crate::model::{SequenceParticipant, SymbolAnchor, SymbolAnchorError, XRefId};
 
 /// Single diagram mutation tagged by AST kind (sequence, flowchart, or xref).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,6 +43,10 @@ pub enum SeqOp {
     SetParticipantNote {
         participant_id: ObjectId,
         note: Option<String>,
+    },
+    SetParticipantSymbol {
+        participant_id: ObjectId,
+        symbol: Option<SymbolAnchor>,
     },
     RemoveParticipant {
         participant_id: ObjectId,
@@ -98,6 +102,10 @@ pub enum FlowOp {
     SetNodeNote {
         node_id: ObjectId,
         note: Option<String>,
+    },
+    SetNodeSymbol {
+        node_id: ObjectId,
+        symbol: Option<SymbolAnchor>,
     },
     RemoveNode {
         node_id: ObjectId,
@@ -291,6 +299,7 @@ pub enum ApplyError {
     DuplicateSeqParticipantMermaidName { mermaid_name: String, participant_id: ObjectId },
     InvalidFlowNodeMermaidId { mermaid_id: String, reason: MermaidIdentError },
     DuplicateFlowNodeMermaidId { mermaid_id: String, node_id: ObjectId },
+    InvalidSymbolAnchor { source: SymbolAnchorError },
 }
 
 impl fmt::Display for ApplyError {
@@ -325,6 +334,7 @@ impl fmt::Display for ApplyError {
             Self::DuplicateFlowNodeMermaidId { mermaid_id, node_id } => {
                 write!(f, "flow node Mermaid id '{mermaid_id}' is already used by node {node_id}")
             }
+            Self::InvalidSymbolAnchor { source } => write!(f, "{source}"),
         }
     }
 }

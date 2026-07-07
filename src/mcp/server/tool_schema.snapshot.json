@@ -292,6 +292,32 @@
                 "participant_id": {
                   "type": "string"
                 },
+                "symbol": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/McpSymbolAnchor"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": {
+                  "const": "seq_set_participant_symbol",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "participant_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "participant_id": {
+                  "type": "string"
+                },
                 "type": {
                   "const": "seq_remove_participant",
                   "type": "string"
@@ -522,6 +548,32 @@
                 "node_id": {
                   "type": "string"
                 },
+                "symbol": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/McpSymbolAnchor"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": {
+                  "const": "flow_set_node_symbol",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "node_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "node_id": {
+                  "type": "string"
+                },
                 "type": {
                   "const": "flow_remove_node",
                   "type": "string"
@@ -638,6 +690,23 @@
               "type": "object"
             }
           ]
+        },
+        "McpSymbolAnchor": {
+          "properties": {
+            "repository_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "stable_symbol_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "stable_symbol_id"
+          ],
+          "type": "object"
         },
         "MessageKind": {
           "enum": [
@@ -1147,6 +1216,16 @@
             },
             "shape": {
               "type": "string"
+            },
+            "symbol": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/McpSymbolAnchor"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [
@@ -1257,6 +1336,16 @@
                 "string",
                 "null"
               ]
+            },
+            "symbol": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/McpSymbolAnchor"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [
@@ -1301,6 +1390,23 @@
           ],
           "type": "string"
         },
+        "McpSymbolAnchor": {
+          "properties": {
+            "repository_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "stable_symbol_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "stable_symbol_id"
+          ],
+          "type": "object"
+        },
         "MessageKind": {
           "enum": [
             "sync",
@@ -1314,6 +1420,12 @@
       "properties": {
         "ast": {
           "$ref": "#/$defs/McpDiagramAst"
+        },
+        "default_symbol_repository_id": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "diagram_id": {
           "type": "string"
@@ -1640,6 +1752,32 @@
                 "participant_id": {
                   "type": "string"
                 },
+                "symbol": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/McpSymbolAnchor"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": {
+                  "const": "seq_set_participant_symbol",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "participant_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "participant_id": {
+                  "type": "string"
+                },
                 "type": {
                   "const": "seq_remove_participant",
                   "type": "string"
@@ -1870,6 +2008,32 @@
                 "node_id": {
                   "type": "string"
                 },
+                "symbol": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/McpSymbolAnchor"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": {
+                  "const": "flow_set_node_symbol",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "node_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "node_id": {
+                  "type": "string"
+                },
                 "type": {
                   "const": "flow_remove_node",
                   "type": "string"
@@ -1986,6 +2150,23 @@
               "type": "object"
             }
           ]
+        },
+        "McpSymbolAnchor": {
+          "properties": {
+            "repository_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "stable_symbol_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "stable_symbol_id"
+          ],
+          "type": "object"
         },
         "MessageKind": {
           "enum": [
@@ -2803,10 +2984,26 @@
                 "mermaid_name": {
                   "type": "string"
                 },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "role": {
                   "type": [
                     "string",
                     "null"
+                  ]
+                },
+                "symbol": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/McpSymbolAnchor"
+                    },
+                    {
+                      "type": "null"
+                    }
                   ]
                 },
                 "type": {
@@ -2935,8 +3132,24 @@
                     "null"
                   ]
                 },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "shape": {
                   "type": "string"
+                },
+                "symbol": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/McpSymbolAnchor"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
                 "type": {
                   "const": "flow_node",
@@ -3006,6 +3219,23 @@
             "and"
           ],
           "type": "string"
+        },
+        "McpSymbolAnchor": {
+          "properties": {
+            "repository_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "stable_symbol_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "stable_symbol_id"
+          ],
+          "type": "object"
         },
         "MessageKind": {
           "enum": [

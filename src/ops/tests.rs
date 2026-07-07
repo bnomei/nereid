@@ -9,7 +9,7 @@
 //! Op application regression tests: revision conflicts, kind mismatches, and deltas.
 
 use crate::model::{
-    DiagramAst, DiagramId, FlowchartAst, ObjectId, SequenceAst, SequenceParticipant,
+    DiagramAst, DiagramId, FlowchartAst, ObjectId, SequenceAst, SequenceParticipant, SymbolAnchor,
 };
 
 use super::{
@@ -228,6 +228,55 @@ fn apply_seq_set_participant_note_sets_note_and_records_delta_updated() {
     };
     let participant = ast.participants().get(&participant_id).expect("participant exists");
     assert_eq!(participant.note(), Some("invariant"));
+}
+
+#[test]
+fn apply_seq_set_participant_symbol_sets_symbol_and_records_delta_updated() {
+    let diagram_id = DiagramId::new("d:seq-symbol").expect("diagram id");
+    let mut diagram = crate::model::Diagram::new(
+        diagram_id,
+        "seq",
+        DiagramAst::Sequence(crate::model::SequenceAst::default()),
+    );
+
+    let participant_id = ObjectId::new("p:alice").expect("participant id");
+    apply_ops(
+        &mut diagram,
+        0,
+        &[Op::Seq(SeqOp::AddParticipant {
+            participant_id: participant_id.clone(),
+            mermaid_name: "Alice".to_owned(),
+        })],
+    )
+    .expect("setup apply");
+
+    let symbol = SymbolAnchor::new("sym-16c57df0026ced40", None).expect("symbol");
+    let result = apply_ops(
+        &mut diagram,
+        1,
+        &[Op::Seq(SeqOp::SetParticipantSymbol {
+            participant_id: participant_id.clone(),
+            symbol: Some(symbol),
+        })],
+    )
+    .expect("apply");
+
+    let expected = crate::model::ObjectRef::new(
+        diagram.diagram_id().clone(),
+        crate::model::CategoryPath::new(vec!["seq".to_owned(), "participant".to_owned()])
+            .expect("category"),
+        participant_id.clone(),
+    );
+    assert_eq!(result.delta.updated, vec![expected]);
+
+    let DiagramAst::Sequence(ast) = diagram.ast() else {
+        panic!("expected sequence ast");
+    };
+    let participant = ast.participants().get(&participant_id).expect("participant exists");
+    assert_eq!(
+        participant.symbol().map(|symbol| symbol.stable_symbol_id()),
+        Some("sym-16c57df0026ced40")
+    );
 }
 
 #[test]
@@ -848,6 +897,61 @@ fn apply_flow_set_node_note_clears_note_and_records_delta_updated() {
     };
     let node = ast.nodes().get(&node_id).expect("node exists");
     assert_eq!(node.note(), None);
+}
+
+#[test]
+fn apply_flow_set_node_symbol_clears_symbol_and_records_delta_updated() {
+    let diagram_id = DiagramId::new("d:flow-symbol").expect("diagram id");
+    let mut diagram = crate::model::Diagram::new(
+        diagram_id,
+        "flow",
+        DiagramAst::Flowchart(FlowchartAst::default()),
+    );
+
+    let node_id = ObjectId::new("n:1").expect("node id");
+    apply_ops(
+        &mut diagram,
+        0,
+        &[Op::Flow(FlowOp::AddNode {
+            node_id: node_id.clone(),
+            label: "Start".to_owned(),
+            shape: None,
+        })],
+    )
+    .expect("setup apply");
+
+    apply_ops(
+        &mut diagram,
+        1,
+        &[Op::Flow(FlowOp::SetNodeSymbol {
+            node_id: node_id.clone(),
+            symbol: Some(
+                SymbolAnchor::new("sym-468b7c6", Some("repo".to_owned())).expect("symbol"),
+            ),
+        })],
+    )
+    .expect("apply set");
+
+    let result = apply_ops(
+        &mut diagram,
+        2,
+        &[Op::Flow(FlowOp::SetNodeSymbol { node_id: node_id.clone(), symbol: None })],
+    )
+    .expect("apply clear");
+
+    let expected = crate::model::ObjectRef::new(
+        diagram.diagram_id().clone(),
+        crate::model::CategoryPath::new(vec!["flow".to_owned(), "node".to_owned()])
+            .expect("category"),
+        node_id.clone(),
+    );
+    assert_eq!(result.delta.updated, vec![expected]);
+
+    let DiagramAst::Flowchart(ast) = diagram.ast() else {
+        panic!("expected flowchart ast");
+    };
+    let node = ast.nodes().get(&node_id).expect("node exists");
+    assert!(node.symbol().is_none());
 }
 
 #[test]

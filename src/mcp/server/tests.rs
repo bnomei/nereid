@@ -1721,9 +1721,11 @@ async fn object_read_returns_seq_participant() {
     assert_eq!(result.objects.len(), 1);
     assert_eq!(result.objects[0].object_ref, "d:d-seq/seq/participant/p:a");
     match &result.objects[0].object {
-        McpObject::SeqParticipant { mermaid_name, role } => {
+        McpObject::SeqParticipant { mermaid_name, role, note, symbol } => {
             assert_eq!(mermaid_name, "A");
             assert_eq!(role.as_deref(), None);
+            assert_eq!(note.as_deref(), None);
+            assert!(symbol.is_none());
         }
         _ => panic!("unexpected object kind"),
     }
@@ -2578,10 +2580,12 @@ async fn object_read_returns_flow_node() {
     assert_eq!(result.context.ui_rev, None);
     assert_eq!(result.context.ui_session_rev, None);
     match &result.objects[0].object {
-        McpObject::FlowNode { label, shape, mermaid_id } => {
+        McpObject::FlowNode { label, shape, mermaid_id, note, symbol } => {
             assert_eq!(label, "A");
             assert_eq!(shape, "rect");
             assert_eq!(mermaid_id.as_deref(), None);
+            assert_eq!(note.as_deref(), None);
+            assert!(symbol.is_none());
         }
         _ => panic!("unexpected object kind"),
     }
@@ -3580,6 +3584,70 @@ async fn apply_ops_supports_setting_and_clearing_sequence_participant_note() {
 }
 
 #[tokio::test]
+async fn apply_ops_supports_setting_and_clearing_sequence_participant_symbol() {
+    let server = NereidMcp::new(demo_session());
+
+    let Json(result) = server
+        .diagram_apply_ops(Parameters(ApplyOpsParams {
+            diagram_id: None,
+            base_rev: 0,
+            ops: vec![McpOp::SeqSetParticipantSymbol {
+                participant_id: "p:a".into(),
+                symbol: Some(McpSymbolAnchor {
+                    stable_symbol_id: "sym-16c57df0026ced40".into(),
+                    repository_id: None,
+                }),
+            }],
+        }))
+        .await
+        .expect("apply");
+
+    assert_eq!(result.new_rev, 1);
+    assert_eq!(result.delta.updated, vec!["d:d-seq/seq/participant/p:a".to_owned()]);
+
+    let Json(ast) = server
+        .diagram_get_ast(Parameters(DiagramTargetParams { diagram_id: None }))
+        .await
+        .expect("ast");
+    let McpDiagramAst::Sequence { participants, .. } = ast.ast else {
+        panic!("expected sequence ast");
+    };
+    assert_eq!(participants[0].participant_id, "p:a");
+    assert_eq!(
+        participants[0].symbol.as_ref().map(|symbol| symbol.stable_symbol_id.as_str()),
+        Some("sym-16c57df0026ced40")
+    );
+    assert_eq!(
+        participants[0].symbol.as_ref().and_then(|symbol| symbol.repository_id.as_deref()),
+        None
+    );
+
+    let Json(result) = server
+        .diagram_apply_ops(Parameters(ApplyOpsParams {
+            diagram_id: None,
+            base_rev: 1,
+            ops: vec![McpOp::SeqSetParticipantSymbol {
+                participant_id: "p:a".into(),
+                symbol: None,
+            }],
+        }))
+        .await
+        .expect("apply clear");
+
+    assert_eq!(result.new_rev, 2);
+    assert_eq!(result.delta.updated, vec!["d:d-seq/seq/participant/p:a".to_owned()]);
+
+    let Json(ast) = server
+        .diagram_get_ast(Parameters(DiagramTargetParams { diagram_id: None }))
+        .await
+        .expect("ast");
+    let McpDiagramAst::Sequence { participants, .. } = ast.ast else {
+        panic!("expected sequence ast");
+    };
+    assert!(participants[0].symbol.is_none());
+}
+
+#[tokio::test]
 async fn apply_ops_supports_setting_flow_node_note() {
     let server = NereidMcp::new(demo_session());
 
@@ -3609,6 +3677,68 @@ async fn apply_ops_supports_setting_flow_node_note() {
     };
     assert_eq!(nodes[0].node_id, "n:a");
     assert_eq!(nodes[0].note.as_deref(), Some("invariant"));
+}
+
+#[tokio::test]
+async fn apply_ops_supports_setting_flow_node_symbol() {
+    let server = NereidMcp::new(demo_session());
+
+    let Json(result) = server
+        .diagram_apply_ops(Parameters(ApplyOpsParams {
+            diagram_id: Some("d-flow".into()),
+            base_rev: 0,
+            ops: vec![McpOp::FlowSetNodeSymbol {
+                node_id: "n:a".into(),
+                symbol: Some(McpSymbolAnchor {
+                    stable_symbol_id: "sym-468b7c6".into(),
+                    repository_id: Some("rust-neo4j-ask-57bbe2dfb196".into()),
+                }),
+            }],
+        }))
+        .await
+        .expect("apply");
+
+    assert_eq!(result.new_rev, 1);
+    assert_eq!(result.delta.updated, vec!["d:d-flow/flow/node/n:a".to_owned()]);
+
+    let Json(object) = server
+        .object_read(Parameters(ObjectGetParams {
+            object_ref: Some("d:d-flow/flow/node/n:a".into()),
+            object_refs: None,
+        }))
+        .await
+        .expect("object read");
+    let McpObject::FlowNode { symbol, .. } = &object.objects[0].object else {
+        panic!("expected flow node");
+    };
+    let symbol = symbol.as_ref().expect("symbol");
+    assert_eq!(symbol.stable_symbol_id, "sym-468b7c6");
+    assert_eq!(symbol.repository_id.as_deref(), Some("rust-neo4j-ask-57bbe2dfb196"));
+}
+
+#[tokio::test]
+async fn apply_ops_rejects_invalid_symbol_id() {
+    let server = NereidMcp::new(demo_session());
+
+    let err = match server
+        .diagram_apply_ops(Parameters(ApplyOpsParams {
+            diagram_id: None,
+            base_rev: 0,
+            ops: vec![McpOp::SeqSetParticipantSymbol {
+                participant_id: "p:a".into(),
+                symbol: Some(McpSymbolAnchor {
+                    stable_symbol_id: "sym-XYZ".into(),
+                    repository_id: None,
+                }),
+            }],
+        }))
+        .await
+    {
+        Ok(_) => panic!("expected invalid symbol id"),
+        Err(err) => err,
+    };
+
+    assert!(err.message.contains("invalid stable_symbol_id"));
 }
 
 #[tokio::test]

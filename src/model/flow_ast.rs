@@ -11,6 +11,7 @@
 use std::collections::BTreeMap;
 
 use super::ids::ObjectId;
+use super::symbol::SymbolAnchor;
 
 /// Mutable flowchart diagram content keyed by stable object IDs.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -75,11 +76,18 @@ pub struct FlowNode {
     label: String,
     shape: String,
     note: Option<String>,
+    symbol: Option<SymbolAnchor>,
 }
 
 impl FlowNode {
     pub fn new(label: impl Into<String>) -> Self {
-        Self { mermaid_id: None, label: label.into(), shape: "rect".to_owned(), note: None }
+        Self {
+            mermaid_id: None,
+            label: label.into(),
+            shape: "rect".to_owned(),
+            note: None,
+            symbol: None,
+        }
     }
 
     pub fn new_with(
@@ -87,7 +95,7 @@ impl FlowNode {
         shape: impl Into<String>,
         mermaid_id: Option<String>,
     ) -> Self {
-        Self { mermaid_id, label: label.into(), shape: shape.into(), note: None }
+        Self { mermaid_id, label: label.into(), shape: shape.into(), note: None, symbol: None }
     }
 
     pub fn set_mermaid_id<T: Into<String>>(&mut self, mermaid_id: Option<T>) {
@@ -106,6 +114,10 @@ impl FlowNode {
         self.note = note.map(Into::into);
     }
 
+    pub fn set_symbol(&mut self, symbol: Option<SymbolAnchor>) {
+        self.symbol = symbol;
+    }
+
     pub fn mermaid_id(&self) -> Option<&str> {
         self.mermaid_id.as_deref()
     }
@@ -120,6 +132,10 @@ impl FlowNode {
 
     pub fn note(&self) -> Option<&str> {
         self.note.as_deref()
+    }
+
+    pub fn symbol(&self) -> Option<&SymbolAnchor> {
+        self.symbol.as_ref()
     }
 }
 

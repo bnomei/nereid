@@ -411,6 +411,9 @@ impl NereidMcp {
             diagram_id: diagram_id.as_str().to_owned(),
             kind: diagram_kind_label(diagram.kind()).to_owned(),
             rev: diagram.rev(),
+            default_symbol_repository_id: diagram
+                .default_symbol_repository_id()
+                .map(ToOwned::to_owned),
             ast: mcp_ast_for_diagram(diagram),
         }))
     }

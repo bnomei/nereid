@@ -72,12 +72,20 @@ pub struct Diagram {
     kind: DiagramKind,
     ast: DiagramAst,
     rev: u64,
+    default_symbol_repository_id: Option<String>,
 }
 
 impl Diagram {
     pub fn new(diagram_id: DiagramId, name: impl Into<String>, ast: DiagramAst) -> Self {
         let kind = ast.kind();
-        Self { diagram_id, name: name.into(), kind, ast, rev: 0 }
+        Self {
+            diagram_id,
+            name: name.into(),
+            kind,
+            ast,
+            rev: 0,
+            default_symbol_repository_id: None,
+        }
     }
 
     pub fn diagram_id(&self) -> &DiagramId {
@@ -115,6 +123,14 @@ impl Diagram {
 
     pub fn set_rev(&mut self, rev: u64) {
         self.rev = rev;
+    }
+
+    pub fn default_symbol_repository_id(&self) -> Option<&str> {
+        self.default_symbol_repository_id.as_deref()
+    }
+
+    pub fn set_default_symbol_repository_id<T: Into<String>>(&mut self, repository_id: Option<T>) {
+        self.default_symbol_repository_id = repository_id.map(Into::into);
     }
 
     pub fn bump_rev(&mut self) {

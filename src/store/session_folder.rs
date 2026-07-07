@@ -33,8 +33,8 @@ use crate::layout::{layout_flowchart, layout_sequence, FlowchartLayoutError, Seq
 use crate::model::{
     Diagram, DiagramAst, DiagramId, DiagramKind, FlowEdge, FlowNode, FlowchartAst, IdError,
     ObjectId, ObjectRef, ParseObjectRefError, SequenceAst, SequenceMessage, SequenceMessageKind,
-    Session, SessionId, Walkthrough, WalkthroughEdge, WalkthroughId, WalkthroughNode,
-    WalkthroughNodeId, XRef, XRefId, XRefStatus as ModelXRefStatus,
+    Session, SessionId, SymbolAnchor, SymbolAnchorError, Walkthrough, WalkthroughEdge,
+    WalkthroughId, WalkthroughNode, WalkthroughNodeId, XRef, XRefId, XRefStatus as ModelXRefStatus,
 };
 use crate::render::{
     render_flowchart_unicode, render_sequence_unicode, render_walkthrough_unicode,
@@ -292,6 +292,11 @@ pub enum StoreError {
         value: String,
         source: Box<ParseObjectRefError>,
     },
+    InvalidSymbolAnchor {
+        field: &'static str,
+        value: String,
+        source: Box<SymbolAnchorError>,
+    },
     InvalidRelativePath {
         field: &'static str,
         value: PathBuf,
@@ -399,6 +404,11 @@ impl fmt::Display for StoreError {
                 value,
                 source,
             } => write!(f, "invalid object ref for {field}: {value:?}: {source}"),
+            Self::InvalidSymbolAnchor {
+                field,
+                value,
+                source,
+            } => write!(f, "invalid symbol anchor for {field}: {value:?}: {source}"),
             Self::InvalidRelativePath { field, value } => {
                 write!(f, "invalid relative path for {field}: {value:?}")
             }
@@ -437,6 +447,7 @@ impl std::error::Error for StoreError {
             Self::WalkthroughRender { source, .. } => Some(source),
             Self::InvalidId { source, .. } => Some(source),
             Self::InvalidObjectRef { source, .. } => Some(source),
+            Self::InvalidSymbolAnchor { source, .. } => Some(source),
             Self::InvalidRelativePath { .. } => None,
             Self::PathOutsideSession { .. } => None,
             Self::SymlinkRefused { .. } => None,
@@ -484,8 +495,11 @@ pub struct DiagramMeta {
     pub xrefs: Vec<DiagramXRef>,
     pub flow_edges: Vec<DiagramFlowEdgeMeta>,
     pub sequence_messages: Vec<DiagramSequenceMessageMeta>,
+    pub default_symbol_repository_id: Option<String>,
     pub flow_node_notes: BTreeMap<ObjectId, String>,
     pub sequence_participant_notes: BTreeMap<ObjectId, String>,
+    pub flow_node_symbols: BTreeMap<ObjectId, SymbolAnchor>,
+    pub sequence_participant_symbols: BTreeMap<ObjectId, SymbolAnchor>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -1168,6 +1182,30 @@ impl SessionFolder {
                     DiagramAst::Flowchart(_) => BTreeMap::new(),
                 };
 
+                let flow_node_symbols = match diagram.ast() {
+                    DiagramAst::Flowchart(ast) => ast
+                        .nodes()
+                        .iter()
+                        .filter_map(|(node_id, node)| {
+                            node.symbol().map(|symbol| (node_id.clone(), symbol.clone()))
+                        })
+                        .collect(),
+                    DiagramAst::Sequence(_) => BTreeMap::new(),
+                };
+
+                let sequence_participant_symbols = match diagram.ast() {
+                    DiagramAst::Sequence(ast) => ast
+                        .participants()
+                        .iter()
+                        .filter_map(|(participant_id, participant)| {
+                            participant
+                                .symbol()
+                                .map(|symbol| (participant_id.clone(), symbol.clone()))
+                        })
+                        .collect(),
+                    DiagramAst::Flowchart(_) => BTreeMap::new(),
+                };
+
                 let diagram_meta = DiagramMeta {
                     diagram_id: diagram_id.clone(),
                     mmd_path: mmd_path.clone(),
@@ -1175,8 +1213,13 @@ impl SessionFolder {
                     xrefs: Vec::new(),
                     flow_edges,
                     sequence_messages,
+                    default_symbol_repository_id: diagram
+                        .default_symbol_repository_id()
+                        .map(ToOwned::to_owned),
                     flow_node_notes,
                     sequence_participant_notes,
+                    flow_node_symbols,
+                    sequence_participant_symbols,
                 };
 
                 match self.save_diagram_artifacts(diagram, &mmd_path, &meta_path, &diagram_meta) {
@@ -1418,17 +1461,23 @@ impl SessionFolder {
                         reconcile_flowchart_nodes(flow_ast, sidecar);
                         reconcile_flowchart_edges(flow_ast, sidecar);
                         reconcile_flowchart_notes(flow_ast, sidecar);
+                        reconcile_flowchart_symbols(flow_ast, sidecar);
                     }
                     DiagramAst::Sequence(seq_ast) => {
                         reconcile_sequence_participants(seq_ast, sidecar);
                         reconcile_sequence_messages(seq_ast, sidecar);
                         reconcile_sequence_participant_notes(seq_ast, sidecar);
+                        reconcile_sequence_participant_symbols(seq_ast, sidecar);
                     }
                 }
             }
 
             let mut diagram = Diagram::new(diagram_id.clone(), diagram_meta.name, ast);
             diagram.set_rev(diagram_meta.rev);
+            if let Some(sidecar) = sidecar.as_ref() {
+                diagram
+                    .set_default_symbol_repository_id(sidecar.default_symbol_repository_id.clone());
+            }
             session.diagrams_mut().insert(diagram_id, diagram);
         }
 

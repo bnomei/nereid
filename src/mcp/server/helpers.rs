@@ -126,6 +126,7 @@ fn mcp_ast_for_diagram(diagram: &Diagram) -> McpDiagramAst {
                     mermaid_name: participant.mermaid_name().to_owned(),
                     role: participant.role().map(ToOwned::to_owned),
                     note: participant.note().map(ToOwned::to_owned),
+                    symbol: participant.symbol().map(mcp_symbol_anchor),
                 })
                 .collect::<Vec<_>>();
             participants.sort_by(|a, b| a.participant_id.cmp(&b.participant_id));
@@ -172,6 +173,7 @@ fn mcp_ast_for_diagram(diagram: &Diagram) -> McpDiagramAst {
                     shape: node.shape().to_owned(),
                     mermaid_id: node.mermaid_id().map(ToOwned::to_owned),
                     note: node.note().map(ToOwned::to_owned),
+                    symbol: node.symbol().map(mcp_symbol_anchor),
                 })
                 .collect::<Vec<_>>();
             nodes.sort_by(|a, b| a.node_id.cmp(&b.node_id));
@@ -193,6 +195,27 @@ fn mcp_ast_for_diagram(diagram: &Diagram) -> McpDiagramAst {
             McpDiagramAst::Flowchart { nodes, edges }
         }
     }
+}
+
+fn mcp_symbol_anchor(symbol: &SymbolAnchor) -> McpSymbolAnchor {
+    McpSymbolAnchor {
+        stable_symbol_id: symbol.stable_symbol_id().to_owned(),
+        repository_id: symbol.repository_id().map(ToOwned::to_owned),
+    }
+}
+
+fn internal_symbol_anchor(symbol: &McpSymbolAnchor) -> Result<SymbolAnchor, ErrorData> {
+    SymbolAnchor::new(symbol.stable_symbol_id.clone(), symbol.repository_id.clone()).map_err(
+        |err| {
+            ErrorData::invalid_params(
+                "invalid stable_symbol_id",
+                Some(serde_json::json!({
+                    "stable_symbol_id": symbol.stable_symbol_id,
+                    "reason": err.to_string(),
+                })),
+            )
+        },
+    )
 }
 
 fn map_seq_block_kind_to_mcp(kind: crate::model::seq_ast::SequenceBlockKind) -> McpSeqBlockKind {
@@ -959,6 +982,10 @@ fn map_apply_error(err: ApplyError) -> ErrorData {
             "flow node Mermaid id already in use",
             Some(serde_json::json!({ "mermaid_id": mermaid_id, "node_id": node_id.to_string() })),
         ),
+        ApplyError::InvalidSymbolAnchor { source } => ErrorData::invalid_params(
+            "invalid symbol anchor",
+            Some(serde_json::json!({ "reason": source.to_string() })),
+        ),
     }
 }
 
@@ -1100,6 +1127,13 @@ fn mcp_op_to_internal(op: &McpOp) -> Result<Op, ErrorData> {
             participant_id: parse_object_id(participant_id)?,
             note: note.clone(),
         }),
+        McpOp::SeqSetParticipantSymbol {
+            participant_id,
+            symbol,
+        } => Op::Seq(SeqOp::SetParticipantSymbol {
+            participant_id: parse_object_id(participant_id)?,
+            symbol: symbol.as_ref().map(internal_symbol_anchor).transpose()?,
+        }),
         McpOp::SeqRemoveParticipant { participant_id } => Op::Seq(SeqOp::RemoveParticipant {
             participant_id: parse_object_id(participant_id)?,
         }),
@@ -1178,6 +1212,10 @@ fn mcp_op_to_internal(op: &McpOp) -> Result<Op, ErrorData> {
         McpOp::FlowSetNodeNote { node_id, note } => Op::Flow(FlowOp::SetNodeNote {
             node_id: parse_object_id(node_id)?,
             note: note.clone(),
+        }),
+        McpOp::FlowSetNodeSymbol { node_id, symbol } => Op::Flow(FlowOp::SetNodeSymbol {
+            node_id: parse_object_id(node_id)?,
+            symbol: symbol.as_ref().map(internal_symbol_anchor).transpose()?,
         }),
         McpOp::FlowRemoveNode { node_id } => Op::Flow(FlowOp::RemoveNode {
             node_id: parse_object_id(node_id)?,

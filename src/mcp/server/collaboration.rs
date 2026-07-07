@@ -300,6 +300,8 @@ impl NereidMcp {
                     McpObject::SeqParticipant {
                         mermaid_name: participant.mermaid_name().to_owned(),
                         role: participant.role().map(|r| r.to_owned()),
+                        note: participant.note().map(ToOwned::to_owned),
+                        symbol: participant.symbol().map(mcp_symbol_anchor),
                     }
                 }
                 ([left, right], DiagramAst::Sequence(ast)) if left == "seq" && right == "block" => {
@@ -381,6 +383,8 @@ impl NereidMcp {
                         label: node.label().to_owned(),
                         shape: node.shape().to_owned(),
                         mermaid_id: node.mermaid_id().map(|s| s.to_owned()),
+                        note: node.note().map(ToOwned::to_owned),
+                        symbol: node.symbol().map(mcp_symbol_anchor),
                     }
                 }
                 ([left, right], DiagramAst::Flowchart(ast))

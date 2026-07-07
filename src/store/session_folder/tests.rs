@@ -24,7 +24,7 @@ use crate::layout::{layout_flowchart, layout_sequence};
 use crate::model::{
     CategoryPath, Diagram, DiagramAst, DiagramId, DiagramKind, FlowEdge, FlowNode, FlowchartAst,
     ObjectId, ObjectRef, SequenceAst, SequenceMessage, SequenceMessageKind, SequenceParticipant,
-    Session, SessionId, Walkthrough, WalkthroughEdge, WalkthroughId, WalkthroughNode,
+    Session, SessionId, SymbolAnchor, Walkthrough, WalkthroughEdge, WalkthroughId, WalkthroughNode,
     WalkthroughNodeId, XRef, XRefId, XRefStatus as ModelXRefStatus,
 };
 use crate::render::{
@@ -433,8 +433,11 @@ fn save_diagram_meta_stores_relative_paths_and_load_resolves_them(ctx: SessionFo
         }],
         flow_edges: Vec::new(),
         sequence_messages: Vec::new(),
+        default_symbol_repository_id: None,
         flow_node_notes: Default::default(),
         sequence_participant_notes: Default::default(),
+        flow_node_symbols: Default::default(),
+        sequence_participant_symbols: Default::default(),
     };
 
     folder.save_diagram_meta(&meta).unwrap();
@@ -463,8 +466,11 @@ fn save_diagram_meta_rejects_paths_outside_session(ctx: SessionFolderTestCtx) {
         xrefs: Vec::new(),
         flow_edges: Vec::new(),
         sequence_messages: Vec::new(),
+        default_symbol_repository_id: None,
         flow_node_notes: Default::default(),
         sequence_participant_notes: Default::default(),
+        flow_node_symbols: Default::default(),
+        sequence_participant_symbols: Default::default(),
     };
 
     let err = folder.save_diagram_meta(&meta).unwrap_err();
@@ -579,6 +585,60 @@ fn save_session_exports_canonical_mmd_and_text_unicode(ctx: SessionFolderTestCtx
     let flow_text_path = session_dir.join("diagrams/d2.ascii.txt");
     assert_eq!(std::fs::read_to_string(&flow_mmd_path).unwrap(), flow_expected_mmd);
     assert_eq!(std::fs::read_to_string(&flow_text_path).unwrap(), flow_expected_text);
+}
+
+#[rstest]
+fn save_and_load_session_round_trips_symbol_anchors_without_changing_mmd(
+    ctx: SessionFolderTestCtx,
+) {
+    let session_dir = &ctx.session_dir;
+    let folder = &ctx.folder;
+
+    let mut session = Session::new(SessionId::new("s:symbols").unwrap());
+    let diagram_id = DiagramId::new("read-search-hybrid-flow").unwrap();
+    let participant_id = ObjectId::new("p:CLI").unwrap();
+    let mut ast = SequenceAst::default();
+    let mut participant = SequenceParticipant::new("CLI");
+    participant.set_note(Some("Entry point"));
+    participant.set_symbol(Some(SymbolAnchor::new("sym-16c57df0026ced40", None).expect("symbol")));
+    ast.participants_mut().insert(participant_id.clone(), participant);
+
+    let expected_mmd = export_sequence_diagram(&ast).unwrap();
+    let mut diagram =
+        Diagram::new(diagram_id.clone(), "ASK Read Search", DiagramAst::Sequence(ast));
+    diagram.set_default_symbol_repository_id(Some("rust-neo4j-ask-57bbe2dfb196"));
+    session.diagrams_mut().insert(diagram_id.clone(), diagram);
+    session.set_active_diagram_id(Some(diagram_id.clone()));
+
+    folder.save_session(&session).unwrap();
+
+    let mmd_path = session_dir.join("diagrams/read-search-hybrid-flow.mmd");
+    assert_eq!(std::fs::read_to_string(&mmd_path).unwrap(), expected_mmd);
+
+    let sidecar_path = session_dir.join("diagrams/read-search-hybrid-flow.meta.json");
+    let sidecar: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&sidecar_path).unwrap()).unwrap();
+    assert_eq!(
+        sidecar["default_symbol_repository_id"].as_str(),
+        Some("rust-neo4j-ask-57bbe2dfb196")
+    );
+    assert_eq!(
+        sidecar["sequence_participant_symbols"]["p:CLI"]["stable_symbol_id"].as_str(),
+        Some("sym-16c57df0026ced40")
+    );
+    assert!(sidecar["sequence_participant_symbols"]["p:CLI"].get("repository_id").is_none());
+
+    let loaded = folder.load_session().unwrap();
+    let loaded_diagram = loaded.diagrams().get(&diagram_id).expect("diagram");
+    assert_eq!(loaded_diagram.default_symbol_repository_id(), Some("rust-neo4j-ask-57bbe2dfb196"));
+    let DiagramAst::Sequence(loaded_ast) = loaded_diagram.ast() else {
+        panic!("expected sequence");
+    };
+    let loaded_participant = loaded_ast.participants().get(&participant_id).expect("participant");
+    assert_eq!(
+        loaded_participant.symbol().map(|symbol| symbol.stable_symbol_id()),
+        Some("sym-16c57df0026ced40")
+    );
 }
 
 #[cfg(unix)]

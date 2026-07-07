@@ -12,6 +12,7 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
 use super::ids::ObjectId;
+use super::symbol::SymbolAnchor;
 
 /// Mutable sequence-diagram content: participants, ordered messages, notes, and blocks.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -106,11 +107,12 @@ pub struct SequenceParticipant {
     mermaid_name: String,
     role: Option<String>,
     note: Option<String>,
+    symbol: Option<SymbolAnchor>,
 }
 
 impl SequenceParticipant {
     pub fn new(mermaid_name: impl Into<String>) -> Self {
-        Self { mermaid_name: mermaid_name.into(), role: None, note: None }
+        Self { mermaid_name: mermaid_name.into(), role: None, note: None, symbol: None }
     }
 
     pub fn set_mermaid_name(&mut self, mermaid_name: impl Into<String>) {
@@ -125,6 +127,10 @@ impl SequenceParticipant {
         self.note = note.map(Into::into);
     }
 
+    pub fn set_symbol(&mut self, symbol: Option<SymbolAnchor>) {
+        self.symbol = symbol;
+    }
+
     pub fn mermaid_name(&self) -> &str {
         &self.mermaid_name
     }
@@ -135,6 +141,10 @@ impl SequenceParticipant {
 
     pub fn note(&self) -> Option<&str> {
         self.note.as_deref()
+    }
+
+    pub fn symbol(&self) -> Option<&SymbolAnchor> {
+        self.symbol.as_ref()
     }
 }
 

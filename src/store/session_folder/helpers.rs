@@ -498,6 +498,18 @@ fn reconcile_flowchart_notes(ast: &mut FlowchartAst, sidecar: &DiagramMeta) {
     }
 }
 
+fn reconcile_flowchart_symbols(ast: &mut FlowchartAst, sidecar: &DiagramMeta) {
+    if sidecar.flow_node_symbols.is_empty() {
+        return;
+    }
+
+    for (node_id, symbol) in &sidecar.flow_node_symbols {
+        if let Some(node) = ast.nodes_mut().get_mut(node_id) {
+            node.set_symbol(Some(symbol.clone()));
+        }
+    }
+}
+
 fn reconcile_sequence_participant_notes(ast: &mut SequenceAst, sidecar: &DiagramMeta) {
     if sidecar.sequence_participant_notes.is_empty() {
         return;
@@ -506,6 +518,18 @@ fn reconcile_sequence_participant_notes(ast: &mut SequenceAst, sidecar: &Diagram
     for (participant_id, note) in &sidecar.sequence_participant_notes {
         if let Some(participant) = ast.participants_mut().get_mut(participant_id) {
             participant.set_note(Some(note.clone()));
+        }
+    }
+}
+
+fn reconcile_sequence_participant_symbols(ast: &mut SequenceAst, sidecar: &DiagramMeta) {
+    if sidecar.sequence_participant_symbols.is_empty() {
+        return;
+    }
+
+    for (participant_id, symbol) in &sidecar.sequence_participant_symbols {
+        if let Some(participant) = ast.participants_mut().get_mut(participant_id) {
+            participant.set_symbol(Some(symbol.clone()));
         }
     }
 }
@@ -902,6 +926,8 @@ fn session_meta_from_json(
 struct DiagramMetaJson {
     diagram_id: String,
     mmd_path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    default_symbol_repository_id: Option<String>,
     #[serde(default)]
     stable_id_map: DiagramStableIdMapJson,
     #[serde(default)]
@@ -914,6 +940,17 @@ struct DiagramMetaJson {
     flow_node_notes: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     sequence_participant_notes: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    flow_node_symbols: BTreeMap<String, DiagramSymbolAnchorJson>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    sequence_participant_symbols: BTreeMap<String, DiagramSymbolAnchorJson>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct DiagramSymbolAnchorJson {
+    stable_symbol_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    repository_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -1096,15 +1133,46 @@ fn diagram_meta_to_json(
         .map(|(participant_id, note)| (participant_id.to_string(), note.clone()))
         .collect();
 
+    let flow_node_symbols: BTreeMap<String, DiagramSymbolAnchorJson> = meta
+        .flow_node_symbols
+        .iter()
+        .map(|(node_id, symbol)| {
+            (
+                node_id.to_string(),
+                DiagramSymbolAnchorJson {
+                    stable_symbol_id: symbol.stable_symbol_id().to_owned(),
+                    repository_id: symbol.repository_id().map(ToOwned::to_owned),
+                },
+            )
+        })
+        .collect();
+
+    let sequence_participant_symbols: BTreeMap<String, DiagramSymbolAnchorJson> = meta
+        .sequence_participant_symbols
+        .iter()
+        .map(|(participant_id, symbol)| {
+            (
+                participant_id.to_string(),
+                DiagramSymbolAnchorJson {
+                    stable_symbol_id: symbol.stable_symbol_id().to_owned(),
+                    repository_id: symbol.repository_id().map(ToOwned::to_owned),
+                },
+            )
+        })
+        .collect();
+
     Ok(DiagramMetaJson {
         diagram_id: meta.diagram_id.to_string(),
         mmd_path: relative_mmd_path.to_string_lossy().into_owned(),
+        default_symbol_repository_id: meta.default_symbol_repository_id.clone(),
         stable_id_map,
         xrefs,
         flow_edges,
         sequence_messages,
         flow_node_notes,
         sequence_participant_notes,
+        flow_node_symbols,
+        sequence_participant_symbols,
     })
 }
 
@@ -1242,6 +1310,48 @@ fn diagram_meta_from_json(
         })
         .collect::<Result<BTreeMap<_, _>, StoreError>>()?;
 
+    let flow_node_symbols = meta_json
+        .flow_node_symbols
+        .into_iter()
+        .map(|(node_id, symbol)| {
+            let parsed_node_id =
+                ObjectId::new(node_id.clone()).map_err(|source| StoreError::InvalidId {
+                    field: "flow_node_symbols keys",
+                    value: node_id,
+                    source: Box::new(source),
+                })?;
+            let stable_symbol_id = symbol.stable_symbol_id;
+            let symbol = SymbolAnchor::new(stable_symbol_id.clone(), symbol.repository_id)
+                .map_err(|source| StoreError::InvalidSymbolAnchor {
+                    field: "flow_node_symbols values",
+                    value: stable_symbol_id,
+                    source: Box::new(source),
+                })?;
+            Ok((parsed_node_id, symbol))
+        })
+        .collect::<Result<BTreeMap<_, _>, StoreError>>()?;
+
+    let sequence_participant_symbols = meta_json
+        .sequence_participant_symbols
+        .into_iter()
+        .map(|(participant_id, symbol)| {
+            let parsed_participant_id =
+                ObjectId::new(participant_id.clone()).map_err(|source| StoreError::InvalidId {
+                    field: "sequence_participant_symbols keys",
+                    value: participant_id,
+                    source: Box::new(source),
+                })?;
+            let stable_symbol_id = symbol.stable_symbol_id;
+            let symbol = SymbolAnchor::new(stable_symbol_id.clone(), symbol.repository_id)
+                .map_err(|source| StoreError::InvalidSymbolAnchor {
+                    field: "sequence_participant_symbols values",
+                    value: stable_symbol_id,
+                    source: Box::new(source),
+                })?;
+            Ok((parsed_participant_id, symbol))
+        })
+        .collect::<Result<BTreeMap<_, _>, StoreError>>()?;
+
     Ok(DiagramMeta {
         diagram_id,
         mmd_path,
@@ -1249,8 +1359,11 @@ fn diagram_meta_from_json(
         xrefs,
         flow_edges,
         sequence_messages,
+        default_symbol_repository_id: meta_json.default_symbol_repository_id,
         flow_node_notes,
         sequence_participant_notes,
+        flow_node_symbols,
+        sequence_participant_symbols,
     })
 }
 

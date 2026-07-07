@@ -17,8 +17,9 @@ use rmcp::{tool_handler, ErrorData, ServerHandler, ServiceExt};
 use tokio::sync::Mutex;
 
 use crate::model::{
-    Diagram, DiagramAst, DiagramId, DiagramKind, ObjectId, ObjectRef, Session, Walkthrough,
-    WalkthroughEdge, WalkthroughId, WalkthroughNode, WalkthroughNodeId, XRefId, XRefStatus,
+    Diagram, DiagramAst, DiagramId, DiagramKind, ObjectId, ObjectRef, Session, SymbolAnchor,
+    Walkthrough, WalkthroughEdge, WalkthroughId, WalkthroughNode, WalkthroughNodeId, XRefId,
+    XRefStatus,
 };
 use crate::ops::{
     ApplyError, FlowEdgePatch, FlowNodePatch, FlowOp, Op, SeqMessagePatch, SeqOp,
