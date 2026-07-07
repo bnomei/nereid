@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-07-07
+- Renamed MCP tool names from dotted namespaces to underscore names for CallMcpTool bridge compatibility.
+- Regenerated the MCP tool schema snapshot and updated Nereid playbooks, skill docs, and README tool references.
+
 ## [0.5.0] - 2026-06-28
 - Hardened persisted session writes against concurrent updates, stale lock files, and failed meta commits.
 - Made MCP diagram and walkthrough updates more consistent when disk-backed sessions change concurrently.
