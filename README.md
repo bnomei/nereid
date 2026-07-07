@@ -181,6 +181,7 @@ Common keys:
 | `4` / `5` | Toggle Inspector / Notes. |
 | `Tab` / `Shift-Tab` | Focus next / previous panel. |
 | `[` / `]` | Open previous / next diagram. |
+| `:` | Open the diagram switcher. |
 | `/` / `\` | Regular / fuzzy search. |
 | `n` / `N` | Next / previous search result. |
 | Arrow keys or `h`/`j`/`k`/`l` | Pan or move within the focused panel. |
