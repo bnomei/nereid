@@ -29,3 +29,6 @@ specs/*
 
 # Generated flamegraphs + derived CSV/JSON summaries
 benchmarks/profiles/
+.frigg
+.devana
+.orchid
