@@ -469,6 +469,21 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) {
         }
         return;
     }
+    if app.diagram_prompt_mode != DiagramPromptMode::Inactive {
+        render_diagram_prompt_menu(frame, app, main_area, status_area);
+        let query = app.diagram_prompt_query.as_str();
+        let status = Paragraph::new(diagram_prompt_footer_line(app, &toast_suffix));
+        frame.render_widget(status, status_area);
+        let brand = Paragraph::new(footer_brand_line()).alignment(Alignment::Right);
+        frame.render_widget(brand, status_area);
+        let cursor_x = status_area
+            .x
+            .saturating_add(1)
+            .saturating_add(query.chars().count() as u16)
+            .min(status_area.x.saturating_add(status_area.width.saturating_sub(1)));
+        frame.set_cursor_position((cursor_x, status_area.y));
+        return;
+    }
 
     let status = Paragraph::new(footer_help_line(app, &toast_suffix, compact_footer));
     frame.render_widget(status, status_area);
@@ -477,6 +492,67 @@ fn draw(frame: &mut Frame<'_>, app: &mut App) {
 
     if app.show_help {
         render_help(frame, app, main_area);
+    }
+}
+
+fn render_diagram_prompt_menu(
+    frame: &mut Frame<'_>,
+    app: &App,
+    main_area: Rect,
+    status_area: Rect,
+) {
+    if app.diagram_prompt_matches.is_empty() || main_area.height == 0 || main_area.width == 0 {
+        return;
+    }
+
+    const MAX_PROMPT_ROWS: usize = 8;
+    let available_height = status_area.y.saturating_sub(main_area.y) as usize;
+    let visible = app.diagram_prompt_matches.len().min(MAX_PROMPT_ROWS).min(available_height);
+    if visible == 0 {
+        return;
+    }
+
+    let top = status_area.y.saturating_sub(visible as u16);
+    let area_x = main_area.x;
+    let area_width = main_area.width;
+    let buf = frame.buffer_mut();
+    for (offset, candidate_idx) in app.diagram_prompt_matches.iter().take(visible).enumerate() {
+        let Some(candidate) = app.diagram_prompt_candidates.get(*candidate_idx) else {
+            continue;
+        };
+        let y = top.saturating_add(offset as u16);
+        let is_selected = offset == 0;
+        let style = if is_selected {
+            Style::default()
+                .fg(Color::White)
+                .bg(Color::Rgb(60, 80, 120))
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Rgb(205, 210, 220)).bg(Color::Rgb(30, 38, 55))
+        };
+
+        fill_tui_row(buf, area_x, y, area_width, style);
+        buf.set_stringn(area_x, y, diagram_prompt_row(candidate), area_width as usize, style);
+    }
+}
+
+fn fill_tui_row(buf: &mut Buffer, x: u16, y: u16, width: u16, style: Style) {
+    for col in x..x.saturating_add(width) {
+        if let Some(cell) = buf.cell_mut((col, y)) {
+            cell.reset();
+            cell.set_char(' ').set_style(style);
+        }
+    }
+}
+
+fn diagram_prompt_row(candidate: &DiagramPromptCandidate) -> String {
+    format!(" [{}] {}", diagram_kind_tag(candidate.kind), candidate.diagram_id)
+}
+
+fn diagram_kind_tag(kind: DiagramKind) -> &'static str {
+    match kind {
+        DiagramKind::Sequence => "SEQ",
+        DiagramKind::Flowchart => "FLO",
     }
 }
 
@@ -519,6 +595,19 @@ enum SearchKind {
 #[derive(Debug, Clone)]
 struct SearchCandidate {
     object_ref: ObjectRef,
+    haystack: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DiagramPromptMode {
+    Inactive,
+    Editing,
+}
+
+#[derive(Debug, Clone)]
+struct DiagramPromptCandidate {
+    diagram_id: DiagramId,
+    kind: DiagramKind,
     haystack: String,
 }
 
@@ -619,6 +708,10 @@ struct App {
     search_candidates: Vec<SearchCandidate>,
     search_results: Vec<ObjectRef>,
     search_result_index: usize,
+    diagram_prompt_mode: DiagramPromptMode,
+    diagram_prompt_query: String,
+    diagram_prompt_candidates: Vec<DiagramPromptCandidate>,
+    diagram_prompt_matches: Vec<usize>,
     pending_external_action: Option<ExternalAction>,
     pending_diagram_sync: Option<PendingDiagramSync>,
     should_quit: bool,
@@ -701,6 +794,10 @@ impl App {
             search_candidates: Vec::new(),
             search_results: Vec::new(),
             search_result_index: 0,
+            diagram_prompt_mode: DiagramPromptMode::Inactive,
+            diagram_prompt_query: String::new(),
+            diagram_prompt_candidates: Vec::new(),
+            diagram_prompt_matches: Vec::new(),
             pending_external_action: None,
             pending_diagram_sync: None,
             should_quit: false,
@@ -1361,6 +1458,9 @@ impl App {
             if self.search_mode != SearchMode::Inactive {
                 self.clear_search();
             }
+            if self.diagram_prompt_mode != DiagramPromptMode::Inactive {
+                self.clear_diagram_prompt();
+            }
             self.cancel_hint_mode();
             self.help_scroll = 0;
         }
@@ -1595,8 +1695,15 @@ impl App {
             SearchMode::Inactive => {}
         }
 
-        if !matches!(code, KeyCode::Char('?') | KeyCode::Char('/') | KeyCode::Char('\\'))
-            && matches!(self.focus, Focus::Diagram | Focus::Objects)
+        if self.diagram_prompt_mode != DiagramPromptMode::Inactive {
+            self.handle_diagram_prompt_key(code);
+            return false;
+        }
+
+        if !matches!(
+            code,
+            KeyCode::Char('?') | KeyCode::Char('/') | KeyCode::Char('\\') | KeyCode::Char(':')
+        ) && matches!(self.focus, Focus::Diagram | Focus::Objects)
             && self.handle_diagram_hint_key(code)
         {
             return false;
@@ -1614,6 +1721,7 @@ impl App {
             KeyCode::Char('d') => self.deselect_current_diagram_objects(),
             KeyCode::Char('/') => self.enter_search_mode(SearchKind::Regular),
             KeyCode::Char('\\') => self.enter_search_mode(SearchKind::Fuzzy),
+            KeyCode::Char(':') => self.enter_diagram_prompt_mode(),
             KeyCode::Char('?') => self.toggle_help(),
             KeyCode::Char('n') => {
                 if self.search_mode == SearchMode::Inactive && self.focus == Focus::Diagram {
@@ -1649,6 +1757,7 @@ impl App {
     }
 
     fn enter_search_mode(&mut self, kind: SearchKind) {
+        self.clear_diagram_prompt();
         self.search_mode = SearchMode::Editing;
         self.search_kind = kind;
         self.search_query.clear();
@@ -1687,6 +1796,90 @@ impl App {
         self.search_candidates.clear();
         self.search_results.clear();
         self.search_result_index = 0;
+    }
+
+    fn enter_diagram_prompt_mode(&mut self) {
+        self.clear_search();
+        self.cancel_hint_mode();
+        self.diagram_prompt_mode = DiagramPromptMode::Editing;
+        self.diagram_prompt_query.clear();
+        self.diagram_prompt_candidates = diagram_prompt_candidates_from_session(&self.session);
+        self.update_diagram_prompt_matches();
+    }
+
+    fn handle_diagram_prompt_key(&mut self, code: KeyCode) {
+        match code {
+            KeyCode::Esc => self.clear_diagram_prompt(),
+            KeyCode::Enter => self.commit_diagram_prompt(),
+            KeyCode::Backspace => {
+                if self.diagram_prompt_query.pop().is_none() {
+                    self.clear_diagram_prompt();
+                } else {
+                    self.update_diagram_prompt_matches();
+                }
+            }
+            KeyCode::Tab => self.complete_diagram_prompt(),
+            KeyCode::Char(ch) => {
+                if !ch.is_control() {
+                    self.diagram_prompt_query.push(ch);
+                    self.update_diagram_prompt_matches();
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn clear_diagram_prompt(&mut self) {
+        self.diagram_prompt_mode = DiagramPromptMode::Inactive;
+        self.diagram_prompt_query.clear();
+        self.diagram_prompt_candidates.clear();
+        self.diagram_prompt_matches.clear();
+    }
+
+    fn complete_diagram_prompt(&mut self) {
+        let Some(diagram_id) =
+            self.best_diagram_prompt_candidate().map(|candidate| candidate.diagram_id.clone())
+        else {
+            return;
+        };
+        self.diagram_prompt_query = diagram_id.to_string();
+        self.update_diagram_prompt_matches();
+    }
+
+    fn commit_diagram_prompt(&mut self) {
+        let Some(diagram_id) = self
+            .exact_diagram_prompt_candidate()
+            .or_else(|| self.best_diagram_prompt_candidate())
+            .map(|candidate| candidate.diagram_id.clone())
+        else {
+            self.clear_diagram_prompt();
+            return;
+        };
+
+        self.clear_diagram_prompt();
+        self.set_active_diagram_id(diagram_id);
+    }
+
+    fn update_diagram_prompt_matches(&mut self) {
+        self.diagram_prompt_matches = ranked_diagram_prompt_matches(
+            &self.diagram_prompt_candidates,
+            &self.diagram_prompt_query,
+            self.active_diagram_id(),
+        );
+    }
+
+    fn best_diagram_prompt_candidate(&self) -> Option<&DiagramPromptCandidate> {
+        self.diagram_prompt_matches.first().and_then(|idx| self.diagram_prompt_candidates.get(*idx))
+    }
+
+    fn exact_diagram_prompt_candidate(&self) -> Option<&DiagramPromptCandidate> {
+        let query = self.diagram_prompt_query.trim();
+        if query.is_empty() {
+            return None;
+        }
+        self.diagram_prompt_candidates
+            .iter()
+            .find(|candidate| candidate.diagram_id.as_str() == query)
     }
 
     fn update_search_results(&mut self) {
@@ -3682,6 +3875,65 @@ fn search_candidates_from_session(session: &Session) -> Vec<SearchCandidate> {
 
     candidates.sort_by(|a, b| a.haystack.cmp(&b.haystack));
     candidates
+}
+
+fn diagram_prompt_candidates_from_session(session: &Session) -> Vec<DiagramPromptCandidate> {
+    session
+        .diagrams()
+        .values()
+        .map(|diagram| {
+            let diagram_id = diagram.diagram_id().clone();
+            let kind = diagram.kind();
+            let haystack = format!("{} {} {:?}", diagram_id, diagram.name(), kind,).to_lowercase();
+            DiagramPromptCandidate { diagram_id, kind, haystack }
+        })
+        .collect()
+}
+
+fn ranked_diagram_prompt_matches(
+    candidates: &[DiagramPromptCandidate],
+    query: &str,
+    active_diagram_id: Option<&DiagramId>,
+) -> Vec<usize> {
+    let needle = query.trim();
+    if needle.is_empty() {
+        let mut indices = (0..candidates.len()).collect::<Vec<_>>();
+        indices.sort_by(|idx_a, idx_b| {
+            let a_is_active =
+                active_diagram_id.is_some_and(|active| &candidates[*idx_a].diagram_id == active);
+            let b_is_active =
+                active_diagram_id.is_some_and(|active| &candidates[*idx_b].diagram_id == active);
+            b_is_active
+                .cmp(&a_is_active)
+                .then_with(|| candidates[*idx_a].diagram_id.cmp(&candidates[*idx_b].diagram_id))
+        });
+        return indices;
+    }
+
+    let exact_needle = needle;
+    let needle = needle.to_lowercase();
+    let mut scored = candidates
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, candidate)| {
+            let mut score = fuzzy_score(&needle, &candidate.haystack)?;
+            let diagram_id = candidate.diagram_id.as_str().to_lowercase();
+            if let Some(id_score) = regular_score(&needle, &diagram_id) {
+                score += id_score * 4;
+            } else if let Some(id_score) = fuzzy_score(&needle, &diagram_id) {
+                score += id_score * 2;
+            }
+            let exact_bonus =
+                if candidate.diagram_id.as_str() == exact_needle { 1_000_000 } else { 0 };
+            Some((idx, score + exact_bonus))
+        })
+        .collect::<Vec<_>>();
+    scored.sort_by(|(idx_a, score_a), (idx_b, score_b)| {
+        score_b
+            .cmp(score_a)
+            .then_with(|| candidates[*idx_a].diagram_id.cmp(&candidates[*idx_b].diagram_id))
+    });
+    scored.into_iter().map(|(idx, _)| idx).collect()
 }
 
 fn ranked_search_results(

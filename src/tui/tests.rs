@@ -10,20 +10,21 @@
 
 use super::{
     apply_highlight_flags, category_path, demo_session, demo_session_fallback,
-    diagram_bottom_title, diagram_counter_label, diagram_note_title, diagram_view_title,
-    ensure_active_diagram_id, export_diagram_mermaid, fill_highlight_bridge_gaps,
-    fill_highlight_bridge_gaps_unbounded, fill_highlight_corner_branch_extensions,
-    footer_help_line, objects_item_bg, osc52_sequence, panel_border_style_for_focus,
-    ranked_search_results, search_candidates_from_session, search_footer_line,
-    stack_main_panes_vertically, style_for_diagram_cell, xref_involves_selected, xref_item_style,
-    xrefs_cursor_highlight_style, App, ExternalAction, Focus, FocusOwner, HintKind, HintMode,
-    PendingDiagramSync, SearchKind, SearchMode, SelectableObject,
+    diagram_bottom_title, diagram_counter_label, diagram_note_title, diagram_prompt_footer_line,
+    diagram_prompt_row, diagram_view_title, ensure_active_diagram_id, export_diagram_mermaid,
+    fill_highlight_bridge_gaps, fill_highlight_bridge_gaps_unbounded,
+    fill_highlight_corner_branch_extensions, footer_help_line, objects_item_bg, osc52_sequence,
+    panel_border_style_for_focus, ranked_search_results, search_candidates_from_session,
+    search_footer_line, stack_main_panes_vertically, style_for_diagram_cell,
+    xref_involves_selected, xref_item_style, xrefs_cursor_highlight_style, App, DiagramPromptMode,
+    ExternalAction, Focus, FocusOwner, HintKind, HintMode, PendingDiagramSync, SearchKind,
+    SearchMode, SelectableObject,
 };
 use crate::format::mermaid::{parse_flowchart, parse_sequence_diagram};
 use crate::model::FlowNode;
 use crate::model::{
-    Diagram, DiagramAst, DiagramId, FlowchartAst, ObjectId, ObjectRef, Session, SessionId, XRef,
-    XRefId, XRefStatus,
+    Diagram, DiagramAst, DiagramId, FlowchartAst, ObjectId, ObjectRef, SequenceAst, Session,
+    SessionId, XRef, XRefId, XRefStatus,
 };
 use crate::render::{diagram::render_diagram_unicode_annotated_with_options, RenderOptions};
 use crate::store::SessionFolder;
@@ -1941,6 +1942,135 @@ fn fuzzy_search_results_cycle_with_n_and_shift_n() {
     assert!(app.search_query.is_empty());
     assert!(app.search_results.is_empty());
     assert_eq!(app.selected_ref().map(ToString::to_string), focused);
+}
+
+#[test]
+fn colon_opens_diagram_prompt_with_all_diagrams() {
+    let mut app = App::new(demo_session());
+
+    app.handle_key_code(KeyCode::Char(':'));
+
+    assert_eq!(app.diagram_prompt_mode, DiagramPromptMode::Editing);
+    assert!(app.diagram_prompt_query.is_empty());
+    assert_eq!(app.diagram_prompt_candidates.len(), app.session.diagrams().len());
+    assert_eq!(app.diagram_prompt_matches.len(), app.session.diagrams().len());
+    assert_eq!(
+        app.best_diagram_prompt_candidate().map(|candidate| candidate.diagram_id.as_str()),
+        app.active_diagram_id().map(DiagramId::as_str)
+    );
+}
+
+#[test]
+fn diagram_prompt_fuzzy_filters_and_tab_completes_best_match() {
+    let mut app = App::new(demo_session());
+
+    app.handle_key_code(KeyCode::Char(':'));
+    for ch in "demo-flow".chars() {
+        app.handle_key_code(KeyCode::Char(ch));
+    }
+
+    assert_eq!(
+        app.best_diagram_prompt_candidate().map(|candidate| candidate.diagram_id.as_str()),
+        Some("demo-flow")
+    );
+
+    app.handle_key_code(KeyCode::Tab);
+
+    assert_eq!(app.diagram_prompt_query, "demo-flow");
+}
+
+#[test]
+fn diagram_prompt_exact_completion_preserves_case_sensitive_ids() {
+    let upper_id = DiagramId::new("Foo").expect("diagram id");
+    let lower_id = DiagramId::new("foo").expect("diagram id");
+    let mut session = Session::new(SessionId::new("case-session").expect("session id"));
+    session.diagrams_mut().insert(
+        upper_id.clone(),
+        Diagram::new(upper_id.clone(), "Upper", DiagramAst::Sequence(SequenceAst::default())),
+    );
+    session.diagrams_mut().insert(
+        lower_id.clone(),
+        Diagram::new(lower_id, "Lower", DiagramAst::Sequence(SequenceAst::default())),
+    );
+
+    let mut app = App::new(session);
+    app.handle_key_code(KeyCode::Char(':'));
+    for ch in "Foo".chars() {
+        app.handle_key_code(KeyCode::Char(ch));
+    }
+    app.handle_key_code(KeyCode::Tab);
+
+    assert_eq!(app.diagram_prompt_query, "Foo");
+}
+
+#[test]
+fn diagram_prompt_enter_switches_to_best_match() {
+    let mut app = App::new(demo_session());
+    app.set_active_diagram_id(DiagramId::new("demo-seq").expect("diagram id"));
+
+    app.handle_key_code(KeyCode::Char(':'));
+    for ch in "demo-flow".chars() {
+        app.handle_key_code(KeyCode::Char(ch));
+    }
+    app.handle_key_code(KeyCode::Enter);
+
+    assert_eq!(app.diagram_prompt_mode, DiagramPromptMode::Inactive);
+    assert_eq!(app.active_diagram_id().map(DiagramId::as_str), Some("demo-flow"));
+}
+
+#[test]
+fn diagram_prompt_escape_and_empty_backspace_close_without_switching() {
+    let mut app = App::new(demo_session());
+    let active = app.active_diagram_id().cloned();
+
+    app.handle_key_code(KeyCode::Char(':'));
+    app.handle_key_code(KeyCode::Esc);
+    assert_eq!(app.diagram_prompt_mode, DiagramPromptMode::Inactive);
+    assert_eq!(app.active_diagram_id().cloned(), active);
+
+    app.handle_key_code(KeyCode::Char(':'));
+    app.handle_key_code(KeyCode::Backspace);
+    assert_eq!(app.diagram_prompt_mode, DiagramPromptMode::Inactive);
+    assert_eq!(app.active_diagram_id().cloned(), active);
+}
+
+#[test]
+fn diagram_prompt_ignores_movement_keys() {
+    let mut app = App::new(demo_session());
+
+    app.handle_key_code(KeyCode::Char(':'));
+    for ch in "flow".chars() {
+        app.handle_key_code(KeyCode::Char(ch));
+    }
+    let before = app.diagram_prompt_matches.clone();
+
+    for key in [KeyCode::Up, KeyCode::Down] {
+        app.handle_key_code(key);
+    }
+
+    assert_eq!(app.diagram_prompt_matches, before);
+    assert_eq!(app.diagram_prompt_query, "flow");
+
+    app.handle_key_code(KeyCode::Char('j'));
+    app.handle_key_code(KeyCode::Char('k'));
+    assert_eq!(app.diagram_prompt_query, "flowjk");
+}
+
+#[test]
+fn diagram_prompt_footer_and_rows_use_colon_and_fixed_kind_tags() {
+    let mut app = App::new(demo_session());
+    app.handle_key_code(KeyCode::Char(':'));
+    for ch in "demo-flow".chars() {
+        app.handle_key_code(KeyCode::Char(ch));
+    }
+
+    let footer = line_to_string(&diagram_prompt_footer_line(&app, ""));
+    assert!(footer.contains(":demo-flow"));
+    assert!(footer.contains("Complete:Tab"));
+    assert!(footer.contains("Accept:Enter"));
+
+    let row = diagram_prompt_row(app.best_diagram_prompt_candidate().expect("best match"));
+    assert!(row.starts_with(" [FLO] demo-flow"));
 }
 
 #[test]

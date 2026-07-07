@@ -458,6 +458,41 @@ fn search_footer_line(app: &App, toast_suffix: &str) -> Line<'static> {
     Line::from(spans)
 }
 
+fn diagram_prompt_footer_line(app: &App, toast_suffix: &str) -> Line<'static> {
+    let query = app.diagram_prompt_query.as_str();
+    let count = app.diagram_prompt_matches.len();
+    let mut spans = vec![
+        Span::styled(
+            ":",
+            Style::default()
+                .fg(FOOTER_KEY_COLOR)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::raw(query.to_owned()),
+        Span::raw("   "),
+        Span::styled(count.to_string(), Style::default().fg(Color::LightGreen)),
+    ];
+
+    push_footer_entry_with_separator(&mut spans, "Complete", "Tab", " | ");
+    push_footer_entry_with_separator(&mut spans, "Accept", "Enter", " | ");
+    push_footer_entry_with_separator(&mut spans, "Close", "Esc", " | ");
+
+    let toast_message = toast_suffix
+        .strip_prefix(" | ")
+        .unwrap_or(toast_suffix)
+        .trim();
+    if !toast_message.is_empty() {
+        spans.push(Span::styled(" | ", Style::default().fg(FOOTER_LABEL_COLOR)));
+        spans.push(Span::styled(
+            "Toast:".to_owned(),
+            Style::default().fg(FOOTER_LABEL_COLOR),
+        ));
+        spans.push(Span::raw(toast_message.to_owned()));
+    }
+
+    Line::from(spans)
+}
+
 fn footer_brand_line() -> Line<'static> {
     Line::from(vec![Span::styled(
         FOOTER_BRAND.to_owned(),
