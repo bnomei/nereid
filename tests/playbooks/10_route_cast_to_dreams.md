@@ -17,26 +17,26 @@
 
 ## Expected Tool Calls
 ### Required (order matters)
-1. `diagram.list`
-2. `diagram.get_ast`
+1. `diagram_list`
+2. `diagram_get_ast`
    - matcher: `diagram_id` `equals` `om-01-cast`
-3. `route.find`
+3. `route_find`
    - matcher: `from_ref` `equals` `d:om-01-cast/flow/node/n:lions`
    - matcher: `to_ref` `equals` `d:om-08-dreams/seq/participant/p:lions`
    - matcher: `ordering` `equals` `fewest_hops`
 
 ### Optional (acceptable alternatives)
-- `diagram.get_ast` for `om-08-dreams`.
-- `xref.neighbors` for intermediate validation.
+- `diagram_get_ast` for `om-08-dreams`.
+- `xref_neighbors` for intermediate validation.
 
 ### Forbidden
-- `diagram.apply_ops`
-- `diagram.propose_ops`
-- `diagram.create_from_mermaid`
-- `selection.update`
-- `xref.add`
-- `xref.remove`
-- `walkthrough.apply_ops`
+- `diagram_apply_ops`
+- `diagram_propose_ops`
+- `diagram_create_from_mermaid`
+- `selection_update`
+- `xref_add`
+- `xref_remove`
+- `walkthrough_apply_ops`
 
 ## Expected Assistant Output
 - Must return this route:
@@ -45,8 +45,8 @@
   - `d:om-08-dreams/seq/participant/p:lions`
 
 ## Pass/Fail Checklist
-- [ ] `diagram.get_ast` used to resolve the Lions node by label.
-- [ ] `route.find` used the exact refs above.
+- [ ] `diagram_get_ast` used to resolve the Lions node by label.
+- [ ] `route_find` used the exact refs above.
 - [ ] Output route matches the expected three-hop sequence.
 - [ ] No forbidden mutating calls were made.
 

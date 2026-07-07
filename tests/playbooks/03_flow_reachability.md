@@ -17,25 +17,25 @@
 
 ## Expected Tool Calls
 ### Required (order matters)
-1. `diagram.list`
-2. `flow.paths`
+1. `diagram_list`
+2. `flow_paths`
    - matcher: `diagram_id` `equals` `demo-t-flow-routing`
    - matcher: `from_node_id` `equals` `n:start`
    - matcher: `to_node_id` `equals` `n:done`
    - matcher: `max_extra_hops` is `0` or omitted
 
 ### Optional (acceptable alternatives)
-- `flow.reachable` to double-check reachability.
-- `diagram.get_ast` for additional validation.
+- `flow_reachable` to double-check reachability.
+- `diagram_get_ast` for additional validation.
 
 ### Forbidden
-- `diagram.apply_ops`
-- `diagram.propose_ops`
-- `diagram.create_from_mermaid`
-- `selection.update`
-- `xref.add`
-- `xref.remove`
-- `walkthrough.apply_ops`
+- `diagram_apply_ops`
+- `diagram_propose_ops`
+- `diagram_create_from_mermaid`
+- `selection_update`
+- `xref_add`
+- `xref_remove`
+- `walkthrough_apply_ops`
 
 ## Expected Assistant Output
 - Must clearly state that `n:start` can reach `n:done`.
@@ -44,7 +44,7 @@
 - Path must be valid node refs from this diagram.
 
 ## Pass/Fail Checklist
-- [ ] `flow.paths` call used the expected source/target nodes.
+- [ ] `flow_paths` call used the expected source/target nodes.
 - [ ] Final answer includes a valid reachable conclusion.
 - [ ] Final answer includes at least one concrete node-ref path.
 - [ ] No forbidden mutating calls were made.

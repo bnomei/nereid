@@ -17,13 +17,13 @@
 
 ## Expected Tool Calls
 ### Required (order matters)
-1. `diagram.list`
-2. `diagram.get_ast`
+1. `diagram_list`
+2. `diagram_get_ast`
    - matcher: `diagram_id` `equals` `demo-00-index`
-3. `xref.list`
+3. `xref_list`
    - matcher: `from_ref` `equals` `d:demo-00-index/flow/node/n:flow_route`
    - matcher: `kind` `equals` `nav`
-4. `flow.paths`
+4. `flow_paths`
    - matcher: `diagram_id` `equals` `demo-t-flow-routing`
    - matcher: `from_node_id` `equals` `n:start`
    - matcher: `to_node_id` `equals` `n:done`
@@ -33,13 +33,13 @@
  
 
 ### Forbidden
-- `diagram.apply_ops`
-- `diagram.propose_ops`
-- `diagram.create_from_mermaid`
-- `selection.update`
-- `xref.add`
-- `xref.remove`
-- `walkthrough.apply_ops`
+- `diagram_apply_ops`
+- `diagram_propose_ops`
+- `diagram_create_from_mermaid`
+- `selection_update`
+- `xref_add`
+- `xref_remove`
+- `walkthrough_apply_ops`
 
 ## Expected Assistant Output
 - Must include source node ref `d:demo-00-index/flow/node/n:flow_route`.
@@ -63,8 +63,8 @@
   - `d:demo-t-flow-routing/flow/node/n:done`
 
 ## Pass/Fail Checklist
-- [ ] `diagram.get_ast` was used to resolve the note-only node.
-- [ ] `xref.list` and `flow.paths` were called with the expected params.
+- [ ] `diagram_get_ast` was used to resolve the note-only node.
+- [ ] `xref_list` and `flow_paths` were called with the expected params.
 - [ ] Output includes the node ref, target diagram id, and a valid shortest path.
 - [ ] No forbidden mutating calls were made.
 

@@ -2,7 +2,7 @@
 
 ## Metadata
 - `id`: `PB-22`
-- `goal`: require `seq.messages` using human-sounding intent and return exact message refs + text.
+- `goal`: require `seq_messages` using human-sounding intent and return exact message refs + text.
 - `session`: `data/demo-session` (use `--demo`).
 - `difficulty`: `advanced`
 - `mutates_state`: `no`
@@ -17,36 +17,36 @@
 
 ## Expected Tool Calls
 ### Required (order matters)
-1. `diagram.list`
-2. `diagram.get_ast`
+1. `diagram_list`
+2. `diagram_get_ast`
    - matcher: `diagram_id` `equals` `om-10-dialogue`
-3. `seq.messages`
+3. `seq_messages`
    - matcher: `diagram_id` `equals` `om-10-dialogue`
    - matcher: `from_participant_id` `equals` `p:manolin`
    - matcher: `to_participant_id` `equals` `p:santiago`
-4. `object.read`
+4. `object_read`
    - matcher: reads `d:om-10-dialogue/seq/message/m:ask_go`
    - matcher: reads `d:om-10-dialogue/seq/message/m:yankees`
 
 ### Optional (acceptable alternatives)
-- `seq.search` as a sanity check (must still use `seq.messages`).
+- `seq_search` as a sanity check (must still use `seq_messages`).
 
 ### Forbidden
-- `diagram.apply_ops`
-- `diagram.propose_ops`
-- `diagram.create_from_mermaid`
-- `selection.update`
-- `xref.add`
-- `xref.remove`
-- `walkthrough.apply_ops`
+- `diagram_apply_ops`
+- `diagram_propose_ops`
+- `diagram_create_from_mermaid`
+- `selection_update`
+- `xref_add`
+- `xref_remove`
+- `walkthrough_apply_ops`
 
 ## Expected Assistant Output
 - Must include `d:om-10-dialogue/seq/message/m:ask_go` with text `Can I go with you again`.
 - Must include `d:om-10-dialogue/seq/message/m:yankees` with text `The Yankees cannot lose`.
 
 ## Pass/Fail Checklist
-- [ ] `seq.messages` was used with the correct from/to participants.
-- [ ] `object.read` was used to report exact text.
+- [ ] `seq_messages` was used with the correct from/to participants.
+- [ ] `object_read` was used to report exact text.
 - [ ] Output includes the two expected refs and texts only.
 - [ ] No forbidden mutating calls were made.
 

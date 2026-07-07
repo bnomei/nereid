@@ -132,7 +132,7 @@ fn e2e_human_and_agent_collaborate_on_persisted_session() {
                 make_active: Some(true),
             }))
             .await
-            .expect("diagram.create_from_mermaid")
+            .expect("diagram_create_from_mermaid")
     });
 
     assert_eq!(created.diagram.diagram_id, diagram_id);
@@ -155,7 +155,7 @@ fn e2e_human_and_agent_collaborate_on_persisted_session() {
     assert_eq!(participant_b_ref, expected_participant_b_ref);
 
     let Json(human_attention) = runtime
-        .block_on(async { server.attention_human_read().await.expect("attention.human.read") });
+        .block_on(async { server.attention_human_read().await.expect("attention_human_read") });
     assert_eq!(human_attention.diagram_id.as_deref(), Some(diagram_id));
     assert_eq!(human_attention.object_ref.as_deref(), Some(participant_b_ref.as_str()));
 
@@ -167,7 +167,7 @@ fn e2e_human_and_agent_collaborate_on_persisted_session() {
                 object_ref: participant_b_ref.clone(),
             }))
             .await
-            .expect("attention.agent.set")
+            .expect("attention_agent_set")
     });
     assert_eq!(update.object_ref, participant_b_ref);
     assert_eq!(update.diagram_id, diagram_id);
@@ -191,7 +191,7 @@ fn e2e_human_and_agent_collaborate_on_persisted_session() {
     // Step 5 (agent/MCP): confirm selection is available via MCP after reload.
     let server = harness.mcp(reloaded);
     let Json(selection) =
-        runtime.block_on(async { server.selection_get().await.expect("selection.read") });
+        runtime.block_on(async { server.selection_get().await.expect("selection_read") });
     assert_eq!(selection.object_refs, vec![participant_b_ref]);
 }
 
@@ -237,19 +237,19 @@ fn e2e_selection_and_active_diagram_do_not_drift_between_tui_and_mcp() {
     assert!(selected_ref.starts_with("d:d-b/"));
 
     let Json(current) =
-        runtime.block_on(async { server.diagram_current().await.expect("diagram.current") });
+        runtime.block_on(async { server.diagram_current().await.expect("diagram_current") });
     assert_eq!(current.active_diagram_id.as_deref(), Some("d-b"));
     assert_eq!(current.context.human_active_diagram_id.as_deref(), Some("d-b"));
 
     let Json(selection) =
-        runtime.block_on(async { server.selection_get().await.expect("selection.read") });
+        runtime.block_on(async { server.selection_get().await.expect("selection_read") });
     assert_eq!(selection.object_refs, vec![selected_ref.clone()]);
     assert!(selection.object_refs.iter().all(|object_ref| object_ref.starts_with("d:d-b/")));
     assert_eq!(selection.context.human_active_diagram_id.as_deref(), Some("d-b"));
     assert_eq!(selection.context.human_active_object_ref.as_deref(), Some(selected_ref.as_str()));
 
     let Json(human_attention) = runtime
-        .block_on(async { server.attention_human_read().await.expect("attention.human.read") });
+        .block_on(async { server.attention_human_read().await.expect("attention_human_read") });
     assert_eq!(human_attention.diagram_id.as_deref(), Some("d-b"));
     assert_eq!(human_attention.object_ref.as_deref(), Some(selected_ref.as_str()));
     assert_eq!(human_attention.context.human_active_diagram_id.as_deref(), Some("d-b"));
@@ -281,14 +281,14 @@ fn e2e_tui_reloads_when_mcp_creates_diagram_and_sets_attention() {
                 make_active: Some(true),
             }))
             .await
-            .expect("diagram.create_from_mermaid");
+            .expect("diagram_create_from_mermaid");
 
         server
             .attention_agent_set(Parameters(AttentionAgentSetParams {
                 object_ref: node_ref.clone(),
             }))
             .await
-            .expect("attention.agent.set");
+            .expect("attention_agent_set");
     });
 
     tui.sync_from_ui_state();
@@ -315,22 +315,22 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
                 make_active: Some(true),
             }))
             .await
-            .expect("diagram.create_from_mermaid");
+            .expect("diagram_create_from_mermaid");
     });
 
     let Json(view) =
-        runtime.block_on(async { server.view_get_state().await.expect("view.read_state") });
+        runtime.block_on(async { server.view_get_state().await.expect("view_read_state") });
     assert_eq!(view.active_diagram_id.as_deref(), Some(diagram_id));
 
     let Json(diagrams) =
-        runtime.block_on(async { server.diagram_list().await.expect("diagram.list") });
+        runtime.block_on(async { server.diagram_list().await.expect("diagram_list") });
     assert!(
         diagrams.diagrams.iter().any(|d| d.diagram_id == diagram_id),
-        "expected diagram.list to include created diagram"
+        "expected diagram_list to include created diagram"
     );
 
     let Json(current) =
-        runtime.block_on(async { server.diagram_current().await.expect("diagram.current") });
+        runtime.block_on(async { server.diagram_current().await.expect("diagram_current") });
     assert_eq!(current.active_diagram_id.as_deref(), Some(diagram_id));
 
     let Json(stat) = runtime.block_on(async {
@@ -339,7 +339,7 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
                 diagram_id: Some(diagram_id.to_owned()),
             }))
             .await
-            .expect("diagram.stat")
+            .expect("diagram_stat")
     });
     assert_eq!(stat.counts.participants, 2);
     assert_eq!(stat.counts.messages, 2);
@@ -349,7 +349,7 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
         server
             .diagram_read(Parameters(DiagramTargetParams { diagram_id: None }))
             .await
-            .expect("diagram.read")
+            .expect("diagram_read")
     });
     assert_eq!(snapshot.kind, "Sequence");
     assert!(snapshot.mermaid.contains("sequenceDiagram"));
@@ -358,7 +358,7 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
         server
             .diagram_render_text(Parameters(DiagramTargetParams { diagram_id: None }))
             .await
-            .expect("diagram.render_text")
+            .expect("diagram_render_text")
     });
     assert!(!render.text.trim().is_empty());
 
@@ -368,7 +368,7 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
                 diagram_id: Some(diagram_id.to_owned()),
             }))
             .await
-            .expect("diagram.get_ast")
+            .expect("diagram_get_ast")
     });
     match ast.ast {
         McpDiagramAst::Sequence { participants, messages, blocks: _ } => {
@@ -386,7 +386,7 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
                 to_participant_id: None,
             }))
             .await
-            .expect("seq.messages")
+            .expect("seq_messages")
     });
     assert_eq!(message_list.messages.len(), 2);
     let message_1_ref = message_list.messages[0].clone();
@@ -404,7 +404,7 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
                 filters: None,
             }))
             .await
-            .expect("diagram.get_slice")
+            .expect("diagram_get_slice")
     });
     assert!(slice.objects.contains(&participant_a_ref), "expected slice to include center ref");
     assert!(!slice.edges.is_empty());
@@ -416,7 +416,7 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
                 object_refs: None,
             }))
             .await
-            .expect("object.read participant")
+            .expect("object_read participant")
     });
     assert_eq!(obj_a.objects.len(), 1);
     match &obj_a.objects[0].object {
@@ -431,7 +431,7 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
                 object_refs: None,
             }))
             .await
-            .expect("object.read message")
+            .expect("object_read message")
     });
     assert_eq!(obj_msg_1.objects.len(), 1);
     match &obj_msg_1.objects[0].object {
@@ -450,7 +450,7 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
                 case_insensitive: Some(true),
             }))
             .await
-            .expect("seq.search")
+            .expect("seq_search")
     });
     assert!(search.messages.iter().any(|m| m == &message_1_ref));
 
@@ -463,7 +463,7 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
                 limit: Some(10),
             }))
             .await
-            .expect("seq.trace")
+            .expect("seq_trace")
     });
     assert!(trace.messages.iter().any(|m| m == &message_2_ref));
 
@@ -473,21 +473,21 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
                 object_ref: participant_b_ref.clone(),
             }))
             .await
-            .expect("attention.agent.set")
+            .expect("attention_agent_set")
     });
     assert_eq!(highlighted.object_ref, participant_b_ref.clone());
     assert_eq!(highlighted.diagram_id, diagram_id);
 
     let Json(attention) = runtime
-        .block_on(async { server.attention_agent_read().await.expect("attention.agent.read") });
+        .block_on(async { server.attention_agent_read().await.expect("attention_agent_read") });
     assert_eq!(attention.object_ref.as_deref(), Some(participant_b_ref.as_str()));
     assert_eq!(attention.diagram_id.as_deref(), Some(diagram_id));
 
     let Json(cleared) = runtime
-        .block_on(async { server.attention_agent_clear().await.expect("attention.agent.clear") });
+        .block_on(async { server.attention_agent_clear().await.expect("attention_agent_clear") });
     assert_eq!(cleared.cleared, 1);
     let Json(attention) = runtime.block_on(async {
-        server.attention_agent_read().await.expect("attention.agent.read (cleared)")
+        server.attention_agent_read().await.expect("attention_agent_read (cleared)")
     });
     assert_eq!(attention.object_ref, None);
     assert_eq!(attention.diagram_id, None);
@@ -508,7 +508,7 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
                 }],
             }))
             .await
-            .expect("diagram.propose_ops")
+            .expect("diagram_propose_ops")
     });
     assert_eq!(proposed.new_rev, snapshot.rev + 1);
 
@@ -528,7 +528,7 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
                 }],
             }))
             .await
-            .expect("diagram.apply_ops")
+            .expect("diagram_apply_ops")
     });
     assert_eq!(applied.new_rev, snapshot.rev + 1);
     assert!(applied.applied >= 1);
@@ -540,7 +540,7 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
                 since_rev: snapshot.rev,
             }))
             .await
-            .expect("diagram.diff")
+            .expect("diagram_diff")
     });
     assert_eq!(delta.from_rev, snapshot.rev);
     assert_eq!(delta.to_rev, applied.new_rev);
@@ -550,7 +550,7 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
         server
             .diagram_stat(Parameters(DiagramTargetParams { diagram_id: None }))
             .await
-            .expect("diagram.stat after apply")
+            .expect("diagram_stat after apply")
     });
     assert_eq!(stat_after.counts.messages, 3);
 
@@ -563,7 +563,7 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
                 case_insensitive: Some(true),
             }))
             .await
-            .expect("seq.search extra")
+            .expect("seq_search extra")
     });
     assert_eq!(search.messages, vec![format!("d:{diagram_id}/seq/message/m:0003")]);
 
@@ -576,7 +576,7 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
                 limit: Some(10),
             }))
             .await
-            .expect("seq.trace after second")
+            .expect("seq_trace after second")
     });
     assert!(trace.messages.iter().any(|m| m.ends_with("/m:0003")));
 
@@ -588,11 +588,11 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
                 mode: UpdateMode::Replace,
             }))
             .await
-            .expect("selection.update");
+            .expect("selection_update");
     });
 
     let Json(selection) =
-        runtime.block_on(async { server.selection_get().await.expect("selection.read") });
+        runtime.block_on(async { server.selection_get().await.expect("selection_read") });
     assert_eq!(selection.object_refs, vec![new_message_ref.clone()]);
 
     let reloaded = harness.load_session();
@@ -606,10 +606,10 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
                 object_ref: new_message_ref.clone(),
             }))
             .await
-            .expect("attention.agent.set");
+            .expect("attention_agent_set");
     });
     let Json(attention) = runtime
-        .block_on(async { server.attention_agent_read().await.expect("attention.agent.read") });
+        .block_on(async { server.attention_agent_read().await.expect("attention_agent_read") });
     assert_eq!(attention.object_ref.as_deref(), Some(new_message_ref.as_str()));
     assert_eq!(attention.diagram_id.as_deref(), Some(diagram_id));
 }
@@ -645,18 +645,18 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
     });
 
     let Json(diagrams) =
-        runtime.block_on(async { server.diagram_list().await.expect("diagram.list") });
+        runtime.block_on(async { server.diagram_list().await.expect("diagram_list") });
     assert_eq!(diagrams.diagrams.len(), 2);
 
     let Json(opened) = runtime.block_on(async {
         server
             .diagram_open(Parameters(DiagramOpenParams { diagram_id: flow_id.to_owned() }))
             .await
-            .expect("diagram.open")
+            .expect("diagram_open")
     });
     assert_eq!(opened.active_diagram_id, flow_id);
     let Json(current) =
-        runtime.block_on(async { server.diagram_current().await.expect("diagram.current") });
+        runtime.block_on(async { server.diagram_current().await.expect("diagram_current") });
     assert_eq!(current.active_diagram_id.as_deref(), Some(flow_id));
 
     let Json(flow_ast) = runtime.block_on(async {
@@ -665,7 +665,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
                 diagram_id: Some(flow_id.to_owned()),
             }))
             .await
-            .expect("diagram.get_ast flow")
+            .expect("diagram_get_ast flow")
     });
     let (first_edge_ref, first_node_ref) = match flow_ast.ast {
         McpDiagramAst::Flowchart { nodes, edges } => {
@@ -685,7 +685,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
                 object_refs: None,
             }))
             .await
-            .expect("object.read flow node")
+            .expect("object_read flow node")
     });
     assert_eq!(obj_node.objects.len(), 1);
     match &obj_node.objects[0].object {
@@ -700,7 +700,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
                 object_refs: None,
             }))
             .await
-            .expect("object.read flow edge")
+            .expect("object_read flow edge")
     });
     assert_eq!(obj_edge.objects.len(), 1);
     match &obj_edge.objects[0].object {
@@ -714,7 +714,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
                 diagram_id: Some(flow_id.to_owned()),
             }))
             .await
-            .expect("diagram.render_text flow")
+            .expect("diagram_render_text flow")
     });
     assert!(!render.text.trim().is_empty());
 
@@ -729,7 +729,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
                 filters: None,
             }))
             .await
-            .expect("diagram.get_slice flow")
+            .expect("diagram_get_slice flow")
     });
     assert!(slice.objects.contains(&flow_node_a_ref));
 
@@ -741,7 +741,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
                 direction: Some("out".to_owned()),
             }))
             .await
-            .expect("flow.reachable")
+            .expect("flow_reachable")
     });
     assert!(reachable.nodes.iter().any(|n| n == &format!("d:{flow_id}/flow/node/n:c")));
 
@@ -755,7 +755,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
                 max_extra_hops: Some(0),
             }))
             .await
-            .expect("flow.paths")
+            .expect("flow_paths")
     });
     assert_eq!(paths.paths.first().map(|p| p.len()), Some(3), "expected a->b->c path");
 
@@ -766,7 +766,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
                 start_node_id: Some("n:a".to_owned()),
             }))
             .await
-            .expect("flow.unreachable")
+            .expect("flow_unreachable")
     });
     assert!(unreachable.nodes.iter().any(|n| n == &format!("d:{flow_id}/flow/node/n:d")));
 
@@ -774,7 +774,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
         server
             .flow_cycles(Parameters(DiagramTargetParams { diagram_id: Some(flow_id.to_owned()) }))
             .await
-            .expect("flow.cycles")
+            .expect("flow_cycles")
     });
     assert!(cycles.cycles.is_empty());
 
@@ -784,7 +784,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
                 diagram_id: Some(flow_id.to_owned()),
             }))
             .await
-            .expect("flow.dead_ends")
+            .expect("flow_dead_ends")
     });
     assert!(dead_ends.nodes.iter().any(|n| n == &format!("d:{flow_id}/flow/node/n:c")));
 
@@ -796,7 +796,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
                 sort_by: Some("total".to_owned()),
             }))
             .await
-            .expect("flow.degrees")
+            .expect("flow_degrees")
     });
     assert!(!degrees.nodes.is_empty());
 
@@ -816,7 +816,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
                 label: Some("connect".to_owned()),
             }))
             .await
-            .expect("xref.add");
+            .expect("xref_add");
         server
             .xref_add(Parameters(XRefAddParams {
                 xref_id: xref_2.to_owned(),
@@ -826,7 +826,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
                 label: None,
             }))
             .await
-            .expect("xref.add 2");
+            .expect("xref_add 2");
     });
 
     let Json(xrefs) = runtime.block_on(async {
@@ -842,7 +842,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
                 limit: None,
             }))
             .await
-            .expect("xref.list")
+            .expect("xref_list")
     });
     assert_eq!(xrefs.xrefs.len(), 2);
 
@@ -853,7 +853,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
                 direction: Some("out".to_owned()),
             }))
             .await
-            .expect("xref.neighbors")
+            .expect("xref_neighbors")
     });
     assert_eq!(neighbors.neighbors, vec![seq_participant_a_ref.clone()]);
 
@@ -867,11 +867,11 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
                 ordering: Some("lexicographic".to_owned()),
             }))
             .await
-            .expect("route.find")
+            .expect("route_find")
     });
     assert!(!routes.routes.is_empty());
 
-    // Start a headless TUI to validate attention.agent.set -> follow-AI sync + xref jumps.
+    // Start a headless TUI to validate attention_agent_set -> follow-AI sync + xref jumps.
     let mut tui = harness.tui(harness.load_session());
     runtime.block_on(async {
         server
@@ -879,7 +879,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
                 object_ref: flow_node_d_ref.clone(),
             }))
             .await
-            .expect("attention.agent.set");
+            .expect("attention_agent_set");
     });
     tui.sync_from_ui_state();
     assert_eq!(tui.selected_ref().expect("tui selection").to_string(), flow_node_d_ref);
@@ -889,7 +889,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
     assert_eq!(tui.selected_ref().expect("tui selection").to_string(), seq_participant_a_ref);
 
     let Json(human_attention) = runtime
-        .block_on(async { server.attention_human_read().await.expect("attention.human.read") });
+        .block_on(async { server.attention_human_read().await.expect("attention_human_read") });
     assert_eq!(human_attention.object_ref.as_deref(), Some(seq_participant_a_ref.as_str()));
     assert_eq!(human_attention.diagram_id.as_deref(), Some(seq_id));
 
@@ -897,7 +897,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
         server
             .xref_remove(Parameters(XRefRemoveParams { xref_id: xref_2.to_owned() }))
             .await
-            .expect("xref.remove")
+            .expect("xref_remove")
     });
     assert!(removed.removed);
 
@@ -934,7 +934,7 @@ fn e2e_walkthrough_tools_cover_full_surface() {
     let server = harness.server();
 
     let Json(list) =
-        runtime.block_on(async { server.walkthrough_list().await.expect("walkthrough.list") });
+        runtime.block_on(async { server.walkthrough_list().await.expect("walkthrough_list") });
     assert_eq!(list.walkthroughs.len(), 1);
     assert_eq!(list.walkthroughs[0].walkthrough_id, walkthrough_id.as_str());
 
@@ -944,12 +944,12 @@ fn e2e_walkthrough_tools_cover_full_surface() {
                 walkthrough_id: walkthrough_id.as_str().to_owned(),
             }))
             .await
-            .expect("walkthrough.open")
+            .expect("walkthrough_open")
     });
     assert_eq!(opened.active_walkthrough_id, walkthrough_id.as_str());
 
     let Json(current) = runtime
-        .block_on(async { server.walkthrough_current().await.expect("walkthrough.current") });
+        .block_on(async { server.walkthrough_current().await.expect("walkthrough_current") });
     assert_eq!(current.active_walkthrough_id.as_deref(), Some(walkthrough_id.as_str()));
 
     let Json(read) = runtime.block_on(async {
@@ -958,7 +958,7 @@ fn e2e_walkthrough_tools_cover_full_surface() {
                 walkthrough_id: walkthrough_id.as_str().to_owned(),
             }))
             .await
-            .expect("walkthrough.read")
+            .expect("walkthrough_read")
     });
     assert_eq!(read.walkthrough.nodes.len(), 0);
     assert_eq!(read.walkthrough.edges.len(), 0);
@@ -969,7 +969,7 @@ fn e2e_walkthrough_tools_cover_full_surface() {
                 walkthrough_id: walkthrough_id.as_str().to_owned(),
             }))
             .await
-            .expect("walkthrough.stat")
+            .expect("walkthrough_stat")
     });
     assert_eq!(digest.digest.rev, 0);
 
@@ -1005,7 +1005,7 @@ fn e2e_walkthrough_tools_cover_full_surface() {
                 ],
             }))
             .await
-            .expect("walkthrough.apply_ops")
+            .expect("walkthrough_apply_ops")
     });
     assert_eq!(applied.new_rev, 1);
     assert!(applied.applied >= 1);
@@ -1016,7 +1016,7 @@ fn e2e_walkthrough_tools_cover_full_surface() {
                 walkthrough_id: walkthrough_id.as_str().to_owned(),
             }))
             .await
-            .expect("walkthrough.render_text")
+            .expect("walkthrough_render_text")
     });
     assert!(!render.text.trim().is_empty());
 
@@ -1027,7 +1027,7 @@ fn e2e_walkthrough_tools_cover_full_surface() {
                 node_id: "n:1".to_owned(),
             }))
             .await
-            .expect("walkthrough.get_node")
+            .expect("walkthrough_get_node")
     });
     assert_eq!(node.node.node_id, "n:1");
     assert_eq!(node.node.title, "Step 1");
@@ -1039,7 +1039,7 @@ fn e2e_walkthrough_tools_cover_full_surface() {
                 since_rev: 0,
             }))
             .await
-            .expect("walkthrough.diff")
+            .expect("walkthrough_diff")
     });
     assert_eq!(delta.from_rev, 0);
     assert_eq!(delta.to_rev, 1);
@@ -1051,7 +1051,7 @@ fn e2e_walkthrough_tools_cover_full_surface() {
                 walkthrough_id: walkthrough_id.as_str().to_owned(),
             }))
             .await
-            .expect("walkthrough.stat after apply")
+            .expect("walkthrough_stat after apply")
     });
     assert_eq!(digest.digest.rev, 1);
 

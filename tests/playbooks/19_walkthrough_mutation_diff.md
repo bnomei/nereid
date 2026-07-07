@@ -17,16 +17,16 @@
 
 ## Expected Tool Calls
 ### Required (order matters)
-1. `diagram.list`
-2. `diagram.get_ast`
+1. `diagram_list`
+2. `diagram_get_ast`
    - matcher: `diagram_id` `equals` `om-13-return`
-3. `walkthrough.stat`
+3. `walkthrough_stat`
    - matcher: `walkthrough_id` `equals` `wt-demo`
-4. `walkthrough.apply_ops`
+4. `walkthrough_apply_ops`
    - matcher: `walkthrough_id` `equals` `wt-demo`
-   - matcher: `base_rev` `equals` value returned by `walkthrough.stat`
+   - matcher: `base_rev` `equals` value returned by `walkthrough_stat`
    - example payload:
-     - replace `base_rev` with the exact `walkthrough.stat.digest.rev` at runtime
+     - replace `base_rev` with the exact `walkthrough_stat.digest.rev` at runtime
      ```json
      {
        "walkthrough_id": "wt-demo",
@@ -41,19 +41,19 @@
        ]
      }
      ```
-5. `walkthrough.diff`
+5. `walkthrough_diff`
    - matcher: `walkthrough_id` `equals` `wt-demo`
-6. `walkthrough.get_node`
+6. `walkthrough_get_node`
    - matcher: `walkthrough_id` `equals` `wt-demo`
    - matcher: `node_id` `equals` `n:wrap`
 
 ### Optional (acceptable alternatives)
-- `walkthrough.read` for full confirmation.
+- `walkthrough_read` for full confirmation.
 
 ### Forbidden
-- `diagram.apply_ops`
-- `xref.add`
-- `xref.remove`
+- `diagram_apply_ops`
+- `xref_add`
+- `xref_remove`
 
 ## Expected Assistant Output
 - Must report that node `n:wrap` was added.
@@ -61,9 +61,9 @@
 - Must include ref `d:om-13-return/flow/node/n:sail_home`.
 
 ## Pass/Fail Checklist
-- [ ] `walkthrough.apply_ops` was called with the current base rev.
-- [ ] `walkthrough.diff` shows an added node.
-- [ ] `walkthrough.get_node` returns the new node details.
+- [ ] `walkthrough_apply_ops` was called with the current base rev.
+- [ ] `walkthrough_diff` shows an added node.
+- [ ] `walkthrough_get_node` returns the new node details.
 - [ ] No forbidden mutating calls were made.
 
 ## Notes

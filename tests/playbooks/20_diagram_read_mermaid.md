@@ -17,27 +17,27 @@
 
 ## Expected Tool Calls
 ### Required (order matters)
-1. `diagram.list`
-2. `diagram.read`
+1. `diagram_list`
+2. `diagram_read`
    - matcher: `diagram_id` `equals` `demo-flow`
 
 ### Optional (acceptable alternatives)
 
 ### Forbidden
-- `diagram.apply_ops`
-- `diagram.propose_ops`
-- `diagram.create_from_mermaid`
-- `selection.update`
-- `xref.add`
-- `xref.remove`
-- `walkthrough.apply_ops`
+- `diagram_apply_ops`
+- `diagram_propose_ops`
+- `diagram_create_from_mermaid`
+- `selection_update`
+- `xref_add`
+- `xref_remove`
+- `walkthrough_apply_ops`
 
 ## Expected Assistant Output
 - Must include the Mermaid line `a -->|beta| c(C)`.
 - Must identify the diagram as `demo-flow`.
 
 ## Pass/Fail Checklist
-- [ ] `diagram.read` was used for Mermaid source retrieval.
+- [ ] `diagram_read` was used for Mermaid source retrieval.
 - [ ] Output includes the beta line exactly.
 - [ ] No forbidden mutating calls were made.
 

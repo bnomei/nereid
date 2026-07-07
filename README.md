@@ -218,12 +218,12 @@ Transports:
 
 Tool groups:
 
-- Diagram lifecycle and reads: `diagram.list`, `diagram.current`, `diagram.open`, `diagram.delete`, `diagram.read`, `diagram.stat`, `diagram.get_ast`, `diagram.get_slice`, `diagram.render_text`, `diagram.diff`.
-- Diagram creation and mutation: `diagram.create_from_mermaid`, `diagram.propose_ops`, `diagram.apply_ops`.
-- Walkthroughs: `walkthrough.list`, `walkthrough.current`, `walkthrough.open`, `walkthrough.read`, `walkthrough.stat`, `walkthrough.get_node`, `walkthrough.render_text`, `walkthrough.diff`, `walkthrough.apply_ops`.
-- Collaboration state: `attention.human.read`, `attention.agent.read`, `attention.agent.set`, `attention.agent.clear`, `follow_ai.read`, `follow_ai.set`, `selection.read`, `selection.update`, `view.read_state`.
-- Cross-references and objects: `xref.list`, `xref.neighbors`, `xref.add`, `xref.remove`, `object.read`.
-- Queries: `route.find`, `seq.messages`, `seq.search`, `seq.trace`, `flow.reachable`, `flow.paths`, `flow.cycles`, `flow.unreachable`, `flow.dead_ends`, `flow.degrees`.
+- Diagram lifecycle and reads: `diagram_list`, `diagram_current`, `diagram_open`, `diagram_delete`, `diagram_read`, `diagram_stat`, `diagram_get_ast`, `diagram_get_slice`, `diagram_render_text`, `diagram_diff`.
+- Diagram creation and mutation: `diagram_create_from_mermaid`, `diagram_propose_ops`, `diagram_apply_ops`.
+- Walkthroughs: `walkthrough_list`, `walkthrough_current`, `walkthrough_open`, `walkthrough_read`, `walkthrough_stat`, `walkthrough_get_node`, `walkthrough_render_text`, `walkthrough_diff`, `walkthrough_apply_ops`.
+- Collaboration state: `attention_human_read`, `attention_agent_read`, `attention_agent_set`, `attention_agent_clear`, `follow_ai_read`, `follow_ai_set`, `selection_read`, `selection_update`, `view_read_state`.
+- Cross-references and objects: `xref_list`, `xref_neighbors`, `xref_add`, `xref_remove`, `object_read`.
+- Queries: `route_find`, `seq_messages`, `seq_search`, `seq_trace`, `flow_reachable`, `flow_paths`, `flow_cycles`, `flow_unreachable`, `flow_dead_ends`, `flow_degrees`.
 
 Object refs use this canonical shape:
 
@@ -255,7 +255,7 @@ Playbook prompts for MCP clients live in [tests/playbooks](tests/playbooks). Exa
 
 - "From the demo index, list every nav xref that lands in a sequence diagram."
 - "In the flowchart demo with alpha/beta edges, return the local neighborhood around node A."
-- "Create a temporary flowchart diagram, delete it, and confirm it is gone from `diagram.list`."
+- "Create a temporary flowchart diagram, delete it, and confirm it is gone from `diagram_list`."
 
 ## Development
 

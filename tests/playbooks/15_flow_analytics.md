@@ -17,30 +17,30 @@
 
 ## Expected Tool Calls
 ### Required (order matters)
-1. `diagram.list`
-2. `flow.cycles`
+1. `diagram_list`
+2. `flow_cycles`
    - matcher: `diagram_id` `equals` `demo-flow`
-3. `flow.dead_ends`
+3. `flow_dead_ends`
    - matcher: `diagram_id` `equals` `demo-flow`
-4. `flow.degrees`
+4. `flow_degrees`
    - matcher: `diagram_id` `equals` `demo-flow`
    - matcher: `sort_by` `equals` `out`
    - matcher: `top` `equals` `1`
-5. `flow.unreachable`
+5. `flow_unreachable`
    - matcher: `diagram_id` `equals` `demo-flow`
    - matcher: `start_node_id` `equals` `n:b`
 
 ### Optional (acceptable alternatives)
-- `diagram.get_ast` for validation.
+- `diagram_get_ast` for validation.
 
 ### Forbidden
-- `diagram.apply_ops`
-- `diagram.propose_ops`
-- `diagram.create_from_mermaid`
-- `selection.update`
-- `xref.add`
-- `xref.remove`
-- `walkthrough.apply_ops`
+- `diagram_apply_ops`
+- `diagram_propose_ops`
+- `diagram_create_from_mermaid`
+- `selection_update`
+- `xref_add`
+- `xref_remove`
+- `walkthrough_apply_ops`
 
 ## Expected Assistant Output
 - Must state that cycles are empty.

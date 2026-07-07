@@ -17,21 +17,21 @@
 
 ## Expected Tool Calls
 ### Required (order matters)
-1. `diagram.current`
-2. `view.read_state`
-3. `selection.read`
+1. `diagram_current`
+2. `view_read_state`
+3. `selection_read`
 
 ### Optional (acceptable alternatives)
-- `diagram.list` for orientation.
+- `diagram_list` for orientation.
 
 ### Forbidden
-- `diagram.apply_ops`
-- `diagram.propose_ops`
-- `diagram.create_from_mermaid`
-- `selection.update`
-- `xref.add`
-- `xref.remove`
-- `walkthrough.apply_ops`
+- `diagram_apply_ops`
+- `diagram_propose_ops`
+- `diagram_create_from_mermaid`
+- `selection_update`
+- `xref_add`
+- `xref_remove`
+- `walkthrough_apply_ops`
 
 ## Expected Assistant Output
 - Must include active diagram id `demo-00-index`.

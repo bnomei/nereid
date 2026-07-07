@@ -17,25 +17,25 @@
 
 ## Expected Tool Calls
 ### Required (order matters)
-1. `walkthrough.list`
-2. `walkthrough.open`
+1. `walkthrough_list`
+2. `walkthrough_open`
    - matcher: `walkthrough_id` `equals` `wt-demo`
-3. `walkthrough.current`
-4. `walkthrough.read`
+3. `walkthrough_current`
+4. `walkthrough_read`
    - matcher: `walkthrough_id` `equals` `wt-demo`
-5. `walkthrough.stat`
+5. `walkthrough_stat`
    - matcher: `walkthrough_id` `equals` `wt-demo`
-6. `walkthrough.render_text`
+6. `walkthrough_render_text`
    - matcher: `walkthrough_id` `equals` `wt-demo`
 
 ### Optional (acceptable alternatives)
-- `walkthrough.get_node` for spot checks.
+- `walkthrough_get_node` for spot checks.
 
 ### Forbidden
-- `walkthrough.apply_ops`
-- `diagram.apply_ops`
-- `xref.add`
-- `xref.remove`
+- `walkthrough_apply_ops`
+- `diagram_apply_ops`
+- `xref_add`
+- `xref_remove`
 
 ## Expected Assistant Output
 - Must include `wt-demo` as current walkthrough id.

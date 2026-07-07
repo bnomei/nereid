@@ -17,23 +17,23 @@
 
 ## Expected Tool Calls
 ### Required (order matters)
-1. `diagram.list`
-2. `diagram.get_ast`
+1. `diagram_list`
+2. `diagram_get_ast`
    - matcher: `diagram_id` `equals` `demo-t-seq-ambiguous`
-3. `object.read`
+3. `object_read`
    - matcher: reads `d:demo-t-seq-ambiguous/seq/message/m:ok_db`
 
 ### Optional (acceptable alternatives)
-- `seq.search` with `needle` `equals` `OK` (must still use AST to pick the else-branch message).
+- `seq_search` with `needle` `equals` `OK` (must still use AST to pick the else-branch message).
 
 ### Forbidden
-- `diagram.apply_ops`
-- `diagram.propose_ops`
-- `diagram.create_from_mermaid`
-- `selection.update`
-- `xref.add`
-- `xref.remove`
-- `walkthrough.apply_ops`
+- `diagram_apply_ops`
+- `diagram_propose_ops`
+- `diagram_create_from_mermaid`
+- `selection_update`
+- `xref_add`
+- `xref_remove`
+- `walkthrough_apply_ops`
 
 ## Expected Assistant Output
 - Must include message ref `d:demo-t-seq-ambiguous/seq/message/m:ok_db`.
@@ -42,8 +42,8 @@
 - Must mention that this is the else/cache miss branch.
 
 ## Pass/Fail Checklist
-- [ ] `diagram.get_ast` was used to disambiguate the else-branch message.
-- [ ] `object.read` was used to confirm from/to and id.
+- [ ] `diagram_get_ast` was used to disambiguate the else-branch message.
+- [ ] `object_read` was used to confirm from/to and id.
 - [ ] Output includes the exact message ref, ids, and branch context.
 - [ ] No forbidden mutating calls were made.
 

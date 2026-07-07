@@ -13,33 +13,33 @@
 3. Use a fresh prompt context.
 
 ## User Prompt
-`Create a temporary flowchart diagram pb-17-flow, then delete it and confirm it is gone from diagram.list.`
+`Create a temporary flowchart diagram pb-17-flow, then delete it and confirm it is gone from diagram_list.`
 
 ## Expected Tool Calls
 ### Required (order matters)
-1. `diagram.create_from_mermaid`
+1. `diagram_create_from_mermaid`
    - matcher: `diagram_id` `equals` `pb-17-flow`
-2. `diagram.delete`
+2. `diagram_delete`
    - matcher: `diagram_id` `equals` `pb-17-flow`
-3. `diagram.list`
+3. `diagram_list`
 
 ### Optional (acceptable alternatives)
-- `diagram.current` after delete.
+- `diagram_current` after delete.
 
 ### Forbidden
-- `diagram.apply_ops`
-- `diagram.propose_ops`
-- `selection.update`
-- `xref.add`
-- `xref.remove`
-- `walkthrough.apply_ops`
+- `diagram_apply_ops`
+- `diagram_propose_ops`
+- `selection_update`
+- `xref_add`
+- `xref_remove`
+- `walkthrough_apply_ops`
 
 ## Expected Assistant Output
 - Must state that `pb-17-flow` was deleted.
-- Must confirm `pb-17-flow` is not present in `diagram.list`.
+- Must confirm `pb-17-flow` is not present in `diagram_list`.
 
 ## Pass/Fail Checklist
-- [ ] `diagram.create_from_mermaid`, `diagram.delete`, and `diagram.list` were called in order.
+- [ ] `diagram_create_from_mermaid`, `diagram_delete`, and `diagram_list` were called in order.
 - [ ] Output confirms deletion and absence from list.
 - [ ] No forbidden mutating calls were made.
 

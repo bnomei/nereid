@@ -2,7 +2,7 @@
 
 ## Metadata
 - `id`: `PB-14`
-- `goal`: validate `diagram.get_slice` on a flow node.
+- `goal`: validate `diagram_get_slice` on a flow node.
 - `session`: `data/demo-session` (use `--demo`).
 - `difficulty`: `advanced`
 - `mutates_state`: `no`
@@ -17,10 +17,10 @@
 
 ## Expected Tool Calls
 ### Required (order matters)
-1. `diagram.list`
-2. `diagram.get_ast`
+1. `diagram_list`
+2. `diagram_get_ast`
    - matcher: `diagram_id` `equals` `demo-flow`
-3. `diagram.get_slice`
+3. `diagram_get_slice`
    - matcher: `diagram_id` `equals` `demo-flow`
    - matcher: `center_ref` `equals` `d:demo-flow/flow/node/n:a`
    - matcher: `radius` `equals` `1`
@@ -28,13 +28,13 @@
 ### Optional (acceptable alternatives)
 
 ### Forbidden
-- `diagram.apply_ops`
-- `diagram.propose_ops`
-- `diagram.create_from_mermaid`
-- `selection.update`
-- `xref.add`
-- `xref.remove`
-- `walkthrough.apply_ops`
+- `diagram_apply_ops`
+- `diagram_propose_ops`
+- `diagram_create_from_mermaid`
+- `selection_update`
+- `xref_add`
+- `xref_remove`
+- `walkthrough_apply_ops`
 
 ## Expected Assistant Output
 - Must include node ref `d:demo-flow/flow/node/n:a`.
@@ -45,7 +45,7 @@
 - Must not include edge refs `d:demo-flow/flow/edge/e:bd` or `d:demo-flow/flow/edge/e:cd`.
 
 ## Pass/Fail Checklist
-- [ ] `diagram.get_slice` used the expected center ref and radius.
+- [ ] `diagram_get_slice` used the expected center ref and radius.
 - [ ] Output includes the expected nodes and edges.
 - [ ] Output excludes edges outside the radius.
 - [ ] No forbidden mutating calls were made.

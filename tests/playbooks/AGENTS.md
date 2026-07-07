@@ -82,7 +82,7 @@ Split calls into required, optional, and forbidden.
 
 Matching rules:
 
-- Tool names must match exactly (for example `diagram.list`).
+- Tool names must match exactly (for example `diagram_list`).
 - Params can be exact values or constrained matchers.
 - Allowed matcher keywords: `equals`, `contains`, `one_of`, `any`.
 - If order matters, keep required calls in strict sequence.

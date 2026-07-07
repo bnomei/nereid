@@ -17,30 +17,30 @@
 
 ## Expected Tool Calls
 ### Required (order matters)
-1. `diagram.list`
-2. `diagram.get_ast`
+1. `diagram_list`
+2. `diagram_get_ast`
    - matcher: `diagram_id` `equals` `om-20-motifs`
-3. `seq.search`
+3. `seq_search`
    - matcher: `diagram_id` `equals` `om-06-baseball`
    - matcher: `needle` `contains` `difference`
-4. `route.find`
+4. `route_find`
    - matcher: `from_ref` `equals` `d:om-20-motifs/flow/node/n:di_maggio`
    - matcher: `to_ref` `equals` `d:om-06-baseball/seq/message/m:dimaggio_diff`
-5. `object.read`
+5. `object_read`
    - matcher: includes `d:om-06-baseball/seq/message/m:dimaggio_diff`
 
 ### Optional (acceptable alternatives)
-- `xref.neighbors` as a pre-check.
-- `xref.list` filtered by `from_ref` or `involves_ref`.
+- `xref_neighbors` as a pre-check.
+- `xref_list` filtered by `from_ref` or `involves_ref`.
 
 ### Forbidden
-- `diagram.apply_ops`
-- `diagram.propose_ops`
-- `diagram.create_from_mermaid`
-- `selection.update`
-- `xref.add`
-- `xref.remove`
-- `walkthrough.apply_ops`
+- `diagram_apply_ops`
+- `diagram_propose_ops`
+- `diagram_create_from_mermaid`
+- `selection_update`
+- `xref_add`
+- `xref_remove`
+- `walkthrough_apply_ops`
 
 ## Expected Assistant Output
 - Must include a route that starts at `d:om-20-motifs/flow/node/n:di_maggio`.
@@ -48,8 +48,8 @@
 - Must quote the final message text `DiMaggio makes the difference`.
 
 ## Pass/Fail Checklist
-- [ ] `route.find` used the exact start and destination refs.
-- [ ] `object.read` was used to retrieve destination object details.
+- [ ] `route_find` used the exact start and destination refs.
+- [ ] `object_read` was used to retrieve destination object details.
 - [ ] Final answer includes route evidence and the exact quote text.
 - [ ] No forbidden mutating calls were made.
 

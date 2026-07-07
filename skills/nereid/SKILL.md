@@ -15,12 +15,12 @@ Assume co-presence by default:
 - The agent should steer attention visually, then speak briefly.
 
 Drive collaboration with this state model:
-- `attention.human.read`: read the human cursor/attention in TUI.
-- `attention.agent.read`: read the agent spotlight object.
-- `attention.agent.set`: move the agent spotlight to one object.
-- `attention.agent.clear`: clear the agent spotlight.
-- `follow_ai.read` / `follow_ai.set`: read or toggle whether TUI follows agent spotlight.
-- `selection.read` / `selection.update`: shared working-set selection (multi-object).
+- `attention_human_read`: read the human cursor/attention in TUI.
+- `attention_agent_read`: read the agent spotlight object.
+- `attention_agent_set`: move the agent spotlight to one object.
+- `attention_agent_clear`: clear the agent spotlight.
+- `follow_ai_read` / `follow_ai_set`: read or toggle whether TUI follows agent spotlight.
+- `selection_read` / `selection_update`: shared working-set selection (multi-object).
 
 Treat these as separate concerns:
 - Human attention: what the person is looking at.
@@ -34,8 +34,8 @@ Treat these as separate concerns:
 - Session files (`nereid-session.meta.json`, `diagrams/*.mmd`, `walkthroughs/*.wt.json`) are app-managed snapshots and can be rewritten frequently while Nereid runs.
 - Use canonical `ObjectRef` everywhere:
   `d:<diagram_id>/<seq|flow>/<participant|message|node|edge>/<object_id>`.
-- Prefer small reads first (`diagram.stat`, `diagram.get_slice`, `diagram.diff`, `walkthrough.diff`).
-- Use typed query tools (`seq.*`, `flow.*`, `xref.*`, `route.find`) before large snapshots.
+- Prefer small reads first (`diagram_stat`, `diagram_get_slice`, `diagram_diff`, `walkthrough_diff`).
+- Use typed query tools (`seq.*`, `flow.*`, `xref.*`, `route_find`) before large snapshots.
 - Gate edits with `base_rev` and keep ops minimal.
 - Record evidence as refs (xrefs and walkthrough nodes) so reasoning is resumable.
 - Keep dangling xrefs visible as TODO artifacts unless asked to clean them.
@@ -51,52 +51,52 @@ Treat these as separate concerns:
 
 ## Tool Groups
 
-- Diagram lifecycle and target: `diagram.list`, `diagram.open`, `diagram.delete`, `diagram.current`, `diagram.create_from_mermaid`
-- Diagram reads: `diagram.stat`, `diagram.get_slice`, `diagram.diff`, `diagram.read`, `diagram.get_ast`, `diagram.render_text`
-- Diagram mutation: `diagram.propose_ops`, `diagram.apply_ops`
-- Walkthrough lifecycle and target: `walkthrough.list`, `walkthrough.open`, `walkthrough.current`
-- Walkthrough reads: `walkthrough.stat`, `walkthrough.diff`, `walkthrough.read`, `walkthrough.get_node`, `walkthrough.render_text`
-- Walkthrough mutation: `walkthrough.apply_ops`
-- Collaboration state: `attention.human.read`, `attention.agent.read`, `attention.agent.set`, `attention.agent.clear`, `follow_ai.read`, `follow_ai.set`, `selection.read`, `selection.update`, `view.read_state`
-- Cross-diagram mapping: `xref.list`, `xref.neighbors`, `xref.add`, `xref.remove`
-- Object inspection: `object.read`
-- Query helpers (route): `route.find`
-- Query helpers (sequence): `seq.messages`, `seq.search`, `seq.trace`
-- Query helpers (flow): `flow.reachable`, `flow.paths`, `flow.cycles`, `flow.unreachable`, `flow.dead_ends`, `flow.degrees`
+- Diagram lifecycle and target: `diagram_list`, `diagram_open`, `diagram_delete`, `diagram_current`, `diagram_create_from_mermaid`
+- Diagram reads: `diagram_stat`, `diagram_get_slice`, `diagram_diff`, `diagram_read`, `diagram_get_ast`, `diagram_render_text`
+- Diagram mutation: `diagram_propose_ops`, `diagram_apply_ops`
+- Walkthrough lifecycle and target: `walkthrough_list`, `walkthrough_open`, `walkthrough_current`
+- Walkthrough reads: `walkthrough_stat`, `walkthrough_diff`, `walkthrough_read`, `walkthrough_get_node`, `walkthrough_render_text`
+- Walkthrough mutation: `walkthrough_apply_ops`
+- Collaboration state: `attention_human_read`, `attention_agent_read`, `attention_agent_set`, `attention_agent_clear`, `follow_ai_read`, `follow_ai_set`, `selection_read`, `selection_update`, `view_read_state`
+- Cross-diagram mapping: `xref_list`, `xref_neighbors`, `xref_add`, `xref_remove`
+- Object inspection: `object_read`
+- Query helpers (route): `route_find`
+- Query helpers (sequence): `seq_messages`, `seq_search`, `seq_trace`
+- Query helpers (flow): `flow_reachable`, `flow_paths`, `flow_cycles`, `flow_unreachable`, `flow_dead_ends`, `flow_degrees`
 
 ## Default Operating Loop
 
 1. Resolve target:
-   - `diagram.current` -> `diagram.list` -> `diagram.open`.
-   - `walkthrough.current` -> `walkthrough.list` -> `walkthrough.open`.
-   - if no diagram exists yet, bootstrap with `diagram.create_from_mermaid`.
+   - `diagram_current` -> `diagram_list` -> `diagram_open`.
+   - `walkthrough_current` -> `walkthrough_list` -> `walkthrough_open`.
+   - if no diagram exists yet, bootstrap with `diagram_create_from_mermaid`.
 2. Read live collab state:
-   - `attention.human.read`, `attention.agent.read`, `follow_ai.read`, `selection.read`.
+   - `attention_human_read`, `attention_agent_read`, `follow_ai_read`, `selection_read`.
 3. Probe local context:
-   - `diagram.stat`, `diagram.get_slice`, then one or two typed queries.
+   - `diagram_stat`, `diagram_get_slice`, then one or two typed queries.
 4. Steer visual attention:
-   - `attention.agent.set` to the object currently being discussed.
+   - `attention_agent_set` to the object currently being discussed.
    - keep chat short while attention marker carries micro-guidance.
 5. Propose and apply minimal edits:
-   - `diagram.propose_ops` -> `diagram.apply_ops`.
-   - `walkthrough.apply_ops` for walkthrough refinement.
+   - `diagram_propose_ops` -> `diagram_apply_ops`.
+   - `walkthrough_apply_ops` for walkthrough refinement.
 6. Refresh with deltas:
-   - `diagram.diff` / `walkthrough.diff` (avoid full re-read unless needed).
+   - `diagram_diff` / `walkthrough_diff` (avoid full re-read unless needed).
 
 ## Live Co-Presence Rules
 
-- Use spotlight-first communication: set `attention.agent.set` before explaining a local change.
+- Use spotlight-first communication: set `attention_agent_set` before explaining a local change.
 - Move spotlight when changing topic; clear it when complete.
 - Keep narration compact when user is actively watching the diagram.
 - Skip spotlight changes for quick query-only answers unless orientation is needed.
-- Use `selection.update` for temporary multi-object working sets, not as a focus proxy.
-- For create/switch-only requests, stop after `diagram.create_from_mermaid` (and optional
-  `attention.agent.set`); avoid extra `diagram.stat`, `diagram.render_text`, or `flow.*` probes
+- Use `selection_update` for temporary multi-object working sets, not as a focus proxy.
+- For create/switch-only requests, stop after `diagram_create_from_mermaid` (and optional
+  `attention_agent_set`); avoid extra `diagram_stat`, `diagram_render_text`, or `flow.*` probes
   unless the user asks for inspection/debugging.
 
 ## Tool Contracts (Input/Output)
 
-### `diagram.create_from_mermaid`
+### `diagram_create_from_mermaid`
 Input:
 ```json
 {
@@ -119,7 +119,7 @@ Output:
 }
 ```
 
-### `diagram.delete`
+### `diagram_delete`
 Input:
 ```json
 {
@@ -134,7 +134,7 @@ Output:
 }
 ```
 
-### `diagram.get_slice`
+### `diagram_get_slice`
 Input:
 ```json
 {
@@ -156,7 +156,7 @@ Output:
 }
 ```
 
-### `diagram.apply_ops`
+### `diagram_apply_ops`
 Input:
 ```json
 {
@@ -174,7 +174,7 @@ Output:
 }
 ```
 
-### `walkthrough.apply_ops`
+### `walkthrough_apply_ops`
 Input:
 ```json
 {
@@ -192,7 +192,7 @@ Output:
 }
 ```
 
-### `object.read`
+### `object_read`
 Input:
 ```json
 { "object_ref": "d:d-seq/seq/block/b:0000" }
@@ -225,7 +225,7 @@ Output:
 }
 ```
 
-### `attention.human.read`
+### `attention_human_read`
 Input:
 ```json
 {}
@@ -238,7 +238,7 @@ Output:
 }
 ```
 
-### `attention.agent.read`
+### `attention_agent_read`
 Input:
 ```json
 {}
@@ -251,7 +251,7 @@ Output:
 }
 ```
 
-### `attention.agent.set`
+### `attention_agent_set`
 Input:
 ```json
 {
@@ -266,7 +266,7 @@ Output:
 }
 ```
 
-### `attention.agent.clear`
+### `attention_agent_clear`
 Input:
 ```json
 {}
@@ -278,7 +278,7 @@ Output:
 }
 ```
 
-### `follow_ai.read`
+### `follow_ai_read`
 Input:
 ```json
 {}
@@ -290,7 +290,7 @@ Output:
 }
 ```
 
-### `follow_ai.set`
+### `follow_ai_set`
 Input:
 ```json
 {
@@ -304,7 +304,7 @@ Output:
 }
 ```
 
-### `selection.update`
+### `selection_update`
 Input:
 ```json
 {
@@ -329,20 +329,20 @@ Output:
 ## Probe-and-Refine on Charts
 
 Use a shallow, typed exploration loop:
-1. Anchor on one object (`attention.human.read` or explicit `object_ref`).
-2. Pull local structure with `diagram.get_slice`.
-3. Ask one typed question (`seq.*`, `flow.*`, `xref.*`, `route.find`).
+1. Anchor on one object (`attention_human_read` or explicit `object_ref`).
+2. Pull local structure with `diagram_get_slice`.
+3. Ask one typed question (`seq.*`, `flow.*`, `xref.*`, `route_find`).
 4. Shift agent spotlight to next object if needed.
 5. Repeat until ambiguity is resolved.
 
-Escalate to global reads (`diagram.read`, `diagram.get_ast`, `diagram.render_text`) only when local probes are insufficient.
+Escalate to global reads (`diagram_read`, `diagram_get_ast`, `diagram_render_text`) only when local probes are insufficient.
 
 ## Mutation Discipline
 
-- Use `diagram.propose_ops` before `diagram.apply_ops` for non-trivial edits.
+- Use `diagram_propose_ops` before `diagram_apply_ops` for non-trivial edits.
 - Keep op batches minimal and scoped to one local intent.
 - Use stable IDs for all new objects.
-- Re-read `diagram.stat` or `diagram.diff` after apply to confirm resulting rev/state.
+- Re-read `diagram_stat` or `diagram_diff` after apply to confirm resulting rev/state.
 
 ## Walkthrough and Evidence Artifacts
 
@@ -353,18 +353,18 @@ Build walkthroughs as resumable breadcrumbs:
 - Update walkthroughs after edits instead of re-deriving from scratch.
 
 Use xrefs to preserve cross-diagram semantics:
-- `xref.add` for implementation/expansion links.
-- `xref.list` and `xref.neighbors` for map and traversal.
+- `xref_add` for implementation/expansion links.
+- `xref_list` and `xref_neighbors` for map and traversal.
 - Surface dangling xrefs explicitly for follow-up.
 
 ## Conflict Recovery
 
 When mutation fails due to stale `base_rev`:
-1. call `diagram.diff` or `walkthrough.diff` from last known rev,
+1. call `diagram_diff` or `walkthrough_diff` from last known rev,
 2. rebase ops on `current_rev`,
 3. retry with updated `base_rev`.
 
-If diff history window is exhausted, fetch a fresh snapshot (`diagram.read` or `walkthrough.read`) and resume delta-first flow.
+If diff history window is exhausted, fetch a fresh snapshot (`diagram_read` or `walkthrough_read`) and resume delta-first flow.
 
 ## Reporting Discipline
 

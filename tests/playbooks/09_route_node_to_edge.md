@@ -17,23 +17,23 @@
 
 ## Expected Tool Calls
 ### Required (order matters)
-1. `route.find`
+1. `route_find`
    - matcher: `from_ref` `equals` `d:demo-flow/flow/node/n:a`
    - matcher: `to_ref` `equals` `d:demo-flow/flow/edge/e:cd`
    - matcher: `ordering` `equals` `fewest_hops`
    - matcher: `limit` `equals` `1`
 
 ### Optional (acceptable alternatives)
-- `diagram.get_ast` for validation.
+- `diagram_get_ast` for validation.
 
 ### Forbidden
-- `diagram.apply_ops`
-- `diagram.propose_ops`
-- `diagram.create_from_mermaid`
-- `selection.update`
-- `xref.add`
-- `xref.remove`
-- `walkthrough.apply_ops`
+- `diagram_apply_ops`
+- `diagram_propose_ops`
+- `diagram_create_from_mermaid`
+- `selection_update`
+- `xref_add`
+- `xref_remove`
+- `walkthrough_apply_ops`
 
 ## Expected Assistant Output
 - Must return the shortest route:
@@ -42,7 +42,7 @@
   - `d:demo-flow/flow/edge/e:cd`
 
 ## Pass/Fail Checklist
-- [ ] `route.find` used fewest-hops ordering with the exact refs.
+- [ ] `route_find` used fewest-hops ordering with the exact refs.
 - [ ] Output route matches the shortest path above.
 - [ ] No forbidden mutating calls were made.
 

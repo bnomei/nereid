@@ -1,6 +1,6 @@
 [
   {
-    "name": "attention.agent.clear",
+    "name": "attention_agent_clear",
     "description": "Clear agent-owned attention; use when done with a topic or before changing context.",
     "inputSchema": {
       "properties": {},
@@ -23,8 +23,8 @@
     }
   },
   {
-    "name": "attention.agent.read",
-    "description": "Read agent-owned attention (single spotlight); call before `attention.agent.set`/`clear`\nto avoid unnecessary spotlight churn.",
+    "name": "attention_agent_read",
+    "description": "Read agent-owned attention (single spotlight); call before `attention_agent_set`/`clear`\nto avoid unnecessary spotlight churn.",
     "inputSchema": {
       "properties": {},
       "type": "object"
@@ -103,7 +103,7 @@
     }
   },
   {
-    "name": "attention.agent.set",
+    "name": "attention_agent_set",
     "description": "Set agent-owned attention to one object; call before explanations/edits so the user can\nfollow the agent in real time.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -137,8 +137,8 @@
     }
   },
   {
-    "name": "attention.human.read",
-    "description": "Read human-owned attention from live TUI state; call early in a turn, then localize with\n`diagram.get_slice` and `object.read`.",
+    "name": "attention_human_read",
+    "description": "Read human-owned attention from live TUI state; call early in a turn, then localize with\n`diagram_get_slice` and `object_read`.",
     "inputSchema": {
       "properties": {},
       "type": "object"
@@ -217,8 +217,8 @@
     }
   },
   {
-    "name": "diagram.apply_ops",
-    "description": "Apply structured diagram ops gated by `base_rev`; prefer `diagram.propose_ops` first, then\nrefresh with `diagram.diff`.",
+    "name": "diagram_apply_ops",
+    "description": "Apply structured diagram ops gated by `base_rev`; prefer `diagram_propose_ops` first, then\nrefresh with `diagram_diff`.",
     "inputSchema": {
       "$defs": {
         "McpOp": {
@@ -732,8 +732,8 @@
     }
   },
   {
-    "name": "diagram.create_from_mermaid",
-    "description": "Create a diagram from raw Mermaid; use to bootstrap a session, then continue with\n`diagram.open`/`diagram.stat`.",
+    "name": "diagram_create_from_mermaid",
+    "description": "Create a diagram from raw Mermaid; use to bootstrap a session, then continue with\n`diagram_open`/`diagram_stat`.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -817,8 +817,8 @@
     }
   },
   {
-    "name": "diagram.current",
-    "description": "Get the active diagram id (`null` when unset); check this before deciding whether to call\n`diagram.open`, then continue with `diagram.stat`/`diagram.get_slice`.",
+    "name": "diagram_current",
+    "description": "Get the active diagram id (`null` when unset); check this before deciding whether to call\n`diagram_open`, then continue with `diagram_stat`/`diagram_get_slice`.",
     "inputSchema": {
       "properties": {},
       "type": "object"
@@ -891,7 +891,7 @@
     }
   },
   {
-    "name": "diagram.delete",
+    "name": "diagram_delete",
     "description": "Remove a diagram by id and retarget active diagram when needed.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -927,8 +927,8 @@
     }
   },
   {
-    "name": "diagram.diff",
-    "description": "Get diagram delta since a revision; default refresh step after `diagram.apply_ops` or\nexternal changes.",
+    "name": "diagram_diff",
+    "description": "Get diagram delta since a revision; default refresh step after `diagram_apply_ops` or\nexternal changes.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -1008,7 +1008,7 @@
     }
   },
   {
-    "name": "diagram.get_ast",
+    "name": "diagram_get_ast",
     "description": "Read full diagram AST for id/label resolution; prefer this over session-file reads.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1338,7 +1338,7 @@
     }
   },
   {
-    "name": "diagram.get_slice",
+    "name": "diagram_get_slice",
     "description": "Get deterministic local neighborhood around an `object_ref`; primary probe tool after\nattention/selection or search hits.",
     "inputSchema": {
       "$defs": {
@@ -1435,8 +1435,8 @@
     }
   },
   {
-    "name": "diagram.list",
-    "description": "List diagrams in the current session; start here, then call `diagram.current` or\n`diagram.open` (bootstrap with `diagram.create_from_mermaid` if empty).",
+    "name": "diagram_list",
+    "description": "List diagrams in the current session; start here, then call `diagram_current` or\n`diagram_open` (bootstrap with `diagram_create_from_mermaid` if empty).",
     "inputSchema": {
       "properties": {},
       "type": "object"
@@ -1535,8 +1535,8 @@
     }
   },
   {
-    "name": "diagram.open",
-    "description": "Set the active diagram default for diagram-scoped tools; typically follows `diagram.list`\nor `diagram.create_from_mermaid`.",
+    "name": "diagram_open",
+    "description": "Set the active diagram default for diagram-scoped tools; typically follows `diagram_list`\nor `diagram_create_from_mermaid`.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -1565,8 +1565,8 @@
     }
   },
   {
-    "name": "diagram.propose_ops",
-    "description": "Validate ops against `base_rev` and return predicted delta without mutation; use immediately\nbefore `diagram.apply_ops` for safe human-agent collaboration.",
+    "name": "diagram_propose_ops",
+    "description": "Validate ops against `base_rev` and return predicted delta without mutation; use immediately\nbefore `diagram_apply_ops` for safe human-agent collaboration.",
     "inputSchema": {
       "$defs": {
         "McpOp": {
@@ -2080,7 +2080,7 @@
     }
   },
   {
-    "name": "diagram.read",
+    "name": "diagram_read",
     "description": "Read canonical Mermaid snapshot of current diagram AST; use for export/review and\ndebugging, not as the default probe.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2171,8 +2171,8 @@
     }
   },
   {
-    "name": "diagram.render_text",
-    "description": "Render diagram as deterministic text (Unicode allowed); use for human-readable snapshots\nand review, then return to `diagram.stat`/`diagram.get_slice` for targeted reasoning.",
+    "name": "diagram_render_text",
+    "description": "Render diagram as deterministic text (Unicode allowed); use for human-readable snapshots\nand review, then return to `diagram_stat`/`diagram_get_slice` for targeted reasoning.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -2252,8 +2252,8 @@
     }
   },
   {
-    "name": "diagram.stat",
-    "description": "Get a compact diagram digest (rev + counts + key names); use as the default first read\nbefore `diagram.get_slice`, typed queries, or mutation planning.",
+    "name": "diagram_stat",
+    "description": "Get a compact diagram digest (rev + counts + key names); use as the default first read\nbefore `diagram_get_slice`, typed queries, or mutation planning.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -2377,7 +2377,7 @@
     }
   },
   {
-    "name": "flow.cycles",
+    "name": "flow_cycles",
     "description": "Detect flowchart cycles (returns node ref cycles); use for risk checks before edits.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2413,8 +2413,8 @@
     }
   },
   {
-    "name": "flow.dead_ends",
-    "description": "List terminal flowchart nodes (returns refs); combine with `flow.unreachable` to identify\ndead routes.",
+    "name": "flow_dead_ends",
+    "description": "List terminal flowchart nodes (returns refs); combine with `flow_unreachable` to identify\ndead routes.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -2446,7 +2446,7 @@
     }
   },
   {
-    "name": "flow.degrees",
+    "name": "flow_degrees",
     "description": "Compute flow fan-in/fan-out degrees (returns refs + counts); use to identify hubs and\nbottlenecks before refactoring.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2522,8 +2522,8 @@
     }
   },
   {
-    "name": "flow.paths",
-    "description": "Find bounded paths between two flow nodes (returns ref paths); use after\n`flow.reachable`/`object.read` to explain alternatives.",
+    "name": "flow_paths",
+    "description": "Find bounded paths between two flow nodes (returns ref paths); use after\n`flow_reachable`/`object_read` to explain alternatives.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -2584,8 +2584,8 @@
     }
   },
   {
-    "name": "flow.reachable",
-    "description": "List flow nodes reachable from a node id (returns refs); pair with `flow.paths` and\n`diagram.get_slice` for local traversal.",
+    "name": "flow_reachable",
+    "description": "List flow nodes reachable from a node id (returns refs); pair with `flow_paths` and\n`diagram_get_slice` for local traversal.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -2629,8 +2629,8 @@
     }
   },
   {
-    "name": "flow.unreachable",
-    "description": "List nodes unreachable from start nodes (returns refs); use for cleanup/TODO mapping and\nfollow with `diagram.get_slice`.",
+    "name": "flow_unreachable",
+    "description": "List nodes unreachable from start nodes (returns refs); use for cleanup/TODO mapping and\nfollow with `diagram_get_slice`.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -2668,8 +2668,8 @@
     }
   },
   {
-    "name": "follow_ai.read",
-    "description": "Read follow-AI mode (`true` means TUI tracks agent spotlight); check this before\nspotlight-heavy guidance, and pair with `follow_ai.set` when handing off control.",
+    "name": "follow_ai_read",
+    "description": "Read follow-AI mode (`true` means TUI tracks agent spotlight); check this before\nspotlight-heavy guidance, and pair with `follow_ai_set` when handing off control.",
     "inputSchema": {
       "properties": {},
       "type": "object"
@@ -2740,8 +2740,8 @@
     }
   },
   {
-    "name": "follow_ai.set",
-    "description": "Set follow-AI mode (`true` to track agent spotlight in TUI); use with `attention.agent.set`\nfor guided handoff.",
+    "name": "follow_ai_set",
+    "description": "Set follow-AI mode (`true` to track agent spotlight in TUI); use with `attention_agent_set`\nfor guided handoff.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -2770,7 +2770,7 @@
     }
   },
   {
-    "name": "object.read",
+    "name": "object_read",
     "description": "Read concrete object fields by ref; use this as evidence before answering.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -3097,8 +3097,8 @@
     }
   },
   {
-    "name": "route.find",
-    "description": "Find cross-diagram routes between two object refs; combine with `xref.neighbors` and\n`diagram.get_slice` for explain-and-refine flows.",
+    "name": "route_find",
+    "description": "Find cross-diagram routes between two object refs; combine with `xref_neighbors` and\n`diagram_get_slice` for explain-and-refine flows.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -3159,8 +3159,8 @@
     }
   },
   {
-    "name": "selection.read",
-    "description": "Read the shared multi-selection working set as canonical `object_ref`s; call after\n`attention.human.read` and before `object.read` or `selection.update`.",
+    "name": "selection_read",
+    "description": "Read the shared multi-selection working set as canonical `object_ref`s; call after\n`attention_human_read` and before `object_read` or `selection_update`.",
     "inputSchema": {
       "properties": {},
       "type": "object"
@@ -3234,7 +3234,7 @@
     }
   },
   {
-    "name": "selection.update",
+    "name": "selection_update",
     "description": "Update shared multi-selection (`replace`/`add`/`remove`); use to mark a temporary working\nset for discussion or edits.",
     "inputSchema": {
       "$defs": {
@@ -3291,8 +3291,8 @@
     }
   },
   {
-    "name": "seq.messages",
-    "description": "List sequence messages (returns refs) with optional filters; good starting point before\n`seq.trace` or targeted mutation planning.",
+    "name": "seq_messages",
+    "description": "List sequence messages (returns refs) with optional filters; good starting point before\n`seq_trace` or targeted mutation planning.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -3336,8 +3336,8 @@
     }
   },
   {
-    "name": "seq.search",
-    "description": "Search sequence messages by substring/regex (returns refs); typically feed results into\n`object.read`, `seq.trace`, or attention/selection updates.",
+    "name": "seq_search",
+    "description": "Search sequence messages by substring/regex (returns refs); typically feed results into\n`object_read`, `seq_trace`, or attention/selection updates.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -3387,7 +3387,7 @@
     }
   },
   {
-    "name": "seq.trace",
+    "name": "seq_trace",
     "description": "Trace sequence message order before/after a message id (returns refs); use for timeline\nexplanations and local impact checks.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -3440,8 +3440,8 @@
     }
   },
   {
-    "name": "view.read_state",
-    "description": "Read UI view state (active diagram, scroll, panes); use with\n`attention.human.read`/`attention.agent.read` for orientation without mutating focus.",
+    "name": "view_read_state",
+    "description": "Read UI view state (active diagram, scroll, panes); use with\n`attention_human_read`/`attention_agent_read` for orientation without mutating focus.",
     "inputSchema": {
       "properties": {},
       "type": "object"
@@ -3542,8 +3542,8 @@
     }
   },
   {
-    "name": "walkthrough.apply_ops",
-    "description": "Apply walkthrough ops using `base_rev` from `walkthrough.stat`; on conflict, refresh and retry.",
+    "name": "walkthrough_apply_ops",
+    "description": "Apply walkthrough ops using `base_rev` from `walkthrough_stat`; on conflict, refresh and retry.",
     "inputSchema": {
       "$defs": {
         "McpWalkthroughOp": {
@@ -3851,8 +3851,8 @@
     }
   },
   {
-    "name": "walkthrough.current",
-    "description": "Get the active walkthrough id (`null` when unset); call after `walkthrough.list` and\nbefore `walkthrough.open`/`walkthrough.read`.",
+    "name": "walkthrough_current",
+    "description": "Get the active walkthrough id (`null` when unset); call after `walkthrough_list` and\nbefore `walkthrough_open`/`walkthrough_read`.",
     "inputSchema": {
       "properties": {},
       "type": "object"
@@ -3925,7 +3925,7 @@
     }
   },
   {
-    "name": "walkthrough.diff",
+    "name": "walkthrough_diff",
     "description": "Read walkthrough delta since a revision; call after mutations to verify applied changes.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -4004,8 +4004,8 @@
     }
   },
   {
-    "name": "walkthrough.get_node",
-    "description": "Get one walkthrough node by id; use for drill-down after `walkthrough.list` or\n`walkthrough.read`.",
+    "name": "walkthrough_get_node",
+    "description": "Get one walkthrough node by id; use for drill-down after `walkthrough_list` or\n`walkthrough_read`.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -4130,8 +4130,8 @@
     }
   },
   {
-    "name": "walkthrough.list",
-    "description": "List walkthroughs in the current session; start here, then `walkthrough.open`,\n`walkthrough.stat`, or `walkthrough.read`.",
+    "name": "walkthrough_list",
+    "description": "List walkthroughs in the current session; start here, then `walkthrough_open`,\n`walkthrough_stat`, or `walkthrough_read`.",
     "inputSchema": {
       "properties": {},
       "type": "object"
@@ -4238,8 +4238,8 @@
     }
   },
   {
-    "name": "walkthrough.open",
-    "description": "Set the active walkthrough default for walkthrough-scoped tools; usually after\n`walkthrough.list`.",
+    "name": "walkthrough_open",
+    "description": "Set the active walkthrough default for walkthrough-scoped tools; usually after\n`walkthrough_list`.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -4268,8 +4268,8 @@
     }
   },
   {
-    "name": "walkthrough.read",
-    "description": "Read a full walkthrough (nodes/edges/refs); call after `walkthrough.stat` when you need\ncomplete node/edge detail, and before targeted `walkthrough.get_node`.",
+    "name": "walkthrough_read",
+    "description": "Read a full walkthrough (nodes/edges/refs); call after `walkthrough_stat` when you need\ncomplete node/edge detail, and before targeted `walkthrough_get_node`.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -4450,8 +4450,8 @@
     }
   },
   {
-    "name": "walkthrough.render_text",
-    "description": "Render walkthrough text for human-readable sharing/export; prefer\n`walkthrough.stat`/`walkthrough.read` for machine reasoning and follow-up edits.",
+    "name": "walkthrough_render_text",
+    "description": "Render walkthrough text for human-readable sharing/export; prefer\n`walkthrough_stat`/`walkthrough_read` for machine reasoning and follow-up edits.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -4531,7 +4531,7 @@
     }
   },
   {
-    "name": "walkthrough.stat",
+    "name": "walkthrough_stat",
     "description": "Read current walkthrough revision and counts; call before walkthrough mutations.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -4648,7 +4648,7 @@
     }
   },
   {
-    "name": "xref.add",
+    "name": "xref_add",
     "description": "Add a cross-diagram xref; use to persist discovered relationships from route/trace analysis\nand walkthrough work.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -4700,7 +4700,7 @@
     }
   },
   {
-    "name": "xref.list",
+    "name": "xref_list",
     "description": "List session xrefs (including dangling filters); use to audit mappings before route/search\nexploration or cleanup.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -4812,8 +4812,8 @@
     }
   },
   {
-    "name": "xref.neighbors",
-    "description": "List xref-neighbor objects connected to an `object_ref`; useful probe step after\n`attention.human.read` or `route.find`.",
+    "name": "xref_neighbors",
+    "description": "List xref-neighbor objects connected to an `object_ref`; useful probe step after\n`attention_human_read` or `route_find`.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -4851,8 +4851,8 @@
     }
   },
   {
-    "name": "xref.remove",
-    "description": "Remove an xref by id; typically follows `xref.list` review or dangling cleanup.",
+    "name": "xref_remove",
+    "description": "Remove an xref by id; typically follows `xref_list` review or dangling cleanup.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {

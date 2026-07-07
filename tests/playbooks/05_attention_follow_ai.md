@@ -18,25 +18,25 @@
 
 ## Expected Tool Calls
 ### Required (order matters)
-1. `follow_ai.set`
+1. `follow_ai_set`
    - matcher: `enabled` `equals` `true`
-2. `attention.agent.set`
+2. `attention_agent_set`
    - matcher: `object_ref` `equals` `d:om-12-sharks/seq/participant/p:mako`
-3. `attention.agent.read`
-4. `follow_ai.read`
+3. `attention_agent_read`
+4. `follow_ai_read`
 
 ### Optional (acceptable alternatives)
-- Initial `follow_ai.read` before `follow_ai.set`.
-- `attention.human.read` for additional context.
+- Initial `follow_ai_read` before `follow_ai_set`.
+- `attention_human_read` for additional context.
 
 ### Forbidden
-- `diagram.apply_ops`
-- `diagram.propose_ops`
-- `diagram.create_from_mermaid`
-- `selection.update`
-- `xref.add`
-- `xref.remove`
-- `walkthrough.apply_ops`
+- `diagram_apply_ops`
+- `diagram_propose_ops`
+- `diagram_create_from_mermaid`
+- `selection_update`
+- `xref_add`
+- `xref_remove`
+- `walkthrough_apply_ops`
 
 ## Expected Assistant Output
 - Must report `follow_ai` as enabled (`true`).
@@ -44,8 +44,8 @@
 - Should mention diagram id `om-12-sharks`.
 
 ## Pass/Fail Checklist
-- [ ] `follow_ai.set(true)` was called.
-- [ ] `attention.agent.set` targeted the exact mako object ref.
+- [ ] `follow_ai_set(true)` was called.
+- [ ] `attention_agent_set` targeted the exact mako object ref.
 - [ ] Readback calls confirm both follow-AI and agent attention state.
 - [ ] Final answer accurately reflects readback state.
 

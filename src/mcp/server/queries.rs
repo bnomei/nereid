@@ -15,9 +15,9 @@ use super::*;
 
 #[tool_router(router = queries_tool_router, vis = "pub(super)")]
 impl NereidMcp {
-    /// Find cross-diagram routes between two object refs; combine with `xref.neighbors` and
-    /// `diagram.get_slice` for explain-and-refine flows.
-    #[tool(name = "route.find")]
+    /// Find cross-diagram routes between two object refs; combine with `xref_neighbors` and
+    /// `diagram_get_slice` for explain-and-refine flows.
+    #[tool(name = "route_find")]
     pub(super) async fn route_find(
         &self,
         params: Parameters<RouteFindParams>,
@@ -62,7 +62,7 @@ impl NereidMcp {
     }
     /// Trace sequence message order before/after a message id (returns refs); use for timeline
     /// explanations and local impact checks.
-    #[tool(name = "seq.trace")]
+    #[tool(name = "seq_trace")]
     pub(super) async fn seq_trace(
         &self,
         params: Parameters<SeqTraceParams>,
@@ -155,8 +155,8 @@ impl NereidMcp {
     }
 
     /// Search sequence messages by substring/regex (returns refs); typically feed results into
-    /// `object.read`, `seq.trace`, or attention/selection updates.
-    #[tool(name = "seq.search")]
+    /// `object_read`, `seq_trace`, or attention/selection updates.
+    #[tool(name = "seq_search")]
     pub(super) async fn seq_search(
         &self,
         params: Parameters<SeqSearchParams>,
@@ -221,8 +221,8 @@ impl NereidMcp {
     }
 
     /// List sequence messages (returns refs) with optional filters; good starting point before
-    /// `seq.trace` or targeted mutation planning.
-    #[tool(name = "seq.messages")]
+    /// `seq_trace` or targeted mutation planning.
+    #[tool(name = "seq_messages")]
     pub(super) async fn seq_messages(
         &self,
         params: Parameters<SeqMessagesParams>,
@@ -289,9 +289,9 @@ impl NereidMcp {
         Ok(Json(SeqMessagesResponse { messages }))
     }
 
-    /// List flow nodes reachable from a node id (returns refs); pair with `flow.paths` and
-    /// `diagram.get_slice` for local traversal.
-    #[tool(name = "flow.reachable")]
+    /// List flow nodes reachable from a node id (returns refs); pair with `flow_paths` and
+    /// `diagram_get_slice` for local traversal.
+    #[tool(name = "flow_reachable")]
     pub(super) async fn flow_reachable(
         &self,
         params: Parameters<FlowReachableParams>,
@@ -360,8 +360,8 @@ impl NereidMcp {
     }
 
     /// Find bounded paths between two flow nodes (returns ref paths); use after
-    /// `flow.reachable`/`object.read` to explain alternatives.
-    #[tool(name = "flow.paths")]
+    /// `flow_reachable`/`object_read` to explain alternatives.
+    #[tool(name = "flow_paths")]
     pub(super) async fn flow_paths(
         &self,
         params: Parameters<FlowPathsParams>,
@@ -455,7 +455,7 @@ impl NereidMcp {
     }
 
     /// Detect flowchart cycles (returns node ref cycles); use for risk checks before edits.
-    #[tool(name = "flow.cycles")]
+    #[tool(name = "flow_cycles")]
     pub(super) async fn flow_cycles(
         &self,
         params: Parameters<DiagramTargetParams>,
@@ -492,9 +492,9 @@ impl NereidMcp {
         Ok(Json(FlowCyclesResponse { cycles }))
     }
 
-    /// List terminal flowchart nodes (returns refs); combine with `flow.unreachable` to identify
+    /// List terminal flowchart nodes (returns refs); combine with `flow_unreachable` to identify
     /// dead routes.
-    #[tool(name = "flow.dead_ends")]
+    #[tool(name = "flow_dead_ends")]
     pub(super) async fn flow_dead_ends(
         &self,
         params: Parameters<DiagramTargetParams>,
@@ -529,7 +529,7 @@ impl NereidMcp {
 
     /// Compute flow fan-in/fan-out degrees (returns refs + counts); use to identify hubs and
     /// bottlenecks before refactoring.
-    #[tool(name = "flow.degrees")]
+    #[tool(name = "flow_degrees")]
     pub(super) async fn flow_degrees(
         &self,
         params: Parameters<FlowDegreesParams>,
@@ -621,8 +621,8 @@ impl NereidMcp {
     }
 
     /// List nodes unreachable from start nodes (returns refs); use for cleanup/TODO mapping and
-    /// follow with `diagram.get_slice`.
-    #[tool(name = "flow.unreachable")]
+    /// follow with `diagram_get_slice`.
+    #[tool(name = "flow_unreachable")]
     pub(super) async fn flow_unreachable(
         &self,
         params: Parameters<FlowUnreachableParams>,

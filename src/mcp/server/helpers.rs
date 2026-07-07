@@ -509,12 +509,12 @@ fn walkthrough_delta_response_from_history(
 
 fn delta_unavailable(since_rev: u64, current_rev: u64, supported_since_rev: u64) -> ErrorData {
     ErrorData::invalid_request(
-        "delta unavailable; use diagram.read",
+        "delta unavailable; use diagram_read",
         Some(serde_json::json!({
             "since_rev": since_rev,
             "current_rev": current_rev,
             "supported_since_rev": supported_since_rev,
-            "snapshot_tool": "diagram.read",
+            "snapshot_tool": "diagram_read",
         })),
     )
 }
@@ -525,12 +525,12 @@ fn walkthrough_delta_unavailable(
     supported_since_rev: u64,
 ) -> ErrorData {
     ErrorData::invalid_request(
-        "delta unavailable; use walkthrough.read",
+        "delta unavailable; use walkthrough_read",
         Some(serde_json::json!({
             "since_rev": since_rev,
             "current_rev": current_rev,
             "supported_since_rev": supported_since_rev,
-            "snapshot_tool": "walkthrough.read",
+            "snapshot_tool": "walkthrough_read",
         })),
     )
 }

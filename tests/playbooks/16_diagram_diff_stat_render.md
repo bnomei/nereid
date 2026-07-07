@@ -2,7 +2,7 @@
 
 ## Metadata
 - `id`: `PB-16`
-- `goal`: cover `diagram.diff`, `diagram.stat`, and `diagram.render_text` in one flow.
+- `goal`: cover `diagram_diff`, `diagram_stat`, and `diagram_render_text` in one flow.
 - `session`: `data/demo-session` (use `--demo`).
 - `difficulty`: `advanced`
 - `mutates_state`: `yes` (creates and updates a temporary diagram)
@@ -17,28 +17,28 @@
 
 ## Expected Tool Calls
 ### Required (order matters)
-1. `diagram.create_from_mermaid`
+1. `diagram_create_from_mermaid`
    - matcher: `diagram_id` `equals` `pb-16-seq`
-2. `diagram.apply_ops`
+2. `diagram_apply_ops`
    - matcher: `diagram_id` `equals` `pb-16-seq`
    - matcher: `base_rev` `equals` `0`
-3. `diagram.diff`
+3. `diagram_diff`
    - matcher: `diagram_id` `equals` `pb-16-seq`
    - matcher: `since_rev` `equals` `0`
-4. `diagram.stat`
+4. `diagram_stat`
    - matcher: `diagram_id` `equals` `pb-16-seq`
-5. `diagram.render_text`
+5. `diagram_render_text`
    - matcher: `diagram_id` `equals` `pb-16-seq`
 
 ### Optional (acceptable alternatives)
-- `diagram.read` before or after apply.
+- `diagram_read` before or after apply.
 
 ### Forbidden
-- `diagram.delete`
-- `selection.update`
-- `xref.add`
-- `xref.remove`
-- `walkthrough.apply_ops`
+- `diagram_delete`
+- `selection_update`
+- `xref_add`
+- `xref_remove`
+- `walkthrough_apply_ops`
 
 ## Expected Assistant Output
 - Must indicate that diff contains changes since rev `0`.

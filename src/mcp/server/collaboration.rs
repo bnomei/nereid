@@ -16,8 +16,8 @@ use super::*;
 #[tool_router(router = collaboration_tool_router, vis = "pub(super)")]
 impl NereidMcp {
     /// Read human-owned attention from live TUI state; call early in a turn, then localize with
-    /// `diagram.get_slice` and `object.read`.
-    #[tool(name = "attention.human.read")]
+    /// `diagram_get_slice` and `object_read`.
+    #[tool(name = "attention_human_read")]
     pub(super) async fn attention_human_read(
         &self,
     ) -> Result<Json<AttentionReadResponse>, ErrorData> {
@@ -33,9 +33,9 @@ impl NereidMcp {
         }))
     }
 
-    /// Read agent-owned attention (single spotlight); call before `attention.agent.set`/`clear`
+    /// Read agent-owned attention (single spotlight); call before `attention_agent_set`/`clear`
     /// to avoid unnecessary spotlight churn.
-    #[tool(name = "attention.agent.read")]
+    #[tool(name = "attention_agent_read")]
     pub(super) async fn attention_agent_read(
         &self,
     ) -> Result<Json<AttentionReadResponse>, ErrorData> {
@@ -57,7 +57,7 @@ impl NereidMcp {
 
     /// Set agent-owned attention to one object; call before explanations/edits so the user can
     /// follow the agent in real time.
-    #[tool(name = "attention.agent.set")]
+    #[tool(name = "attention_agent_set")]
     pub(super) async fn attention_agent_set(
         &self,
         params: Parameters<AttentionAgentSetParams>,
@@ -85,7 +85,7 @@ impl NereidMcp {
     }
 
     /// Clear agent-owned attention; use when done with a topic or before changing context.
-    #[tool(name = "attention.agent.clear")]
+    #[tool(name = "attention_agent_clear")]
     pub(super) async fn attention_agent_clear(
         &self,
     ) -> Result<Json<AttentionClearResponse>, ErrorData> {
@@ -97,8 +97,8 @@ impl NereidMcp {
     }
 
     /// Read follow-AI mode (`true` means TUI tracks agent spotlight); check this before
-    /// spotlight-heavy guidance, and pair with `follow_ai.set` when handing off control.
-    #[tool(name = "follow_ai.read")]
+    /// spotlight-heavy guidance, and pair with `follow_ai_set` when handing off control.
+    #[tool(name = "follow_ai_read")]
     pub(super) async fn follow_ai_read(&self) -> Result<Json<FollowAiReadResponse>, ErrorData> {
         let state = self.lock_state_synced().await?;
         let session_active_diagram_id =
@@ -109,9 +109,9 @@ impl NereidMcp {
         Ok(Json(FollowAiReadResponse { enabled, context }))
     }
 
-    /// Set follow-AI mode (`true` to track agent spotlight in TUI); use with `attention.agent.set`
+    /// Set follow-AI mode (`true` to track agent spotlight in TUI); use with `attention_agent_set`
     /// for guided handoff.
-    #[tool(name = "follow_ai.set")]
+    #[tool(name = "follow_ai_set")]
     pub(super) async fn follow_ai_set(
         &self,
         params: Parameters<FollowAiSetParams>,
@@ -124,8 +124,8 @@ impl NereidMcp {
     }
 
     /// Read the shared multi-selection working set as canonical `object_ref`s; call after
-    /// `attention.human.read` and before `object.read` or `selection.update`.
-    #[tool(name = "selection.read")]
+    /// `attention_human_read` and before `object_read` or `selection_update`.
+    #[tool(name = "selection_read")]
     pub(super) async fn selection_get(&self) -> Result<Json<SelectionGetResponse>, ErrorData> {
         let mut state = self.lock_state_synced().await?;
         if let Some(session_folder) = &self.session_folder {
@@ -151,7 +151,7 @@ impl NereidMcp {
 
     /// Update shared multi-selection (`replace`/`add`/`remove`); use to mark a temporary working
     /// set for discussion or edits.
-    #[tool(name = "selection.update")]
+    #[tool(name = "selection_update")]
     pub(super) async fn selection_update(
         &self,
         params: Parameters<SelectionUpdateParams>,
@@ -221,8 +221,8 @@ impl NereidMcp {
     }
 
     /// Read UI view state (active diagram, scroll, panes); use with
-    /// `attention.human.read`/`attention.agent.read` for orientation without mutating focus.
-    #[tool(name = "view.read_state")]
+    /// `attention_human_read`/`attention_agent_read` for orientation without mutating focus.
+    #[tool(name = "view_read_state")]
     pub(super) async fn view_get_state(&self) -> Result<Json<ViewGetStateResponse>, ErrorData> {
         let state = self.lock_state_synced().await?;
         let active_diagram_id =
@@ -238,7 +238,7 @@ impl NereidMcp {
         }))
     }
     /// Read concrete object fields by ref; use this as evidence before answering.
-    #[tool(name = "object.read")]
+    #[tool(name = "object_read")]
     pub(super) async fn object_read(
         &self,
         params: Parameters<ObjectGetParams>,

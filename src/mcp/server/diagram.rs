@@ -20,9 +20,9 @@ use super::*;
 
 #[tool_router(router = diagram_tool_router, vis = "pub(super)")]
 impl NereidMcp {
-    /// List diagrams in the current session; start here, then call `diagram.current` or
-    /// `diagram.open` (bootstrap with `diagram.create_from_mermaid` if empty).
-    #[tool(name = "diagram.list")]
+    /// List diagrams in the current session; start here, then call `diagram_current` or
+    /// `diagram_open` (bootstrap with `diagram_create_from_mermaid` if empty).
+    #[tool(name = "diagram_list")]
     pub(super) async fn diagram_list(&self) -> Result<Json<ListDiagramsResponse>, ErrorData> {
         let state = self.lock_state_synced().await?;
         let session_active_diagram_id =
@@ -45,8 +45,8 @@ impl NereidMcp {
     }
 
     /// Create a diagram from raw Mermaid; use to bootstrap a session, then continue with
-    /// `diagram.open`/`diagram.stat`.
-    #[tool(name = "diagram.create_from_mermaid")]
+    /// `diagram_open`/`diagram_stat`.
+    #[tool(name = "diagram_create_from_mermaid")]
     pub(super) async fn diagram_create_from_mermaid(
         &self,
         params: Parameters<DiagramCreateFromMermaidParams>,
@@ -189,9 +189,9 @@ impl NereidMcp {
         Ok(response)
     }
 
-    /// Set the active diagram default for diagram-scoped tools; typically follows `diagram.list`
-    /// or `diagram.create_from_mermaid`.
-    #[tool(name = "diagram.open")]
+    /// Set the active diagram default for diagram-scoped tools; typically follows `diagram_list`
+    /// or `diagram_create_from_mermaid`.
+    #[tool(name = "diagram_open")]
     pub(super) async fn diagram_open(
         &self,
         params: Parameters<DiagramOpenParams>,
@@ -247,7 +247,7 @@ impl NereidMcp {
     }
 
     /// Remove a diagram by id and retarget active diagram when needed.
-    #[tool(name = "diagram.delete")]
+    #[tool(name = "diagram_delete")]
     pub(super) async fn diagram_delete(
         &self,
         params: Parameters<DiagramDeleteParams>,
@@ -329,8 +329,8 @@ impl NereidMcp {
     }
 
     /// Get the active diagram id (`null` when unset); check this before deciding whether to call
-    /// `diagram.open`, then continue with `diagram.stat`/`diagram.get_slice`.
-    #[tool(name = "diagram.current")]
+    /// `diagram_open`, then continue with `diagram_stat`/`diagram_get_slice`.
+    #[tool(name = "diagram_current")]
     pub(super) async fn diagram_current(&self) -> Result<Json<DiagramCurrentResponse>, ErrorData> {
         let state = self.lock_state_synced().await?;
         let active_diagram_id =
@@ -341,8 +341,8 @@ impl NereidMcp {
         Ok(Json(DiagramCurrentResponse { active_diagram_id, context }))
     }
     /// Get a compact diagram digest (rev + counts + key names); use as the default first read
-    /// before `diagram.get_slice`, typed queries, or mutation planning.
-    #[tool(name = "diagram.stat")]
+    /// before `diagram_get_slice`, typed queries, or mutation planning.
+    #[tool(name = "diagram_stat")]
     pub(super) async fn diagram_stat(
         &self,
         params: Parameters<DiagramTargetParams>,
@@ -365,7 +365,7 @@ impl NereidMcp {
 
     /// Read canonical Mermaid snapshot of current diagram AST; use for export/review and
     /// debugging, not as the default probe.
-    #[tool(name = "diagram.read")]
+    #[tool(name = "diagram_read")]
     pub(super) async fn diagram_read(
         &self,
         params: Parameters<DiagramTargetParams>,
@@ -393,7 +393,7 @@ impl NereidMcp {
     }
 
     /// Read full diagram AST for id/label resolution; prefer this over session-file reads.
-    #[tool(name = "diagram.get_ast")]
+    #[tool(name = "diagram_get_ast")]
     pub(super) async fn diagram_get_ast(
         &self,
         params: Parameters<DiagramTargetParams>,
@@ -417,7 +417,7 @@ impl NereidMcp {
 
     /// Get deterministic local neighborhood around an `object_ref`; primary probe tool after
     /// attention/selection or search hits.
-    #[tool(name = "diagram.get_slice")]
+    #[tool(name = "diagram_get_slice")]
     pub(super) async fn diagram_get_slice(
         &self,
         params: Parameters<DiagramGetSliceParams>,
@@ -898,8 +898,8 @@ impl NereidMcp {
     }
 
     /// Render diagram as deterministic text (Unicode allowed); use for human-readable snapshots
-    /// and review, then return to `diagram.stat`/`diagram.get_slice` for targeted reasoning.
-    #[tool(name = "diagram.render_text")]
+    /// and review, then return to `diagram_stat`/`diagram_get_slice` for targeted reasoning.
+    #[tool(name = "diagram_render_text")]
     pub(super) async fn diagram_render_text(
         &self,
         params: Parameters<DiagramTargetParams>,
@@ -926,9 +926,9 @@ impl NereidMcp {
         Ok(Json(DiagramRenderTextResponse { text, context }))
     }
 
-    /// Get diagram delta since a revision; default refresh step after `diagram.apply_ops` or
+    /// Get diagram delta since a revision; default refresh step after `diagram_apply_ops` or
     /// external changes.
-    #[tool(name = "diagram.diff")]
+    #[tool(name = "diagram_diff")]
     pub(super) async fn diagram_diff(
         &self,
         params: Parameters<GetDeltaParams>,
@@ -974,9 +974,9 @@ impl NereidMcp {
         Ok(Json(delta))
     }
 
-    /// Apply structured diagram ops gated by `base_rev`; prefer `diagram.propose_ops` first, then
-    /// refresh with `diagram.diff`.
-    #[tool(name = "diagram.apply_ops")]
+    /// Apply structured diagram ops gated by `base_rev`; prefer `diagram_propose_ops` first, then
+    /// refresh with `diagram_diff`.
+    #[tool(name = "diagram_apply_ops")]
     pub(super) async fn diagram_apply_ops(
         &self,
         params: Parameters<ApplyOpsParams>,
@@ -1014,7 +1014,7 @@ impl NereidMcp {
                         Some(serde_json::json!({
                             "base_rev": base_rev,
                             "current_rev": current_rev,
-                            "snapshot_tool": "diagram.stat",
+                            "snapshot_tool": "diagram_stat",
                             "digest": {
                                 "rev": digest.rev,
                                 "counts": {
@@ -1099,7 +1099,7 @@ impl NereidMcp {
                 Some(serde_json::json!({
                     "base_rev": base_rev,
                     "current_rev": current_rev,
-                    "snapshot_tool": "diagram.stat",
+                    "snapshot_tool": "diagram_stat",
                     "digest": {
                         "rev": digest.rev,
                         "counts": {
@@ -1162,8 +1162,8 @@ impl NereidMcp {
     }
 
     /// Validate ops against `base_rev` and return predicted delta without mutation; use immediately
-    /// before `diagram.apply_ops` for safe human-agent collaboration.
-    #[tool(name = "diagram.propose_ops")]
+    /// before `diagram_apply_ops` for safe human-agent collaboration.
+    #[tool(name = "diagram_propose_ops")]
     pub(super) async fn diagram_propose_ops(
         &self,
         params: Parameters<DiagramProposeOpsParams>,

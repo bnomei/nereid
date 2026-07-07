@@ -19,7 +19,7 @@ use super::*;
 impl NereidMcp {
     /// List session xrefs (including dangling filters); use to audit mappings before route/search
     /// exploration or cleanup.
-    #[tool(name = "xref.list")]
+    #[tool(name = "xref_list")]
     pub(super) async fn xref_list(
         &self,
         params: Parameters<XRefListParams>,
@@ -144,8 +144,8 @@ impl NereidMcp {
     }
 
     /// List xref-neighbor objects connected to an `object_ref`; useful probe step after
-    /// `attention.human.read` or `route.find`.
-    #[tool(name = "xref.neighbors")]
+    /// `attention_human_read` or `route_find`.
+    #[tool(name = "xref_neighbors")]
     pub(super) async fn xref_neighbors(
         &self,
         params: Parameters<XRefNeighborsParams>,
@@ -182,7 +182,7 @@ impl NereidMcp {
 
     /// Add a cross-diagram xref; use to persist discovered relationships from route/trace analysis
     /// and walkthrough work.
-    #[tool(name = "xref.add")]
+    #[tool(name = "xref_add")]
     pub(super) async fn xref_add(
         &self,
         params: Parameters<XRefAddParams>,
@@ -262,8 +262,8 @@ impl NereidMcp {
         Ok(response)
     }
 
-    /// Remove an xref by id; typically follows `xref.list` review or dangling cleanup.
-    #[tool(name = "xref.remove")]
+    /// Remove an xref by id; typically follows `xref_list` review or dangling cleanup.
+    #[tool(name = "xref_remove")]
     pub(super) async fn xref_remove(
         &self,
         params: Parameters<XRefRemoveParams>,

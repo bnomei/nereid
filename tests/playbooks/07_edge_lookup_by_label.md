@@ -17,22 +17,22 @@
 
 ## Expected Tool Calls
 ### Required (order matters)
-1. `diagram.list`
-2. `diagram.get_ast`
+1. `diagram_list`
+2. `diagram_get_ast`
    - matcher: `diagram_id` `equals` `demo-flow`
 
 ### Optional (acceptable alternatives)
-- `object.read` for the resolved edge ref.
-- `diagram.read` for additional confirmation.
+- `object_read` for the resolved edge ref.
+- `diagram_read` for additional confirmation.
 
 ### Forbidden
-- `diagram.apply_ops`
-- `diagram.propose_ops`
-- `diagram.create_from_mermaid`
-- `selection.update`
-- `xref.add`
-- `xref.remove`
-- `walkthrough.apply_ops`
+- `diagram_apply_ops`
+- `diagram_propose_ops`
+- `diagram_create_from_mermaid`
+- `selection_update`
+- `xref_add`
+- `xref_remove`
+- `walkthrough_apply_ops`
 
 ## Expected Assistant Output
 - Must include edge ref `d:demo-flow/flow/edge/e:ac`.
@@ -40,7 +40,7 @@
 - Must include to node ref `d:demo-flow/flow/node/n:c`.
 
 ## Pass/Fail Checklist
-- [ ] `diagram.get_ast` was used to resolve the labeled edge.
+- [ ] `diagram_get_ast` was used to resolve the labeled edge.
 - [ ] Output includes the exact edge ref and both endpoint refs.
 - [ ] No forbidden mutating calls were made.
 

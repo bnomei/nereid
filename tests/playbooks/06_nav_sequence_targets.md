@@ -17,21 +17,21 @@
 
 ## Expected Tool Calls
 ### Required (order matters)
-1. `diagram.list`
-2. `xref.list`
+1. `diagram_list`
+2. `xref_list`
    - matcher: `kind` `equals` `nav`
 
 ### Optional (acceptable alternatives)
-- `diagram.read` for the index diagram.
+- `diagram_read` for the index diagram.
 
 ### Forbidden
-- `diagram.apply_ops`
-- `diagram.propose_ops`
-- `diagram.create_from_mermaid`
-- `selection.update`
-- `xref.add`
-- `xref.remove`
-- `walkthrough.apply_ops`
+- `diagram_apply_ops`
+- `diagram_propose_ops`
+- `diagram_create_from_mermaid`
+- `selection_update`
+- `xref_add`
+- `xref_remove`
+- `walkthrough_apply_ops`
 
 ## Expected Assistant Output
 - Must include all five sequence targets:
@@ -43,7 +43,7 @@
 - Must not include flowchart targets.
 
 ## Pass/Fail Checklist
-- [ ] `diagram.list` and `xref.list` were used.
+- [ ] `diagram_list` and `xref_list` were used.
 - [ ] All five expected sequence targets are present.
 - [ ] No flowchart targets are listed.
 - [ ] No forbidden mutating calls were made.

@@ -580,7 +580,7 @@ fn mcp_tool_schema_snapshot_is_current() {
 #[tokio::test]
 async fn attention_human_and_follow_ai_read_return_stable_defaults_without_ui_state() {
     let server = NereidMcp::new(demo_session());
-    let Json(attention) = server.attention_human_read().await.expect("attention.human.read");
+    let Json(attention) = server.attention_human_read().await.expect("attention_human_read");
 
     assert_eq!(attention.object_ref, None);
     assert_eq!(attention.diagram_id, None);
@@ -591,7 +591,7 @@ async fn attention_human_and_follow_ai_read_return_stable_defaults_without_ui_st
     assert_eq!(attention.context.ui_rev, None);
     assert_eq!(attention.context.ui_session_rev, None);
 
-    let Json(follow_ai) = server.follow_ai_read().await.expect("follow_ai.read");
+    let Json(follow_ai) = server.follow_ai_read().await.expect("follow_ai_read");
     assert!(follow_ai.enabled);
     assert_eq!(follow_ai.context.session_active_diagram_id.as_deref(), Some("d-seq"));
     assert_eq!(follow_ai.context.human_active_diagram_id, None);
@@ -610,17 +610,17 @@ async fn follow_ai_set_updates_shared_ui_state_when_available() {
         Some(ui_state.clone()),
     );
 
-    let Json(initial) = server.follow_ai_read().await.expect("follow_ai.read initial");
+    let Json(initial) = server.follow_ai_read().await.expect("follow_ai_read initial");
     assert!(initial.enabled);
     assert_eq!(initial.context.follow_ai, Some(true));
 
     let Json(updated) = server
         .follow_ai_set(Parameters(FollowAiSetParams { enabled: false }))
         .await
-        .expect("follow_ai.set");
+        .expect("follow_ai_set");
     assert!(!updated.enabled);
 
-    let Json(current) = server.follow_ai_read().await.expect("follow_ai.read current");
+    let Json(current) = server.follow_ai_read().await.expect("follow_ai_read current");
     assert!(!current.enabled);
     assert_eq!(current.context.follow_ai, Some(false));
     assert!(!ui_state.lock().await.follow_ai());
@@ -731,7 +731,7 @@ async fn selection_get_includes_human_active_diagram_when_ui_state_is_shared() {
         Some(ui_state),
     );
 
-    let Json(selection) = server.selection_get().await.expect("selection.read");
+    let Json(selection) = server.selection_get().await.expect("selection_read");
     assert_eq!(selection.context.session_active_diagram_id.as_deref(), Some("d-seq"));
     assert_eq!(selection.context.human_active_diagram_id.as_deref(), Some("d-flow"));
     assert_eq!(selection.context.human_active_object_ref, None);
@@ -744,7 +744,7 @@ async fn selection_get_includes_human_active_diagram_when_ui_state_is_shared() {
 async fn attention_agent_set_read_clear_validates_refs() {
     let server = NereidMcp::new(demo_session());
 
-    let Json(initial) = server.attention_agent_read().await.expect("attention.agent.read initial");
+    let Json(initial) = server.attention_agent_read().await.expect("attention_agent_read initial");
     assert_eq!(initial.object_ref, None);
     assert_eq!(initial.diagram_id, None);
     assert_eq!(initial.context.session_active_diagram_id.as_deref(), Some("d-seq"));
@@ -755,7 +755,7 @@ async fn attention_agent_set_read_clear_validates_refs() {
         }))
         .await
     {
-        Ok(_) => panic!("attention.agent.set should reject missing object"),
+        Ok(_) => panic!("attention_agent_set should reject missing object"),
         Err(err) => err,
     };
     assert!(err.message.contains("object not found"));
@@ -764,20 +764,20 @@ async fn attention_agent_set_read_clear_validates_refs() {
     let Json(set) = server
         .attention_agent_set(Parameters(AttentionAgentSetParams { object_ref: object_ref.clone() }))
         .await
-        .expect("attention.agent.set");
+        .expect("attention_agent_set");
     assert_eq!(set.object_ref, object_ref);
     assert_eq!(set.diagram_id, "d-flow");
 
-    let Json(read) = server.attention_agent_read().await.expect("attention.agent.read");
+    let Json(read) = server.attention_agent_read().await.expect("attention_agent_read");
     assert_eq!(read.object_ref.as_deref(), Some("d:d-flow/flow/edge/e:ab"));
     assert_eq!(read.diagram_id.as_deref(), Some("d-flow"));
     assert_eq!(read.context.session_active_diagram_id.as_deref(), Some("d-seq"));
 
-    let Json(cleared) = server.attention_agent_clear().await.expect("attention.agent.clear");
+    let Json(cleared) = server.attention_agent_clear().await.expect("attention_agent_clear");
     assert_eq!(cleared.cleared, 1);
 
     let Json(after_clear) =
-        server.attention_agent_read().await.expect("attention.agent.read after clear");
+        server.attention_agent_read().await.expect("attention_agent_read after clear");
     assert_eq!(after_clear.object_ref, None);
     assert_eq!(after_clear.diagram_id, None);
     assert_eq!(after_clear.context.session_active_diagram_id.as_deref(), Some("d-seq"));
@@ -803,7 +803,7 @@ async fn diagram_apply_ops_prunes_agent_spotlight_for_removed_object() {
         .await
         .expect("apply ops");
 
-    let Json(read) = server.attention_agent_read().await.expect("attention.agent.read");
+    let Json(read) = server.attention_agent_read().await.expect("attention_agent_read");
     assert_eq!(
         read.object_ref, None,
         "agent spotlight must be pruned once apply_ops removes its target object",
@@ -819,7 +819,7 @@ async fn attention_agent_set_overwrites_previous_value() {
             object_ref: "d:d-seq/seq/participant/p:a".to_owned(),
         }))
         .await
-        .expect("attention.agent.set first");
+        .expect("attention_agent_set first");
     assert_eq!(first.object_ref, "d:d-seq/seq/participant/p:a");
     assert_eq!(first.diagram_id, "d-seq");
 
@@ -828,20 +828,20 @@ async fn attention_agent_set_overwrites_previous_value() {
             object_ref: "d:d-seq/seq/message/m:1".to_owned(),
         }))
         .await
-        .expect("attention.agent.set second");
+        .expect("attention_agent_set second");
     assert_eq!(second.object_ref, "d:d-seq/seq/message/m:1");
     assert_eq!(second.diagram_id, "d-seq");
 
-    let Json(read) = server.attention_agent_read().await.expect("attention.agent.read");
+    let Json(read) = server.attention_agent_read().await.expect("attention_agent_read");
     assert_eq!(read.object_ref.as_deref(), Some("d:d-seq/seq/message/m:1"));
     assert_eq!(read.diagram_id.as_deref(), Some("d-seq"));
     assert_eq!(read.context.session_active_diagram_id.as_deref(), Some("d-seq"));
 
-    let Json(cleared) = server.attention_agent_clear().await.expect("attention.agent.clear");
+    let Json(cleared) = server.attention_agent_clear().await.expect("attention_agent_clear");
     assert_eq!(cleared.cleared, 1);
 
     let Json(cleared_again) =
-        server.attention_agent_clear().await.expect("attention.agent.clear again");
+        server.attention_agent_clear().await.expect("attention_agent_clear again");
     assert_eq!(cleared_again.cleared, 0);
 }
 
@@ -871,7 +871,7 @@ async fn streamable_http_tools_call_updates_shared_agent_attention_state() {
         "id": 1,
         "method": "tools/call",
         "params": {
-            "name": "attention.agent.set",
+            "name": "attention_agent_set",
             "arguments": {
                 "object_ref": "d:d-seq/seq/participant/p:a",
             }
@@ -1171,7 +1171,7 @@ async fn walkthrough_apply_ops_conflicts_on_stale_base_rev() {
     };
     assert_eq!(err.code, rmcp::model::ErrorCode::INVALID_REQUEST);
     let data = err.data.expect("error data");
-    assert_eq!(data["snapshot_tool"].as_str().unwrap(), "walkthrough.stat");
+    assert_eq!(data["snapshot_tool"].as_str().unwrap(), "walkthrough_stat");
     assert_eq!(data["digest"]["rev"].as_u64().unwrap(), 0);
 }
 
@@ -3431,7 +3431,7 @@ async fn apply_ops_conflicts_on_stale_base_rev() {
     };
     assert_eq!(err.code, rmcp::model::ErrorCode::INVALID_REQUEST);
     let data = err.data.expect("error data");
-    assert_eq!(data["snapshot_tool"].as_str().unwrap(), "diagram.stat");
+    assert_eq!(data["snapshot_tool"].as_str().unwrap(), "diagram_stat");
     assert_eq!(data["digest"]["rev"].as_u64().unwrap(), 0);
 }
 
@@ -3897,7 +3897,7 @@ async fn diagram_diff_errors_with_supported_since_rev_and_snapshot_tool_outside_
     assert_eq!(err.code, rmcp::model::ErrorCode::INVALID_REQUEST);
     let data = err.data.expect("error data");
     assert_eq!(data["current_rev"].as_u64().unwrap(), base_rev);
-    assert_eq!(data["snapshot_tool"].as_str().unwrap(), "diagram.read");
+    assert_eq!(data["snapshot_tool"].as_str().unwrap(), "diagram_read");
     assert!(data["supported_since_rev"].as_u64().unwrap() > 0);
 }
 
@@ -4142,7 +4142,7 @@ async fn diagram_current_refreshes_from_session_folder() {
         .save_active_diagram_id(&external)
         .expect("persist active diagram externally");
 
-    let Json(current) = server.diagram_current().await.expect("diagram.current");
+    let Json(current) = server.diagram_current().await.expect("diagram_current");
     assert_eq!(current.active_diagram_id.as_deref(), Some("d-flow"));
 }
 
@@ -4167,7 +4167,7 @@ async fn diagram_list_refreshes_from_session_folder() {
     );
     SessionFolder::new(dir_str).save_session(&external).expect("persist external diagram");
 
-    let Json(list) = server.diagram_list().await.expect("diagram.list");
+    let Json(list) = server.diagram_list().await.expect("diagram_list");
     assert!(list.diagrams.iter().any(|diagram| diagram.diagram_id == extra_id.as_str()));
 }
 
@@ -4281,7 +4281,7 @@ async fn selection_get_refreshes_from_session_folder_meta() {
         .save_selected_object_refs(&on_disk)
         .expect("persist external selection");
 
-    let Json(selection) = server.selection_get().await.expect("selection.read");
+    let Json(selection) = server.selection_get().await.expect("selection_read");
     assert_eq!(
         selection.object_refs,
         vec!["d:d-flow/flow/edge/e:ab".to_owned(), "d:d-seq/seq/participant/p:a".to_owned(),]
@@ -4316,7 +4316,7 @@ async fn selection_update_add_uses_latest_meta_selection_in_persistent_mode() {
             mode: UpdateMode::Add,
         }))
         .await
-        .expect("selection.update add");
+        .expect("selection_update add");
 
     let loaded = SessionFolder::new(dir_str).load_session().expect("load merged selection");
     let selected =

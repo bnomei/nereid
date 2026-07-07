@@ -2,7 +2,7 @@
 
 ## Metadata
 - `id`: `PB-21`
-- `goal`: require `diagram.open` and `flow.reachable` on a discovered diagram.
+- `goal`: require `diagram_open` and `flow_reachable` on a discovered diagram.
 - `session`: `data/demo-session` (use `--demo`).
 - `difficulty`: `advanced`
 - `mutates_state`: `no`
@@ -17,24 +17,24 @@
 
 ## Expected Tool Calls
 ### Required (order matters)
-1. `diagram.list`
-2. `diagram.open`
+1. `diagram_list`
+2. `diagram_open`
    - matcher: `diagram_id` `equals` `demo-t-flow-routing`
-3. `flow.reachable`
+3. `flow_reachable`
    - matcher: `diagram_id` `equals` `demo-t-flow-routing`
    - matcher: `from_node_id` `equals` `n:start`
 
 ### Optional (acceptable alternatives)
-- `diagram.get_ast` for validation.
+- `diagram_get_ast` for validation.
 
 ### Forbidden
-- `diagram.apply_ops`
-- `diagram.propose_ops`
-- `diagram.create_from_mermaid`
-- `selection.update`
-- `xref.add`
-- `xref.remove`
-- `walkthrough.apply_ops`
+- `diagram_apply_ops`
+- `diagram_propose_ops`
+- `diagram_create_from_mermaid`
+- `selection_update`
+- `xref_add`
+- `xref_remove`
+- `walkthrough_apply_ops`
 
 ## Expected Assistant Output
 - Must include all reachable node refs:
@@ -53,7 +53,7 @@
   - `d:demo-t-flow-routing/flow/node/n:done`
 
 ## Pass/Fail Checklist
-- [ ] `diagram.open` and `flow.reachable` were called with expected params.
+- [ ] `diagram_open` and `flow_reachable` were called with expected params.
 - [ ] Output includes every reachable node listed above.
 - [ ] No forbidden mutating calls were made.
 

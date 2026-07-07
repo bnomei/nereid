@@ -18,8 +18,8 @@ use super::*;
 #[tool_router(router = walkthrough_tool_router, vis = "pub(super)")]
 impl NereidMcp {
     /// Set the active walkthrough default for walkthrough-scoped tools; usually after
-    /// `walkthrough.list`.
-    #[tool(name = "walkthrough.open")]
+    /// `walkthrough_list`.
+    #[tool(name = "walkthrough_open")]
     pub(super) async fn walkthrough_open(
         &self,
         params: Parameters<WalkthroughOpenParams>,
@@ -70,9 +70,9 @@ impl NereidMcp {
         Ok(response)
     }
 
-    /// Get the active walkthrough id (`null` when unset); call after `walkthrough.list` and
-    /// before `walkthrough.open`/`walkthrough.read`.
-    #[tool(name = "walkthrough.current")]
+    /// Get the active walkthrough id (`null` when unset); call after `walkthrough_list` and
+    /// before `walkthrough_open`/`walkthrough_read`.
+    #[tool(name = "walkthrough_current")]
     pub(super) async fn walkthrough_current(
         &self,
     ) -> Result<Json<WalkthroughCurrentResponse>, ErrorData> {
@@ -88,9 +88,9 @@ impl NereidMcp {
 
         Ok(Json(WalkthroughCurrentResponse { active_walkthrough_id, context }))
     }
-    /// List walkthroughs in the current session; start here, then `walkthrough.open`,
-    /// `walkthrough.stat`, or `walkthrough.read`.
-    #[tool(name = "walkthrough.list")]
+    /// List walkthroughs in the current session; start here, then `walkthrough_open`,
+    /// `walkthrough_stat`, or `walkthrough_read`.
+    #[tool(name = "walkthrough_list")]
     pub(super) async fn walkthrough_list(
         &self,
     ) -> Result<Json<ListWalkthroughsResponse>, ErrorData> {
@@ -116,9 +116,9 @@ impl NereidMcp {
         Ok(Json(ListWalkthroughsResponse { walkthroughs, context }))
     }
 
-    /// Read a full walkthrough (nodes/edges/refs); call after `walkthrough.stat` when you need
-    /// complete node/edge detail, and before targeted `walkthrough.get_node`.
-    #[tool(name = "walkthrough.read")]
+    /// Read a full walkthrough (nodes/edges/refs); call after `walkthrough_stat` when you need
+    /// complete node/edge detail, and before targeted `walkthrough_get_node`.
+    #[tool(name = "walkthrough_read")]
     pub(super) async fn walkthrough_read(
         &self,
         params: Parameters<WalkthroughGetParams>,
@@ -173,9 +173,9 @@ impl NereidMcp {
         Ok(Json(WalkthroughGetResponse { walkthrough, context }))
     }
 
-    /// Get one walkthrough node by id; use for drill-down after `walkthrough.list` or
-    /// `walkthrough.read`.
-    #[tool(name = "walkthrough.get_node")]
+    /// Get one walkthrough node by id; use for drill-down after `walkthrough_list` or
+    /// `walkthrough_read`.
+    #[tool(name = "walkthrough_get_node")]
     pub(super) async fn walkthrough_get_node(
         &self,
         params: Parameters<WalkthroughGetNodeParams>,
@@ -223,7 +223,7 @@ impl NereidMcp {
     }
 
     /// Read current walkthrough revision and counts; call before walkthrough mutations.
-    #[tool(name = "walkthrough.stat")]
+    #[tool(name = "walkthrough_stat")]
     pub(super) async fn walkthrough_stat(
         &self,
         params: Parameters<WalkthroughGetParams>,
@@ -248,8 +248,8 @@ impl NereidMcp {
     }
 
     /// Render walkthrough text for human-readable sharing/export; prefer
-    /// `walkthrough.stat`/`walkthrough.read` for machine reasoning and follow-up edits.
-    #[tool(name = "walkthrough.render_text")]
+    /// `walkthrough_stat`/`walkthrough_read` for machine reasoning and follow-up edits.
+    #[tool(name = "walkthrough_render_text")]
     pub(super) async fn walkthrough_render_text(
         &self,
         params: Parameters<WalkthroughGetParams>,
@@ -280,7 +280,7 @@ impl NereidMcp {
     }
 
     /// Read walkthrough delta since a revision; call after mutations to verify applied changes.
-    #[tool(name = "walkthrough.diff")]
+    #[tool(name = "walkthrough_diff")]
     pub(super) async fn walkthrough_diff(
         &self,
         params: Parameters<WalkthroughGetDeltaParams>,
@@ -330,8 +330,8 @@ impl NereidMcp {
         Ok(Json(delta))
     }
 
-    /// Apply walkthrough ops using `base_rev` from `walkthrough.stat`; on conflict, refresh and retry.
-    #[tool(name = "walkthrough.apply_ops")]
+    /// Apply walkthrough ops using `base_rev` from `walkthrough_stat`; on conflict, refresh and retry.
+    #[tool(name = "walkthrough_apply_ops")]
     pub(super) async fn walkthrough_apply_ops(
         &self,
         params: Parameters<WalkthroughApplyOpsParams>,
@@ -366,7 +366,7 @@ impl NereidMcp {
                         Some(serde_json::json!({
                             "base_rev": base_rev,
                             "current_rev": current_rev,
-                            "snapshot_tool": "walkthrough.stat",
+                            "snapshot_tool": "walkthrough_stat",
                             "digest": {
                                 "rev": digest.rev,
                                 "counts": {
@@ -450,7 +450,7 @@ impl NereidMcp {
                 Some(serde_json::json!({
                     "base_rev": base_rev,
                     "current_rev": current_rev,
-                    "snapshot_tool": "walkthrough.stat",
+                    "snapshot_tool": "walkthrough_stat",
                     "digest": {
                         "rev": digest.rev,
                         "counts": {

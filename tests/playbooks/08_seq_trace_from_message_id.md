@@ -17,34 +17,34 @@
 
 ## Expected Tool Calls
 ### Required (order matters)
-1. `diagram.list`
-2. `seq.trace`
+1. `diagram_list`
+2. `seq_trace`
    - matcher: `diagram_id` `equals` `om-10-dialogue`
    - matcher: `from_message_id` `equals` `m:ask_go`
    - matcher: `direction` `equals` `after`
    - matcher: `limit` `equals` `2`
-3. `object.read`
-   - matcher: reads both refs returned by `seq.trace`
+3. `object_read`
+   - matcher: reads both refs returned by `seq_trace`
 
 ### Optional (acceptable alternatives)
-- `seq.search` to confirm the starting message.
+- `seq_search` to confirm the starting message.
 
 ### Forbidden
-- `diagram.apply_ops`
-- `diagram.propose_ops`
-- `diagram.create_from_mermaid`
-- `selection.update`
-- `xref.add`
-- `xref.remove`
-- `walkthrough.apply_ops`
+- `diagram_apply_ops`
+- `diagram_propose_ops`
+- `diagram_create_from_mermaid`
+- `selection_update`
+- `xref_add`
+- `xref_remove`
+- `walkthrough_apply_ops`
 
 ## Expected Assistant Output
 - Must include `d:om-10-dialogue/seq/message/m:stay` with text `Stay with them`.
 - Must include `d:om-10-dialogue/seq/message/m:we_will_go` with text `We will go`.
 
 ## Pass/Fail Checklist
-- [ ] `seq.trace` used the exact message id and requested limit 2.
-- [ ] `object.read` was used to retrieve message text.
+- [ ] `seq_trace` used the exact message id and requested limit 2.
+- [ ] `object_read` was used to retrieve message text.
 - [ ] Output includes both expected message refs and texts.
 - [ ] No forbidden mutating calls were made.
 

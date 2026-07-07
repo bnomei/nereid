@@ -15,16 +15,16 @@ cargo run -- --mcp --session path/to/session
 ```
 
 Resolve active diagram:
-1. `diagram.current`
-2. if null: `diagram.list`
-3. then: `diagram.open`
+1. `diagram_current`
+2. if null: `diagram_list`
+3. then: `diagram_open`
 
 Resolve active walkthrough with the same pattern:
-1. `walkthrough.current`
-2. if null: `walkthrough.list`
-3. then: `walkthrough.open`
+1. `walkthrough_current`
+2. if null: `walkthrough_list`
+3. then: `walkthrough_open`
 
-If you need a new diagram first, call `diagram.create_from_mermaid`:
+If you need a new diagram first, call `diagram_create_from_mermaid`:
 
 ```json
 {
@@ -39,7 +39,7 @@ Creation runs parse + render preflight. If the call returns `INVALID_PARAMS` wit
 `cannot render Mermaid diagram: ...` (for example cycle/layout issues), fix Mermaid and retry
 before proceeding.
 For create/switch-only tasks, use the create response as the success signal; skip
-`diagram.stat`/`diagram.render_text`/`flow.*` unless inspection is explicitly requested.
+`diagram_stat`/`diagram_render_text`/`flow.*` unless inspection is explicitly requested.
 Failed preflight is non-mutating: no new diagram is persisted and active diagram remains unchanged.
 
 Delete a diagram when cleaning up:
@@ -54,7 +54,7 @@ Delete a diagram when cleaning up:
 
 ### Read human attention
 
-Tool: `attention.human.read`
+Tool: `attention_human_read`
 
 ```json
 {}
@@ -62,7 +62,7 @@ Tool: `attention.human.read`
 
 ### Set and read agent attention
 
-Tool: `attention.agent.set`
+Tool: `attention_agent_set`
 
 ```json
 {
@@ -70,7 +70,7 @@ Tool: `attention.agent.set`
 }
 ```
 
-Tool: `attention.agent.read`
+Tool: `attention_agent_read`
 
 ```json
 {}
@@ -78,7 +78,7 @@ Tool: `attention.agent.read`
 
 ### Clear agent attention
 
-Tool: `attention.agent.clear`
+Tool: `attention_agent_clear`
 
 ```json
 {}
@@ -86,13 +86,13 @@ Tool: `attention.agent.clear`
 
 ### Follow-AI mode
 
-Tool: `follow_ai.read`
+Tool: `follow_ai_read`
 
 ```json
 {}
 ```
 
-Tool: `follow_ai.set`
+Tool: `follow_ai_set`
 
 ```json
 {
@@ -102,7 +102,7 @@ Tool: `follow_ai.set`
 
 ### Shared working set
 
-Tool: `selection.update`
+Tool: `selection_update`
 
 ```json
 {
@@ -116,7 +116,7 @@ Tool: `selection.update`
 
 ## Probe before edit
 
-Tool: `diagram.stat`
+Tool: `diagram_stat`
 
 ```json
 {
@@ -124,7 +124,7 @@ Tool: `diagram.stat`
 }
 ```
 
-Tool: `diagram.get_slice`
+Tool: `diagram_get_slice`
 
 ```json
 {
@@ -139,8 +139,8 @@ Canonical object ref format:
 
 ## Safe mutation pattern
 
-1. `diagram.propose_ops`
-2. if result is good: same payload to `diagram.apply_ops`
+1. `diagram_propose_ops`
+2. if result is good: same payload to `diagram_apply_ops`
 
 ```json
 {
@@ -191,7 +191,7 @@ Canonical object ref format:
 
 ## Cross-diagram mapping and routes
 
-Tool: `xref.add`
+Tool: `xref_add`
 
 ```json
 {
@@ -203,7 +203,7 @@ Tool: `xref.add`
 }
 ```
 
-Tool: `xref.list` (dangling TODOs)
+Tool: `xref_list` (dangling TODOs)
 
 ```json
 {
@@ -211,7 +211,7 @@ Tool: `xref.list` (dangling TODOs)
 }
 ```
 
-Tool: `route.find`
+Tool: `route_find`
 
 ```json
 {
@@ -225,7 +225,7 @@ Tool: `route.find`
 
 ## Walkthrough refinement
 
-Tool: `walkthrough.apply_ops`
+Tool: `walkthrough_apply_ops`
 
 ```json
 {
@@ -259,8 +259,8 @@ Tool: `walkthrough.apply_ops`
 ## Conflict handling
 
 On stale `base_rev`:
-1. refresh with `diagram.diff` or `walkthrough.diff`,
+1. refresh with `diagram_diff` or `walkthrough_diff`,
 2. rebase ops,
 3. retry apply.
 
-If diff history is unavailable, fetch `diagram.read` or `walkthrough.read` once, then return to diff/slice-first calls.
+If diff history is unavailable, fetch `diagram_read` or `walkthrough_read` once, then return to diff/slice-first calls.
