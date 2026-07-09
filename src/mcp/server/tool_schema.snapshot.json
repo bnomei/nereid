@@ -568,7 +568,7 @@
                   ]
                 },
                 "kind": {
-                  "$ref": "#/$defs/McpSeqSectionKind"
+                  "$ref": "#/$defs/McpSeqSectionAddKind"
                 },
                 "section_id": {
                   "type": "string"
@@ -881,9 +881,9 @@
           ],
           "type": "string"
         },
-        "McpSeqSectionKind": {
+        "McpSeqSectionAddKind": {
+          "description": "Write-only section kinds for `seq_add_section` (main is created by `seq_add_block`).",
           "enum": [
-            "main",
             "else",
             "and"
           ],
@@ -2226,7 +2226,7 @@
                   ]
                 },
                 "kind": {
-                  "$ref": "#/$defs/McpSeqSectionKind"
+                  "$ref": "#/$defs/McpSeqSectionAddKind"
                 },
                 "section_id": {
                   "type": "string"
@@ -2539,9 +2539,9 @@
           ],
           "type": "string"
         },
-        "McpSeqSectionKind": {
+        "McpSeqSectionAddKind": {
+          "description": "Write-only section kinds for `seq_add_section` (main is created by `seq_add_block`).",
           "enum": [
-            "main",
             "else",
             "and"
           ],

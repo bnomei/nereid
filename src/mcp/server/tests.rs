@@ -3964,7 +3964,7 @@ async fn apply_ops_builds_sequence_alt_else_structure() {
                 McpOp::SeqAddSection {
                     section_id: "sec:cache:else".into(),
                     block_id: "b:cache".into(),
-                    kind: McpSeqSectionKind::Else,
+                    kind: McpSeqSectionAddKind::Else,
                     header: Some("miss".into()),
                 },
                 McpOp::SeqAddMessage {

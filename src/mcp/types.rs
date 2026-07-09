@@ -432,6 +432,14 @@ pub enum McpSeqSectionKind {
     And,
 }
 
+/// Write-only section kinds for `seq_add_section` (main is created by `seq_add_block`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum McpSeqSectionAddKind {
+    Else,
+    And,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct McpFlowNodeAst {
     pub node_id: String,
@@ -874,7 +882,7 @@ pub enum McpOp {
     SeqAddSection {
         section_id: String,
         block_id: String,
-        kind: McpSeqSectionKind,
+        kind: McpSeqSectionAddKind,
         #[serde(default)]
         header: Option<String>,
     },

@@ -244,6 +244,15 @@ fn map_mcp_seq_section_kind(kind: McpSeqSectionKind) -> crate::model::seq_ast::S
     }
 }
 
+fn map_mcp_seq_section_add_kind(
+    kind: McpSeqSectionAddKind,
+) -> crate::model::seq_ast::SequenceSectionKind {
+    match kind {
+        McpSeqSectionAddKind::Else => crate::model::seq_ast::SequenceSectionKind::Else,
+        McpSeqSectionAddKind::And => crate::model::seq_ast::SequenceSectionKind::And,
+    }
+}
+
 fn map_seq_section_kind_to_mcp(
     kind: crate::model::seq_ast::SequenceSectionKind,
 ) -> McpSeqSectionKind {
@@ -1327,7 +1336,7 @@ fn mcp_op_to_internal(op: &McpOp) -> Result<Op, ErrorData> {
         } => Op::Seq(SeqOp::AddSection {
             section_id: parse_object_id(section_id)?,
             block_id: parse_object_id(block_id)?,
-            kind: map_mcp_seq_section_kind(*kind),
+            kind: map_mcp_seq_section_add_kind(*kind),
             header: header.clone(),
         }),
         McpOp::SeqUpdateSection { section_id, header } => Op::Seq(SeqOp::UpdateSection {
