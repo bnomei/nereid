@@ -433,6 +433,7 @@ fn save_diagram_meta_stores_relative_paths_and_load_resolves_them(ctx: SessionFo
         }],
         flow_edges: Vec::new(),
         sequence_messages: Vec::new(),
+        sequence_blocks: Vec::new(),
         default_symbol_repository_id: None,
         flow_node_notes: Default::default(),
         sequence_participant_notes: Default::default(),
@@ -466,6 +467,7 @@ fn save_diagram_meta_rejects_paths_outside_session(ctx: SessionFolderTestCtx) {
         xrefs: Vec::new(),
         flow_edges: Vec::new(),
         sequence_messages: Vec::new(),
+        sequence_blocks: Vec::new(),
         default_symbol_repository_id: None,
         flow_node_notes: Default::default(),
         sequence_participant_notes: Default::default(),
@@ -1569,6 +1571,83 @@ fn save_and_load_sequence_preserves_message_ids_via_sidecar_even_when_parse_orde
         .find(|msg| msg.message_id().as_str() == "m:beta")
         .expect("second message");
     assert_eq!(second.text(), "Second");
+}
+
+#[rstest]
+fn save_and_load_sequence_preserves_custom_block_and_section_ids(ctx: SessionFolderTestCtx) {
+    use crate::model::seq_ast::{
+        SequenceBlock, SequenceBlockKind, SequenceSection, SequenceSectionKind,
+    };
+
+    let folder = &ctx.folder;
+    let mut session = Session::new(SessionId::new("s1").unwrap());
+    let seq_id = DiagramId::new("d1").unwrap();
+    let mut seq_ast = SequenceAst::default();
+    let p_alice = ObjectId::new("p:Alice").unwrap();
+    let p_bob = ObjectId::new("p:Bob").unwrap();
+    let m_hit = ObjectId::new("m:hit").unwrap();
+    let m_miss = ObjectId::new("m:miss").unwrap();
+    let block_id = ObjectId::new("b:cache").unwrap();
+    let main_sec = ObjectId::new("sec:cache:main").unwrap();
+    let else_sec = ObjectId::new("sec:cache:else").unwrap();
+
+    seq_ast.participants_mut().insert(p_alice.clone(), SequenceParticipant::new("Alice"));
+    seq_ast.participants_mut().insert(p_bob.clone(), SequenceParticipant::new("Bob"));
+    seq_ast.messages_mut().push(SequenceMessage::new(
+        m_hit.clone(),
+        p_alice.clone(),
+        p_bob.clone(),
+        SequenceMessageKind::Sync,
+        "hit",
+        1000,
+    ));
+    seq_ast.messages_mut().push(SequenceMessage::new(
+        m_miss.clone(),
+        p_alice.clone(),
+        p_bob.clone(),
+        SequenceMessageKind::Sync,
+        "miss",
+        2000,
+    ));
+    seq_ast.blocks_mut().push(SequenceBlock::new(
+        block_id.clone(),
+        SequenceBlockKind::Alt,
+        Some("cache".to_owned()),
+        vec![
+            SequenceSection::new(main_sec.clone(), SequenceSectionKind::Main, None, vec![m_hit]),
+            SequenceSection::new(
+                else_sec.clone(),
+                SequenceSectionKind::Else,
+                Some("miss".to_owned()),
+                vec![m_miss],
+            ),
+        ],
+        Vec::new(),
+    ));
+    session
+        .diagrams_mut()
+        .insert(seq_id.clone(), Diagram::new(seq_id.clone(), "Seq", DiagramAst::Sequence(seq_ast)));
+
+    folder.save_session(&session).unwrap();
+
+    // Reparse from mermaid (positional block ids) and confirm sidecar remaps back.
+    let loaded = folder.load_session().unwrap();
+    let loaded_diagram = loaded.diagrams().get(&seq_id).expect("seq diagram");
+    let DiagramAst::Sequence(loaded_ast) = loaded_diagram.ast() else {
+        panic!("expected sequence ast");
+    };
+
+    assert!(loaded_ast.contains_block_id(&block_id));
+    assert!(loaded_ast.contains_section_id(&main_sec));
+    assert!(loaded_ast.contains_section_id(&else_sec));
+    assert_eq!(
+        loaded_ast.find_section(&main_sec).expect("main").message_ids()[0].as_str(),
+        "m:hit"
+    );
+    assert_eq!(
+        loaded_ast.find_section(&else_sec).expect("else").message_ids()[0].as_str(),
+        "m:miss"
+    );
 }
 
 #[rstest]

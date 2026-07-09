@@ -438,6 +438,8 @@ struct DiagramMetaJson {
     flow_edges: Vec<DiagramFlowEdgeMetaJson>,
     #[serde(default)]
     sequence_messages: Vec<DiagramSequenceMessageMetaJson>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    sequence_blocks: Vec<DiagramSequenceBlockMetaJson>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     flow_node_notes: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -492,6 +494,87 @@ struct DiagramSequenceMessageMetaJson {
     to_participant_id: String,
     kind: SequenceMessageKindJson,
     text: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct DiagramSequenceBlockMetaJson {
+    block_id: String,
+    kind: SequenceBlockKindJson,
+    #[serde(default)]
+    header: Option<String>,
+    #[serde(default)]
+    parent_block_id: Option<String>,
+    #[serde(default)]
+    sections: Vec<DiagramSequenceSectionMetaJson>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct DiagramSequenceSectionMetaJson {
+    section_id: String,
+    kind: SequenceSectionKindJson,
+    #[serde(default)]
+    header: Option<String>,
+    #[serde(default)]
+    message_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum SequenceBlockKindJson {
+    Alt,
+    Opt,
+    Loop,
+    Par,
+}
+
+impl From<crate::model::seq_ast::SequenceBlockKind> for SequenceBlockKindJson {
+    fn from(kind: crate::model::seq_ast::SequenceBlockKind) -> Self {
+        match kind {
+            crate::model::seq_ast::SequenceBlockKind::Alt => Self::Alt,
+            crate::model::seq_ast::SequenceBlockKind::Opt => Self::Opt,
+            crate::model::seq_ast::SequenceBlockKind::Loop => Self::Loop,
+            crate::model::seq_ast::SequenceBlockKind::Par => Self::Par,
+        }
+    }
+}
+
+impl From<SequenceBlockKindJson> for crate::model::seq_ast::SequenceBlockKind {
+    fn from(kind: SequenceBlockKindJson) -> Self {
+        match kind {
+            SequenceBlockKindJson::Alt => Self::Alt,
+            SequenceBlockKindJson::Opt => Self::Opt,
+            SequenceBlockKindJson::Loop => Self::Loop,
+            SequenceBlockKindJson::Par => Self::Par,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum SequenceSectionKindJson {
+    Main,
+    Else,
+    And,
+}
+
+impl From<crate::model::seq_ast::SequenceSectionKind> for SequenceSectionKindJson {
+    fn from(kind: crate::model::seq_ast::SequenceSectionKind) -> Self {
+        match kind {
+            crate::model::seq_ast::SequenceSectionKind::Main => Self::Main,
+            crate::model::seq_ast::SequenceSectionKind::Else => Self::Else,
+            crate::model::seq_ast::SequenceSectionKind::And => Self::And,
+        }
+    }
+}
+
+impl From<SequenceSectionKindJson> for crate::model::seq_ast::SequenceSectionKind {
+    fn from(kind: SequenceSectionKindJson) -> Self {
+        match kind {
+            SequenceSectionKindJson::Main => Self::Main,
+            SequenceSectionKindJson::Else => Self::Else,
+            SequenceSectionKindJson::And => Self::And,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -623,6 +706,31 @@ fn diagram_meta_to_json(
         })
         .collect();
 
+    let sequence_blocks = meta
+        .sequence_blocks
+        .iter()
+        .map(|block| DiagramSequenceBlockMetaJson {
+            block_id: block.block_id.to_string(),
+            kind: block.kind.into(),
+            header: block.header.clone(),
+            parent_block_id: block.parent_block_id.as_ref().map(ToString::to_string),
+            sections: block
+                .sections
+                .iter()
+                .map(|section| DiagramSequenceSectionMetaJson {
+                    section_id: section.section_id.to_string(),
+                    kind: section.kind.into(),
+                    header: section.header.clone(),
+                    message_ids: section
+                        .message_ids
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                })
+                .collect(),
+        })
+        .collect();
+
     let flow_node_notes: BTreeMap<String, String> = meta
         .flow_node_notes
         .iter()
@@ -671,6 +779,7 @@ fn diagram_meta_to_json(
         xrefs,
         flow_edges,
         sequence_messages,
+        sequence_blocks,
         flow_node_notes,
         sequence_participant_notes,
         flow_node_symbols,
@@ -784,6 +893,68 @@ fn diagram_meta_from_json(
             })
             .collect::<Result<Vec<_>, StoreError>>()?;
 
+    let sequence_blocks = meta_json
+        .sequence_blocks
+        .into_iter()
+        .map(|block_json| {
+            let block_id = ObjectId::new(block_json.block_id.clone()).map_err(|source| {
+                StoreError::InvalidId {
+                    field: "sequence_blocks[].block_id",
+                    value: block_json.block_id,
+                    source: Box::new(source),
+                }
+            })?;
+            let parent_block_id = block_json
+                .parent_block_id
+                .map(|raw| {
+                    ObjectId::new(raw.clone()).map_err(|source| StoreError::InvalidId {
+                        field: "sequence_blocks[].parent_block_id",
+                        value: raw,
+                        source: Box::new(source),
+                    })
+                })
+                .transpose()?;
+            let sections = block_json
+                .sections
+                .into_iter()
+                .map(|section_json| {
+                    let section_id =
+                        ObjectId::new(section_json.section_id.clone()).map_err(|source| {
+                            StoreError::InvalidId {
+                                field: "sequence_blocks[].sections[].section_id",
+                                value: section_json.section_id,
+                                source: Box::new(source),
+                            }
+                        })?;
+                    let message_ids = section_json
+                        .message_ids
+                        .into_iter()
+                        .map(|raw| {
+                            ObjectId::new(raw.clone()).map_err(|source| StoreError::InvalidId {
+                                field: "sequence_blocks[].sections[].message_ids[]",
+                                value: raw,
+                                source: Box::new(source),
+                            })
+                        })
+                        .collect::<Result<Vec<_>, StoreError>>()?;
+                    Ok(DiagramSequenceSectionMeta {
+                        section_id,
+                        kind: section_json.kind.into(),
+                        header: section_json.header,
+                        message_ids,
+                    })
+                })
+                .collect::<Result<Vec<_>, StoreError>>()?;
+            Ok(DiagramSequenceBlockMeta {
+                block_id,
+                kind: block_json.kind.into(),
+                header: block_json.header,
+                parent_block_id,
+                sections,
+            })
+        })
+        .collect::<Result<Vec<_>, StoreError>>()?;
+
     let flow_node_notes = meta_json
         .flow_node_notes
         .into_iter()
@@ -861,6 +1032,7 @@ fn diagram_meta_from_json(
         xrefs,
         flow_edges,
         sequence_messages,
+        sequence_blocks,
         default_symbol_repository_id: meta_json.default_symbol_repository_id,
         flow_node_notes,
         sequence_participant_notes,

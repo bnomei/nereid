@@ -10,10 +10,12 @@
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use super::{DiagramMeta, DiagramStableIdMap};
+use super::{DiagramMeta, DiagramSequenceBlockMeta, DiagramStableIdMap};
+use crate::model::seq_ast::{
+    SequenceBlock, SequenceBlockKind, SequenceSection, SequenceSectionKind,
+};
 use crate::model::{
-    DiagramAst, FlowEdge, FlowNode, FlowchartAst, ObjectId, SequenceAst, SequenceMessage,
-    SequenceMessageKind, SymbolAnchor,
+    DiagramAst, FlowEdge, FlowchartAst, ObjectId, SequenceAst, SequenceMessage, SequenceMessageKind,
 };
 
 pub(crate) fn stable_id_map_from_ast(ast: &DiagramAst) -> DiagramStableIdMap {
@@ -486,6 +488,173 @@ pub(crate) fn reconcile_sequence_participant_symbols(ast: &mut SequenceAst, side
     }
 }
 
+pub(crate) fn reconcile_sequence_blocks(ast: &mut SequenceAst, sidecar: &DiagramMeta) {
+    if sidecar.sequence_blocks.is_empty() || ast.blocks().is_empty() {
+        return;
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    struct SectionFingerprint {
+        kind: u8,
+        header: Option<String>,
+        message_ids: Vec<ObjectId>,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    struct BlockFingerprint {
+        kind: u8,
+        header: Option<String>,
+        sections: Vec<SectionFingerprint>,
+    }
+
+    fn block_kind_key(kind: SequenceBlockKind) -> u8 {
+        match kind {
+            SequenceBlockKind::Alt => 0,
+            SequenceBlockKind::Opt => 1,
+            SequenceBlockKind::Loop => 2,
+            SequenceBlockKind::Par => 3,
+        }
+    }
+
+    fn section_kind_key(kind: SequenceSectionKind) -> u8 {
+        match kind {
+            SequenceSectionKind::Main => 0,
+            SequenceSectionKind::Else => 1,
+            SequenceSectionKind::And => 2,
+        }
+    }
+
+    fn fingerprint_from_meta(entry: &DiagramSequenceBlockMeta) -> BlockFingerprint {
+        BlockFingerprint {
+            kind: block_kind_key(entry.kind),
+            header: entry.header.clone(),
+            sections: entry
+                .sections
+                .iter()
+                .map(|section| SectionFingerprint {
+                    kind: section_kind_key(section.kind),
+                    header: section.header.clone(),
+                    message_ids: section.message_ids.clone(),
+                })
+                .collect(),
+        }
+    }
+
+    fn fingerprint_from_block(block: &SequenceBlock) -> BlockFingerprint {
+        BlockFingerprint {
+            kind: block_kind_key(block.kind()),
+            header: block.header().map(ToOwned::to_owned),
+            sections: block
+                .sections()
+                .iter()
+                .map(|section| SectionFingerprint {
+                    kind: section_kind_key(section.kind()),
+                    header: section.header().map(ToOwned::to_owned),
+                    message_ids: section.message_ids().to_vec(),
+                })
+                .collect(),
+        }
+    }
+
+    let mut by_fingerprint: BTreeMap<BlockFingerprint, VecDeque<&DiagramSequenceBlockMeta>> =
+        BTreeMap::new();
+    for entry in &sidecar.sequence_blocks {
+        by_fingerprint.entry(fingerprint_from_meta(entry)).or_default().push_back(entry);
+    }
+
+    let mut block_remap = BTreeMap::<ObjectId, ObjectId>::new();
+    let mut section_remap = BTreeMap::<ObjectId, ObjectId>::new();
+    let mut assigned_block_ids = BTreeSet::<ObjectId>::new();
+    let mut assigned_section_ids = BTreeSet::<ObjectId>::new();
+
+    fn walk_match(
+        blocks: &[SequenceBlock],
+        by_fingerprint: &mut BTreeMap<BlockFingerprint, VecDeque<&DiagramSequenceBlockMeta>>,
+        block_remap: &mut BTreeMap<ObjectId, ObjectId>,
+        section_remap: &mut BTreeMap<ObjectId, ObjectId>,
+        assigned_block_ids: &mut BTreeSet<ObjectId>,
+        assigned_section_ids: &mut BTreeSet<ObjectId>,
+    ) {
+        for block in blocks {
+            let fingerprint = fingerprint_from_block(block);
+            if let Some(queue) = by_fingerprint.get_mut(&fingerprint) {
+                if let Some(entry) = queue.pop_front() {
+                    let target_block_id = if assigned_block_ids.contains(&entry.block_id) {
+                        block.block_id().clone()
+                    } else {
+                        entry.block_id.clone()
+                    };
+                    assigned_block_ids.insert(target_block_id.clone());
+                    block_remap.insert(block.block_id().clone(), target_block_id);
+
+                    for (section, entry_section) in
+                        block.sections().iter().zip(entry.sections.iter())
+                    {
+                        let target_section_id =
+                            if assigned_section_ids.contains(&entry_section.section_id) {
+                                section.section_id().clone()
+                            } else {
+                                entry_section.section_id.clone()
+                            };
+                        assigned_section_ids.insert(target_section_id.clone());
+                        section_remap.insert(section.section_id().clone(), target_section_id);
+                    }
+                }
+            }
+            walk_match(
+                block.blocks(),
+                by_fingerprint,
+                block_remap,
+                section_remap,
+                assigned_block_ids,
+                assigned_section_ids,
+            );
+        }
+    }
+
+    walk_match(
+        ast.blocks(),
+        &mut by_fingerprint,
+        &mut block_remap,
+        &mut section_remap,
+        &mut assigned_block_ids,
+        &mut assigned_section_ids,
+    );
+
+    if block_remap.is_empty() && section_remap.is_empty() {
+        return;
+    }
+
+    fn apply_remaps(
+        blocks: &mut [SequenceBlock],
+        block_remap: &BTreeMap<ObjectId, ObjectId>,
+        section_remap: &BTreeMap<ObjectId, ObjectId>,
+    ) {
+        for block in blocks {
+            let old_id = block.block_id().clone();
+            let new_id = block_remap.get(&old_id).cloned().unwrap_or(old_id);
+            let kind = block.kind();
+            let header = block.header().map(ToOwned::to_owned);
+            let mut sections = std::mem::take(block.sections_mut());
+            for section in sections.iter_mut() {
+                let old_section_id = section.section_id().clone();
+                let new_section_id =
+                    section_remap.get(&old_section_id).cloned().unwrap_or(old_section_id);
+                let section_kind = section.kind();
+                let section_header = section.header().map(ToOwned::to_owned);
+                let message_ids = section.message_ids().to_vec();
+                *section =
+                    SequenceSection::new(new_section_id, section_kind, section_header, message_ids);
+            }
+            let mut nested = std::mem::take(block.blocks_mut());
+            apply_remaps(&mut nested, block_remap, section_remap);
+            *block = SequenceBlock::new(new_id, kind, header, sections, nested);
+        }
+    }
+
+    apply_remaps(ast.blocks_mut(), &block_remap, &section_remap);
+}
+
 /// Apply all identity/sidecar reconciliations appropriate for `ast`.
 pub(crate) fn reconcile_diagram_ast(ast: &mut DiagramAst, sidecar: &DiagramMeta) {
     match ast {
@@ -498,6 +667,7 @@ pub(crate) fn reconcile_diagram_ast(ast: &mut DiagramAst, sidecar: &DiagramMeta)
         DiagramAst::Sequence(seq_ast) => {
             reconcile_sequence_participants(seq_ast, sidecar);
             reconcile_sequence_messages(seq_ast, sidecar);
+            reconcile_sequence_blocks(seq_ast, sidecar);
             reconcile_sequence_participant_notes(seq_ast, sidecar);
             reconcile_sequence_participant_symbols(seq_ast, sidecar);
         }

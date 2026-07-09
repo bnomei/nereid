@@ -30,11 +30,12 @@ use crate::format::mermaid::{
     MermaidSequenceParseError,
 };
 use crate::layout::{layout_flowchart, layout_sequence, FlowchartLayoutError, SequenceLayoutError};
+use crate::model::seq_ast::{SequenceBlock, SequenceBlockKind, SequenceSectionKind};
 use crate::model::{
-    Diagram, DiagramAst, DiagramId, DiagramKind, FlowEdge, FlowNode, FlowchartAst, IdError,
-    ObjectId, ObjectRef, ParseObjectRefError, SequenceAst, SequenceMessage, SequenceMessageKind,
-    Session, SessionId, SymbolAnchor, SymbolAnchorError, Walkthrough, WalkthroughEdge,
-    WalkthroughId, WalkthroughNode, WalkthroughNodeId, XRef, XRefId, XRefStatus as ModelXRefStatus,
+    Diagram, DiagramAst, DiagramId, DiagramKind, FlowNode, FlowchartAst, IdError, ObjectId,
+    ObjectRef, ParseObjectRefError, SequenceAst, SequenceMessageKind, Session, SessionId,
+    SymbolAnchor, SymbolAnchorError, Walkthrough, WalkthroughEdge, WalkthroughId, WalkthroughNode,
+    WalkthroughNodeId, XRef, XRefId, XRefStatus as ModelXRefStatus,
 };
 use crate::render::{
     render_flowchart_unicode, render_sequence_unicode, render_walkthrough_unicode,
@@ -499,6 +500,7 @@ pub struct DiagramMeta {
     pub xrefs: Vec<DiagramXRef>,
     pub flow_edges: Vec<DiagramFlowEdgeMeta>,
     pub sequence_messages: Vec<DiagramSequenceMessageMeta>,
+    pub sequence_blocks: Vec<DiagramSequenceBlockMeta>,
     pub default_symbol_repository_id: Option<String>,
     pub flow_node_notes: BTreeMap<ObjectId, String>,
     pub sequence_participant_notes: BTreeMap<ObjectId, String>,
@@ -538,6 +540,55 @@ pub struct DiagramSequenceMessageMeta {
     pub to_participant_id: ObjectId,
     pub kind: SequenceMessageKind,
     pub text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiagramSequenceBlockMeta {
+    pub block_id: ObjectId,
+    pub kind: SequenceBlockKind,
+    pub header: Option<String>,
+    pub parent_block_id: Option<ObjectId>,
+    pub sections: Vec<DiagramSequenceSectionMeta>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiagramSequenceSectionMeta {
+    pub section_id: ObjectId,
+    pub kind: SequenceSectionKind,
+    pub header: Option<String>,
+    pub message_ids: Vec<ObjectId>,
+}
+
+pub(crate) fn sequence_blocks_meta_from_ast(ast: &SequenceAst) -> Vec<DiagramSequenceBlockMeta> {
+    fn walk(
+        blocks: &[SequenceBlock],
+        parent_block_id: Option<&ObjectId>,
+        out: &mut Vec<DiagramSequenceBlockMeta>,
+    ) {
+        for block in blocks {
+            out.push(DiagramSequenceBlockMeta {
+                block_id: block.block_id().clone(),
+                kind: block.kind(),
+                header: block.header().map(ToOwned::to_owned),
+                parent_block_id: parent_block_id.cloned(),
+                sections: block
+                    .sections()
+                    .iter()
+                    .map(|section| DiagramSequenceSectionMeta {
+                        section_id: section.section_id().clone(),
+                        kind: section.kind(),
+                        header: section.header().map(ToOwned::to_owned),
+                        message_ids: section.message_ids().to_vec(),
+                    })
+                    .collect(),
+            });
+            walk(block.blocks(), Some(block.block_id()), out);
+        }
+    }
+
+    let mut out = Vec::new();
+    walk(ast.blocks(), None, &mut out);
+    out
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1164,6 +1215,11 @@ impl SessionFolder {
                     DiagramAst::Flowchart(_) => Vec::new(),
                 };
 
+                let sequence_blocks = match diagram.ast() {
+                    DiagramAst::Sequence(ast) => sequence_blocks_meta_from_ast(ast),
+                    DiagramAst::Flowchart(_) => Vec::new(),
+                };
+
                 let flow_node_notes = match diagram.ast() {
                     DiagramAst::Flowchart(ast) => ast
                         .nodes()
@@ -1217,6 +1273,7 @@ impl SessionFolder {
                     xrefs: Vec::new(),
                     flow_edges,
                     sequence_messages,
+                    sequence_blocks,
                     default_symbol_repository_id: diagram
                         .default_symbol_repository_id()
                         .map(ToOwned::to_owned),
