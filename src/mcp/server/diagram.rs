@@ -14,11 +14,191 @@ use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::{tool, tool_router};
 
 use crate::format::mermaid::{parse_flowchart, parse_sequence_diagram};
-use crate::model::CategoryPath;
+use crate::model::{CategoryPath, DiagramAst, DiagramId, ObjectId, ObjectRef};
 use crate::ops::apply_ops;
 use crate::render::render_diagram_unicode;
 
 use super::*;
+
+fn category(segments: &[&str]) -> CategoryPath {
+    CategoryPath::new(segments.iter().map(|segment| (*segment).to_owned()).collect())
+        .expect("static object category")
+}
+
+fn object_ref(diagram_id: &DiagramId, category: CategoryPath, object_id: &ObjectId) -> ObjectRef {
+    ObjectRef::new(diagram_id.clone(), category, object_id.clone())
+}
+
+fn stable_object_snapshots(
+    diagram_id: &DiagramId,
+    ast: &DiagramAst,
+) -> std::collections::BTreeMap<ObjectRef, String> {
+    let mut snapshots = std::collections::BTreeMap::new();
+
+    match ast {
+        DiagramAst::Sequence(seq) => {
+            let participant_category = category(&["seq", "participant"]);
+            let message_category = category(&["seq", "message"]);
+            let block_category = category(&["seq", "block"]);
+            let section_category = category(&["seq", "section"]);
+
+            for (participant_id, participant) in seq.participants() {
+                snapshots.insert(
+                    object_ref(diagram_id, participant_category.clone(), participant_id),
+                    format!(
+                        "name={:?};role={:?};note={:?};symbol={:?}",
+                        participant.mermaid_name(),
+                        participant.role(),
+                        participant.note(),
+                        participant.symbol()
+                    ),
+                );
+            }
+
+            for message in seq.messages() {
+                snapshots.insert(
+                    object_ref(diagram_id, message_category.clone(), message.message_id()),
+                    format!(
+                        "from={};to={};kind={:?};arrow={:?};text={:?};order={}",
+                        message.from_participant_id(),
+                        message.to_participant_id(),
+                        message.kind(),
+                        message.raw_arrow(),
+                        message.text(),
+                        message.order_key()
+                    ),
+                );
+            }
+
+            fn collect_blocks(
+                diagram_id: &DiagramId,
+                block_category: &CategoryPath,
+                section_category: &CategoryPath,
+                snapshots: &mut std::collections::BTreeMap<ObjectRef, String>,
+                blocks: &[crate::model::seq_ast::SequenceBlock],
+            ) {
+                for block in blocks {
+                    let section_ids = block
+                        .sections()
+                        .iter()
+                        .map(|section| section.section_id().to_string())
+                        .collect::<Vec<_>>();
+                    let child_block_ids = block
+                        .blocks()
+                        .iter()
+                        .map(|child| child.block_id().to_string())
+                        .collect::<Vec<_>>();
+                    snapshots.insert(
+                        object_ref(diagram_id, block_category.clone(), block.block_id()),
+                        format!(
+                            "kind={:?};header={:?};sections={:?};children={:?}",
+                            block.kind(),
+                            block.header(),
+                            section_ids,
+                            child_block_ids
+                        ),
+                    );
+
+                    for section in block.sections() {
+                        let message_ids = section
+                            .message_ids()
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect::<Vec<_>>();
+                        snapshots.insert(
+                            object_ref(diagram_id, section_category.clone(), section.section_id()),
+                            format!(
+                                "kind={:?};header={:?};messages={:?}",
+                                section.kind(),
+                                section.header(),
+                                message_ids
+                            ),
+                        );
+                    }
+
+                    collect_blocks(
+                        diagram_id,
+                        block_category,
+                        section_category,
+                        snapshots,
+                        block.blocks(),
+                    );
+                }
+            }
+
+            collect_blocks(
+                diagram_id,
+                &block_category,
+                &section_category,
+                &mut snapshots,
+                seq.blocks(),
+            );
+        }
+        DiagramAst::Flowchart(flow) => {
+            let node_category = category(&["flow", "node"]);
+            let edge_category = category(&["flow", "edge"]);
+
+            for (node_id, node) in flow.nodes() {
+                snapshots.insert(
+                    object_ref(diagram_id, node_category.clone(), node_id),
+                    format!(
+                        "mermaid_id={:?};label={:?};shape={:?};note={:?};symbol={:?}",
+                        node.mermaid_id(),
+                        node.label(),
+                        node.shape(),
+                        node.note(),
+                        node.symbol()
+                    ),
+                );
+            }
+
+            for (edge_id, edge) in flow.edges() {
+                snapshots.insert(
+                    object_ref(diagram_id, edge_category.clone(), edge_id),
+                    format!(
+                        "from={};to={};label={:?};connector={:?};style={:?}",
+                        edge.from_node_id(),
+                        edge.to_node_id(),
+                        edge.label(),
+                        edge.connector(),
+                        edge.style()
+                    ),
+                );
+            }
+        }
+    }
+
+    snapshots
+}
+
+fn replace_delta_from_asts(
+    diagram_id: &DiagramId,
+    previous_ast: &DiagramAst,
+    next_ast: &DiagramAst,
+) -> crate::ops::Delta {
+    let previous = stable_object_snapshots(diagram_id, previous_ast);
+    let next = stable_object_snapshots(diagram_id, next_ast);
+
+    let mut delta = crate::ops::Delta::default();
+
+    for (object_ref, next_payload) in &next {
+        match previous.get(object_ref) {
+            Some(previous_payload) if previous_payload != next_payload => {
+                delta.updated.push(object_ref.clone());
+            }
+            Some(_) => {}
+            None => delta.added.push(object_ref.clone()),
+        }
+    }
+
+    for object_ref in previous.keys() {
+        if !next.contains_key(object_ref) {
+            delta.removed.push(object_ref.clone());
+        }
+    }
+
+    delta
+}
 
 #[tool_router(router = diagram_tool_router, vis = "pub(super)")]
 impl NereidMcp {
@@ -90,9 +270,12 @@ impl NereidMcp {
                 ));
             }
 
+            let previous_ast = candidate_diagram.ast().clone();
             let replace =
                 crate::store::replace_diagram_from_mermaid(&mut candidate_diagram, &mermaid)
                     .map_err(map_replace_error)?;
+            let delta =
+                replace_delta_from_asts(&diagram_id, &previous_ast, candidate_diagram.ast());
             render_diagram_unicode(&candidate_diagram).map_err(|err| {
                 ErrorData::invalid_request(
                     format!("cannot render diagram after replace_from_mermaid: {err}"),
@@ -114,11 +297,7 @@ impl NereidMcp {
 
             let mut history =
                 state.delta_history.get(&diagram_id).cloned().unwrap_or_else(VecDeque::new);
-            history.push_back(LastDelta {
-                from_rev: base_rev,
-                to_rev: replace.new_rev,
-                delta: crate::ops::Delta::default(),
-            });
+            history.push_back(LastDelta { from_rev: base_rev, to_rev: replace.new_rev, delta });
             while history.len() > DELTA_HISTORY_LIMIT {
                 history.pop_front();
             }
@@ -169,9 +348,12 @@ impl NereidMcp {
                 ));
             }
 
+            let previous_ast = candidate_diagram.ast().clone();
             let replace =
                 crate::store::replace_diagram_from_mermaid(&mut candidate_diagram, &mermaid)
                     .map_err(map_replace_error)?;
+            let delta =
+                replace_delta_from_asts(&diagram_id, &previous_ast, candidate_diagram.ast());
             render_diagram_unicode(&candidate_diagram).map_err(|err| {
                 ErrorData::invalid_request(
                     format!("cannot render diagram after replace_from_mermaid: {err}"),
@@ -192,11 +374,7 @@ impl NereidMcp {
 
             let mut history =
                 state.delta_history.get(&diagram_id).cloned().unwrap_or_else(VecDeque::new);
-            history.push_back(LastDelta {
-                from_rev: base_rev,
-                to_rev: replace.new_rev,
-                delta: crate::ops::Delta::default(),
-            });
+            history.push_back(LastDelta { from_rev: base_rev, to_rev: replace.new_rev, delta });
             while history.len() > DELTA_HISTORY_LIMIT {
                 history.pop_front();
             }

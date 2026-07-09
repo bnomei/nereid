@@ -53,6 +53,7 @@ fn seq_add_message_ops(participants: &[ObjectId], order_key_base: i64, count: us
             arrow: None,
             text,
             order_key,
+            section_id: None,
         }));
     }
     ops

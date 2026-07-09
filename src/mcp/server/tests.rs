@@ -3861,6 +3861,21 @@ async fn diagram_replace_from_mermaid_preserves_message_ids_and_reports_identity
     assert!(renamed.identity.dropped.iter().any(|id| id == "m:alpha"));
     assert!(!renamed.identity.newly_allocated.is_empty());
     assert!(renamed.dangling_xref_ids.iter().any(|id| id == "x:1"));
+
+    let Json(delta) = server
+        .diagram_diff(Parameters(GetDeltaParams { diagram_id: None, since_rev: 1 }))
+        .await
+        .expect("diff after replace rename");
+    assert_eq!(delta.from_rev, 1);
+    assert_eq!(delta.to_rev, 2);
+    assert!(delta.changes.iter().any(|change| {
+        change.kind == DeltaChangeKind::Removed
+            && change.refs.iter().any(|r| r == "d:d-replace/seq/message/m:alpha")
+    }));
+    assert!(delta.changes.iter().any(|change| {
+        change.kind == DeltaChangeKind::Added
+            && change.refs.iter().any(|r| r.starts_with("d:d-replace/seq/message/"))
+    }));
 }
 
 #[tokio::test]
