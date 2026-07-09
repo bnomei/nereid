@@ -848,18 +848,24 @@ pub enum McpOp {
     },
     SeqSetMessageSection {
         message_id: String,
+        /// Omit or null to detach from all sections.
+        #[serde(default)]
         section_id: Option<String>,
     },
     SeqAddBlock {
         block_id: String,
         kind: McpSeqBlockKind,
+        #[serde(default)]
         header: Option<String>,
+        /// Omit for root blocks.
+        #[serde(default)]
         parent_block_id: Option<String>,
         main_section_id: String,
     },
     SeqUpdateBlock {
         block_id: String,
         /// When present, replaces the block header (`null` clears it).
+        #[serde(default)]
         header: Option<Option<String>>,
     },
     SeqRemoveBlock {
@@ -869,11 +875,13 @@ pub enum McpOp {
         section_id: String,
         block_id: String,
         kind: McpSeqSectionKind,
+        #[serde(default)]
         header: Option<String>,
     },
     SeqUpdateSection {
         section_id: String,
         /// When present, replaces the section header (`null` clears it).
+        #[serde(default)]
         header: Option<Option<String>>,
     },
     SeqRemoveSection {

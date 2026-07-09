@@ -458,6 +458,8 @@
                   "type": "string"
                 },
                 "section_id": {
+                  "default": null,
+                  "description": "Omit or null to detach from all sections.",
                   "type": [
                     "string",
                     "null"
@@ -480,6 +482,7 @@
                   "type": "string"
                 },
                 "header": {
+                  "default": null,
                   "type": [
                     "string",
                     "null"
@@ -492,6 +495,8 @@
                   "type": "string"
                 },
                 "parent_block_id": {
+                  "default": null,
+                  "description": "Omit for root blocks.",
                   "type": [
                     "string",
                     "null"
@@ -516,6 +521,7 @@
                   "type": "string"
                 },
                 "header": {
+                  "default": null,
                   "description": "When present, replaces the block header (`null` clears it).",
                   "type": [
                     "string",
@@ -555,6 +561,7 @@
                   "type": "string"
                 },
                 "header": {
+                  "default": null,
                   "type": [
                     "string",
                     "null"
@@ -582,6 +589,7 @@
             {
               "properties": {
                 "header": {
+                  "default": null,
                   "description": "When present, replaces the section header (`null` clears it).",
                   "type": [
                     "string",
@@ -2108,6 +2116,8 @@
                   "type": "string"
                 },
                 "section_id": {
+                  "default": null,
+                  "description": "Omit or null to detach from all sections.",
                   "type": [
                     "string",
                     "null"
@@ -2130,6 +2140,7 @@
                   "type": "string"
                 },
                 "header": {
+                  "default": null,
                   "type": [
                     "string",
                     "null"
@@ -2142,6 +2153,8 @@
                   "type": "string"
                 },
                 "parent_block_id": {
+                  "default": null,
+                  "description": "Omit for root blocks.",
                   "type": [
                     "string",
                     "null"
@@ -2166,6 +2179,7 @@
                   "type": "string"
                 },
                 "header": {
+                  "default": null,
                   "description": "When present, replaces the block header (`null` clears it).",
                   "type": [
                     "string",
@@ -2205,6 +2219,7 @@
                   "type": "string"
                 },
                 "header": {
+                  "default": null,
                   "type": [
                     "string",
                     "null"
@@ -2232,6 +2247,7 @@
             {
               "properties": {
                 "header": {
+                  "default": null,
                   "description": "When present, replaces the section header (`null` clears it).",
                   "type": [
                     "string",

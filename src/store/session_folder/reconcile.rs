@@ -612,12 +612,11 @@ pub(crate) fn reconcile_sequence_blocks(ast: &mut SequenceAst, sidecar: &Diagram
     ) {
         for block in blocks {
             let fingerprint = fingerprint_from_block(block, parent_stable_id.clone());
-            let mut target_block_id = block.block_id().clone();
             if let Some(queue) = by_fingerprint.get_mut(&fingerprint) {
                 if let Some(entry) = queue.pop_front() {
                     // Sidecar ids were pre-reserved; reclaim this match.
                     assigned_block_ids.remove(&entry.block_id);
-                    target_block_id = if assigned_block_ids.contains(&entry.block_id) {
+                    let target_block_id = if assigned_block_ids.contains(&entry.block_id) {
                         allocate_unique_id(block.block_id(), assigned_block_ids, "b")
                     } else {
                         assigned_block_ids.insert(entry.block_id.clone());
@@ -654,7 +653,7 @@ pub(crate) fn reconcile_sequence_blocks(ast: &mut SequenceAst, sidecar: &Diagram
             }
 
             // Unmatched parse block: keep id only if free, else reallocate.
-            target_block_id = allocate_unique_id(block.block_id(), assigned_block_ids, "b");
+            let target_block_id = allocate_unique_id(block.block_id(), assigned_block_ids, "b");
             if &target_block_id != block.block_id() {
                 block_remap.insert(block.block_id().clone(), target_block_id.clone());
             }
