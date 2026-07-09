@@ -3864,6 +3864,47 @@ async fn diagram_replace_from_mermaid_preserves_message_ids_and_reports_identity
 }
 
 #[tokio::test]
+async fn diagram_replace_from_mermaid_records_delta_history_for_in_memory_session() {
+    let mut session = Session::new(SessionId::new("s-replace-hist").expect("session id"));
+    let diagram_id = DiagramId::new("d-replace-hist").expect("diagram id");
+    let mut ast = SequenceAst::default();
+    let p_a = oid("p:A");
+    let p_b = oid("p:B");
+    ast.participants_mut().insert(p_a.clone(), SequenceParticipant::new("A"));
+    ast.participants_mut().insert(p_b.clone(), SequenceParticipant::new("B"));
+    ast.messages_mut().push(SequenceMessage::new(
+        oid("m:1"),
+        p_a,
+        p_b,
+        SequenceMessageKind::Sync,
+        "Hello",
+        1000,
+    ));
+    session.diagrams_mut().insert(
+        diagram_id.clone(),
+        Diagram::new(diagram_id.clone(), "Hist", DiagramAst::Sequence(ast)),
+    );
+    session.set_active_diagram_id(Some(diagram_id));
+    let server = NereidMcp::new(session);
+
+    server
+        .diagram_replace_from_mermaid(Parameters(DiagramReplaceFromMermaidParams {
+            diagram_id: None,
+            base_rev: 0,
+            mermaid: "sequenceDiagram\n  A->>B: Hello\n".into(),
+        }))
+        .await
+        .expect("replace");
+
+    let Json(delta) = server
+        .diagram_diff(Parameters(GetDeltaParams { diagram_id: None, since_rev: 0 }))
+        .await
+        .expect("diff after in-memory replace must use recorded history");
+    assert_eq!(delta.from_rev, 0);
+    assert_eq!(delta.to_rev, 1);
+}
+
+#[tokio::test]
 async fn diagram_replace_from_mermaid_rejects_stale_base_rev_and_kind_mismatch() {
     let server = NereidMcp::new(demo_session());
 

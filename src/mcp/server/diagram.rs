@@ -199,6 +199,19 @@ impl NereidMcp {
                 .collect::<Vec<_>>();
             let identity =
                 identity_report_from_sets(&replace.previous_object_ids, &replace.next_object_ids);
+
+            let mut history =
+                state.delta_history.get(&diagram_id).cloned().unwrap_or_else(VecDeque::new);
+            // Match the session_folder path: coarse rev step with empty object delta.
+            history.push_back(LastDelta {
+                from_rev: base_rev,
+                to_rev: replace.new_rev,
+                delta: crate::ops::Delta::default(),
+            });
+            while history.len() > DELTA_HISTORY_LIMIT {
+                history.pop_front();
+            }
+
             (
                 Json(DiagramReplaceFromMermaidResponse {
                     new_rev: replace.new_rev,
@@ -207,7 +220,7 @@ impl NereidMcp {
                     identity,
                     dangling_xref_ids,
                 }),
-                None,
+                Some((diagram_id, history)),
             )
         };
 
