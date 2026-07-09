@@ -505,6 +505,7 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
                     arrow: None,
                     text: "Extra".to_owned(),
                     order_key: 4000,
+                    section_id: None,
                 }],
             }))
             .await
@@ -525,6 +526,7 @@ fn e2e_diagram_and_sequence_tools_cover_full_surface() {
                     arrow: None,
                     text: "Extra".to_owned(),
                     order_key: 4000,
+                    section_id: None,
                 }],
             }))
             .await

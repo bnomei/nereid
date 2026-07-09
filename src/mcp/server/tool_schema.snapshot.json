@@ -350,6 +350,13 @@
                   "format": "int64",
                   "type": "integer"
                 },
+                "section_id": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "text": {
                   "type": "string"
                 },
@@ -442,6 +449,172 @@
               "required": [
                 "type",
                 "message_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "message_id": {
+                  "type": "string"
+                },
+                "section_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "seq_set_message_section",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "message_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "block_id": {
+                  "type": "string"
+                },
+                "header": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "kind": {
+                  "$ref": "#/$defs/McpSeqBlockKind"
+                },
+                "main_section_id": {
+                  "type": "string"
+                },
+                "parent_block_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "seq_add_block",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "block_id",
+                "kind",
+                "main_section_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "block_id": {
+                  "type": "string"
+                },
+                "header": {
+                  "description": "When present, replaces the block header (`null` clears it).",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "seq_update_block",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "block_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "block_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "seq_remove_block",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "block_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "block_id": {
+                  "type": "string"
+                },
+                "header": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "kind": {
+                  "$ref": "#/$defs/McpSeqSectionKind"
+                },
+                "section_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "seq_add_section",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "section_id",
+                "block_id",
+                "kind"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "header": {
+                  "description": "When present, replaces the section header (`null` clears it).",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "section_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "seq_update_section",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "section_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "section_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "seq_remove_section",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "section_id"
               ],
               "type": "object"
             },
@@ -690,6 +863,23 @@
               "type": "object"
             }
           ]
+        },
+        "McpSeqBlockKind": {
+          "enum": [
+            "alt",
+            "opt",
+            "loop",
+            "par"
+          ],
+          "type": "string"
+        },
+        "McpSeqSectionKind": {
+          "enum": [
+            "main",
+            "else",
+            "and"
+          ],
+          "type": "string"
         },
         "McpSymbolAnchor": {
           "properties": {
@@ -1810,6 +2000,13 @@
                   "format": "int64",
                   "type": "integer"
                 },
+                "section_id": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "text": {
                   "type": "string"
                 },
@@ -1902,6 +2099,172 @@
               "required": [
                 "type",
                 "message_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "message_id": {
+                  "type": "string"
+                },
+                "section_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "seq_set_message_section",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "message_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "block_id": {
+                  "type": "string"
+                },
+                "header": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "kind": {
+                  "$ref": "#/$defs/McpSeqBlockKind"
+                },
+                "main_section_id": {
+                  "type": "string"
+                },
+                "parent_block_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "seq_add_block",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "block_id",
+                "kind",
+                "main_section_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "block_id": {
+                  "type": "string"
+                },
+                "header": {
+                  "description": "When present, replaces the block header (`null` clears it).",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "seq_update_block",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "block_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "block_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "seq_remove_block",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "block_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "block_id": {
+                  "type": "string"
+                },
+                "header": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "kind": {
+                  "$ref": "#/$defs/McpSeqSectionKind"
+                },
+                "section_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "seq_add_section",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "section_id",
+                "block_id",
+                "kind"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "header": {
+                  "description": "When present, replaces the section header (`null` clears it).",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "section_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "seq_update_section",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "section_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "section_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "seq_remove_section",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "section_id"
               ],
               "type": "object"
             },
@@ -2150,6 +2513,23 @@
               "type": "object"
             }
           ]
+        },
+        "McpSeqBlockKind": {
+          "enum": [
+            "alt",
+            "opt",
+            "loop",
+            "par"
+          ],
+          "type": "string"
+        },
+        "McpSeqSectionKind": {
+          "enum": [
+            "main",
+            "else",
+            "and"
+          ],
+          "type": "string"
         },
         "McpSymbolAnchor": {
           "properties": {

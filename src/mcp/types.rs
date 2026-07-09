@@ -803,6 +803,8 @@ pub enum McpOp {
         arrow: Option<String>,
         text: String,
         order_key: i64,
+        #[serde(default)]
+        section_id: Option<String>,
     },
     SeqUpdateMessage {
         message_id: String,
@@ -815,6 +817,39 @@ pub enum McpOp {
     },
     SeqRemoveMessage {
         message_id: String,
+    },
+    SeqSetMessageSection {
+        message_id: String,
+        section_id: Option<String>,
+    },
+    SeqAddBlock {
+        block_id: String,
+        kind: McpSeqBlockKind,
+        header: Option<String>,
+        parent_block_id: Option<String>,
+        main_section_id: String,
+    },
+    SeqUpdateBlock {
+        block_id: String,
+        /// When present, replaces the block header (`null` clears it).
+        header: Option<Option<String>>,
+    },
+    SeqRemoveBlock {
+        block_id: String,
+    },
+    SeqAddSection {
+        section_id: String,
+        block_id: String,
+        kind: McpSeqSectionKind,
+        header: Option<String>,
+    },
+    SeqUpdateSection {
+        section_id: String,
+        /// When present, replaces the section header (`null` clears it).
+        header: Option<Option<String>>,
+    },
+    SeqRemoveSection {
+        section_id: String,
     },
     FlowAddNode {
         node_id: String,

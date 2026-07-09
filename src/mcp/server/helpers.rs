@@ -227,6 +227,23 @@ fn map_seq_block_kind_to_mcp(kind: crate::model::seq_ast::SequenceBlockKind) -> 
     }
 }
 
+fn map_mcp_seq_block_kind(kind: McpSeqBlockKind) -> crate::model::seq_ast::SequenceBlockKind {
+    match kind {
+        McpSeqBlockKind::Alt => crate::model::seq_ast::SequenceBlockKind::Alt,
+        McpSeqBlockKind::Opt => crate::model::seq_ast::SequenceBlockKind::Opt,
+        McpSeqBlockKind::Loop => crate::model::seq_ast::SequenceBlockKind::Loop,
+        McpSeqBlockKind::Par => crate::model::seq_ast::SequenceBlockKind::Par,
+    }
+}
+
+fn map_mcp_seq_section_kind(kind: McpSeqSectionKind) -> crate::model::seq_ast::SequenceSectionKind {
+    match kind {
+        McpSeqSectionKind::Main => crate::model::seq_ast::SequenceSectionKind::Main,
+        McpSeqSectionKind::Else => crate::model::seq_ast::SequenceSectionKind::Else,
+        McpSeqSectionKind::And => crate::model::seq_ast::SequenceSectionKind::And,
+    }
+}
+
 fn map_seq_section_kind_to_mcp(
     kind: crate::model::seq_ast::SequenceSectionKind,
 ) -> McpSeqSectionKind {
@@ -271,6 +288,11 @@ fn map_seq_block_to_mcp(block: &crate::model::seq_ast::SequenceBlock) -> McpSeqB
 }
 
 fn mermaid_for_sequence(ast: &crate::model::SequenceAst) -> String {
+    // Prefer the full exporter so alt/opt/loop/par structure is preserved for MCP reads.
+    if let Ok(exported) = crate::format::mermaid::export_sequence_diagram(ast) {
+        return exported;
+    }
+
     let mut out = String::new();
     out.push_str("sequenceDiagram\n");
 
@@ -1179,6 +1201,7 @@ fn mcp_op_to_internal(op: &McpOp) -> Result<Op, ErrorData> {
             arrow,
             text,
             order_key,
+            section_id,
         } => Op::Seq(SeqOp::AddMessage {
             message_id: parse_object_id(message_id)?,
             from_participant_id: parse_object_id(from_participant_id)?,
@@ -1187,7 +1210,7 @@ fn mcp_op_to_internal(op: &McpOp) -> Result<Op, ErrorData> {
             arrow: arrow.clone(),
             text: text.clone(),
             order_key: *order_key,
-            section_id: None,
+            section_id: section_id.as_deref().map(parse_object_id).transpose()?,
         }),
         McpOp::SeqUpdateMessage {
             message_id,
@@ -1216,6 +1239,51 @@ fn mcp_op_to_internal(op: &McpOp) -> Result<Op, ErrorData> {
         }),
         McpOp::SeqRemoveMessage { message_id } => Op::Seq(SeqOp::RemoveMessage {
             message_id: parse_object_id(message_id)?,
+        }),
+        McpOp::SeqSetMessageSection {
+            message_id,
+            section_id,
+        } => Op::Seq(SeqOp::SetMessageSection {
+            message_id: parse_object_id(message_id)?,
+            section_id: section_id.as_deref().map(parse_object_id).transpose()?,
+        }),
+        McpOp::SeqAddBlock {
+            block_id,
+            kind,
+            header,
+            parent_block_id,
+            main_section_id,
+        } => Op::Seq(SeqOp::AddBlock {
+            block_id: parse_object_id(block_id)?,
+            kind: map_mcp_seq_block_kind(*kind),
+            header: header.clone(),
+            parent_block_id: parent_block_id.as_deref().map(parse_object_id).transpose()?,
+            main_section_id: parse_object_id(main_section_id)?,
+        }),
+        McpOp::SeqUpdateBlock { block_id, header } => Op::Seq(SeqOp::UpdateBlock {
+            block_id: parse_object_id(block_id)?,
+            patch: SeqBlockPatch { header: header.clone() },
+        }),
+        McpOp::SeqRemoveBlock { block_id } => Op::Seq(SeqOp::RemoveBlock {
+            block_id: parse_object_id(block_id)?,
+        }),
+        McpOp::SeqAddSection {
+            section_id,
+            block_id,
+            kind,
+            header,
+        } => Op::Seq(SeqOp::AddSection {
+            section_id: parse_object_id(section_id)?,
+            block_id: parse_object_id(block_id)?,
+            kind: map_mcp_seq_section_kind(*kind),
+            header: header.clone(),
+        }),
+        McpOp::SeqUpdateSection { section_id, header } => Op::Seq(SeqOp::UpdateSection {
+            section_id: parse_object_id(section_id)?,
+            patch: SeqSectionPatch { header: header.clone() },
+        }),
+        McpOp::SeqRemoveSection { section_id } => Op::Seq(SeqOp::RemoveSection {
+            section_id: parse_object_id(section_id)?,
         }),
         McpOp::FlowAddNode {
             node_id,

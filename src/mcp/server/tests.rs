@@ -13,7 +13,7 @@ use rmcp::handler::server::wrapper::{Json, Parameters};
 
 use crate::model::{
     seq_ast::{SequenceBlock, SequenceBlockKind, SequenceSection, SequenceSectionKind},
-    DiagramAst, FlowEdge, FlowNode, FlowchartAst, ObjectRef, SequenceAst, SequenceMessage,
+    Diagram, DiagramAst, FlowEdge, FlowNode, FlowchartAst, ObjectRef, SequenceAst, SequenceMessage,
     SequenceMessageKind, SequenceParticipant, SessionId, Walkthrough, WalkthroughEdge,
     WalkthroughId, WalkthroughNode, WalkthroughNodeId, XRef, XRefId, XRefStatus,
 };
@@ -3791,6 +3791,102 @@ async fn apply_ops_rejects_invalid_flow_node_mermaid_id() {
     };
 
     assert_eq!(err.code, rmcp::model::ErrorCode::INVALID_PARAMS);
+}
+
+#[tokio::test]
+async fn apply_ops_builds_sequence_alt_else_structure() {
+    let mut session = Session::new(SessionId::new("s-structure").expect("session id"));
+    let diagram_id = DiagramId::new("d-struct").expect("diagram id");
+    let mut ast = SequenceAst::default();
+    ast.participants_mut().insert(ObjectId::new("p:A").expect("id"), SequenceParticipant::new("A"));
+    ast.participants_mut().insert(ObjectId::new("p:B").expect("id"), SequenceParticipant::new("B"));
+    session.diagrams_mut().insert(
+        diagram_id.clone(),
+        Diagram::new(diagram_id.clone(), "Struct", DiagramAst::Sequence(ast)),
+    );
+    session.set_active_diagram_id(Some(diagram_id));
+    let server = NereidMcp::new(session);
+
+    let Json(applied) = server
+        .diagram_apply_ops(Parameters(ApplyOpsParams {
+            diagram_id: None,
+            base_rev: 0,
+            ops: vec![
+                McpOp::SeqAddBlock {
+                    block_id: "b:cache".into(),
+                    kind: McpSeqBlockKind::Alt,
+                    header: Some("cache".into()),
+                    parent_block_id: None,
+                    main_section_id: "sec:cache:main".into(),
+                },
+                McpOp::SeqAddSection {
+                    section_id: "sec:cache:else".into(),
+                    block_id: "b:cache".into(),
+                    kind: McpSeqSectionKind::Else,
+                    header: Some("miss".into()),
+                },
+                McpOp::SeqAddMessage {
+                    message_id: "m:hit".into(),
+                    from_participant_id: "p:A".into(),
+                    to_participant_id: "p:B".into(),
+                    kind: MessageKind::Sync,
+                    arrow: None,
+                    text: "hit".into(),
+                    order_key: 1000,
+                    section_id: Some("sec:cache:main".into()),
+                },
+                McpOp::SeqAddMessage {
+                    message_id: "m:miss".into(),
+                    from_participant_id: "p:A".into(),
+                    to_participant_id: "p:B".into(),
+                    kind: MessageKind::Sync,
+                    arrow: None,
+                    text: "miss".into(),
+                    order_key: 2000,
+                    section_id: Some("sec:cache:else".into()),
+                },
+            ],
+        }))
+        .await
+        .expect("apply structure ops");
+
+    assert_eq!(applied.new_rev, 1);
+    assert!(applied.delta.added.iter().any(|r| r.contains("seq/block/b:cache")));
+    assert!(applied.delta.added.iter().any(|r| r.contains("sec:cache:else")));
+
+    let Json(read) = server
+        .object_read(Parameters(ObjectGetParams {
+            object_ref: Some("d:d-struct/seq/block/b:cache".into()),
+            object_refs: None,
+        }))
+        .await
+        .expect("object_read block");
+    assert_eq!(read.objects.len(), 1);
+
+    let Json(ast) = server
+        .diagram_get_ast(Parameters(DiagramTargetParams { diagram_id: None }))
+        .await
+        .expect("get_ast");
+    let McpDiagramAst::Sequence { blocks, messages, .. } = ast.ast else {
+        panic!("expected sequence ast");
+    };
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(blocks[0].block_id, "b:cache");
+    assert_eq!(blocks[0].kind, McpSeqBlockKind::Alt);
+    assert_eq!(blocks[0].sections.len(), 2);
+    let main = blocks[0]
+        .sections
+        .iter()
+        .find(|section| section.section_id == "sec:cache:main")
+        .expect("main section");
+    let else_section = blocks[0]
+        .sections
+        .iter()
+        .find(|section| section.section_id == "sec:cache:else")
+        .expect("else section");
+    assert_eq!(main.message_ids, vec!["m:hit".to_owned()]);
+    assert_eq!(else_section.message_ids, vec!["m:miss".to_owned()]);
+    assert_eq!(messages.len(), 2);
 }
 
 #[tokio::test]

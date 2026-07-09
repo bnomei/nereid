@@ -22,8 +22,8 @@ use crate::model::{
     XRefStatus,
 };
 use crate::ops::{
-    ApplyError, FlowEdgePatch, FlowNodePatch, FlowOp, Op, SeqMessagePatch, SeqOp,
-    SeqParticipantPatch,
+    ApplyError, FlowEdgePatch, FlowNodePatch, FlowOp, Op, SeqBlockPatch, SeqMessagePatch, SeqOp,
+    SeqParticipantPatch, SeqSectionPatch,
 };
 use crate::store::SessionFolder;
 use crate::ui::UiState;
