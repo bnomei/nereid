@@ -257,9 +257,16 @@ fn apply_seq_op(
                     attach_message_to_section(diagram_id, ast, message_id, section_id, delta)?;
                 }
                 None => {
+                    let previous_sections = ast.sections_containing_message(message_id);
                     let detached = ast.detach_message_from_all_sections(message_id);
                     if detached > 0 {
                         delta.record_updated(seq_message_ref(diagram_id, message_id));
+                        for previous_section_id in previous_sections {
+                            delta.record_updated(seq_section_ref(diagram_id, &previous_section_id));
+                            if let Some(block) = ast.find_block_for_section(&previous_section_id) {
+                                delta.record_updated(seq_block_ref(diagram_id, block.block_id()));
+                            }
+                        }
                     }
                 }
             }
@@ -472,7 +479,16 @@ fn attach_message_to_section(
     membership_sections.sort_by(|a, b| a.as_str().cmp(b.as_str()));
     membership_sections.dedup();
 
+    let previous_sections = ast.sections_containing_message(message_id);
     ast.detach_message_from_all_sections(message_id);
+    for previous_section_id in &previous_sections {
+        if !membership_sections.contains(previous_section_id) {
+            delta.record_updated(seq_section_ref(diagram_id, previous_section_id));
+            if let Some(block) = ast.find_block_for_section(previous_section_id) {
+                delta.record_updated(seq_block_ref(diagram_id, block.block_id()));
+            }
+        }
+    }
 
     for membership_section_id in &membership_sections {
         let Some(section) = ast.find_section_mut(membership_section_id) else {
