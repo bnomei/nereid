@@ -294,7 +294,7 @@ fn apply_seq_op(
                 });
             }
 
-            let parent_depth = if let Some(parent_id) = parent_block_id {
+            if let Some(parent_id) = parent_block_id {
                 let Some(depth) = ast.block_depth(parent_id) else {
                     return Err(ApplyError::NotFound {
                         kind: ObjectKind::SeqBlock,
@@ -309,11 +309,16 @@ fn apply_seq_op(
                         ),
                     });
                 }
-                depth
-            } else {
-                0
-            };
-            let _ = parent_depth;
+                if ast.find_block(parent_id).is_some_and(|parent| parent.sections().is_empty()) {
+                    return Err(ApplyError::InvalidSeqBlockNesting {
+                        block_id: block_id.clone(),
+                        reason: format!(
+                            "parent block {} has no sections; nested messages must also join an ancestor section (attach via section_id on AddMessage or SetMessageSection)",
+                            parent_id.as_str()
+                        ),
+                    });
+                }
+            }
 
             let block = SequenceBlock::new(
                 block_id.clone(),

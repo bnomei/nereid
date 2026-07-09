@@ -459,7 +459,7 @@ impl fmt::Display for ApplyError {
             Self::InvalidSeqBlockStructure { reason } => {
                 write!(
                     f,
-                    "invalid sequence block structure: {reason} (section messages must be contiguous in order_key order)"
+                    "invalid sequence block structure: {reason} (section messages must be contiguous in order_key order; nested messages must also belong to ancestor sections)"
                 )
             }
         }
