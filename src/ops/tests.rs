@@ -1510,8 +1510,8 @@ fn apply_seq_builds_alt_else_via_structure_and_membership_ops() {
     assert!(result.delta.added.iter().any(|r| r.object_id() == &else_sec));
 
     let DiagramAst::Sequence(ast) = diagram.ast() else { panic!("seq") };
-    assert_eq!(ast.find_section(&main_sec).expect("main").message_ids(), &[m1.clone()]);
-    assert_eq!(ast.find_section(&else_sec).expect("else").message_ids(), &[m2.clone()]);
+    assert_eq!(ast.find_section(&main_sec).expect("main").message_ids(), std::slice::from_ref(&m1));
+    assert_eq!(ast.find_section(&else_sec).expect("else").message_ids(), std::slice::from_ref(&m2));
     let exported = export_sequence_diagram(ast).expect("export alt");
     assert!(exported.contains("alt cache"));
     assert!(exported.contains("else miss"));

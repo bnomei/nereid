@@ -87,10 +87,8 @@ impl SequenceAst {
             blocks: &'a mut [SequenceBlock],
             block_id: &ObjectId,
         ) -> Option<&'a mut SequenceBlock> {
-            for index in 0..blocks.len() {
-                if blocks[index].block_id() == block_id {
-                    return Some(&mut blocks[index]);
-                }
+            if let Some(index) = blocks.iter().position(|block| block.block_id() == block_id) {
+                return Some(&mut blocks[index]);
             }
             for block in blocks.iter_mut() {
                 if let Some(found) = find(block.blocks_mut(), block_id) {
@@ -173,11 +171,10 @@ impl SequenceAst {
             blocks: &'a mut [SequenceBlock],
             section_id: &ObjectId,
         ) -> Option<&'a mut SequenceBlock> {
-            for index in 0..blocks.len() {
-                if blocks[index].sections().iter().any(|section| section.section_id() == section_id)
-                {
-                    return Some(&mut blocks[index]);
-                }
+            if let Some(index) = blocks.iter().position(|block| {
+                block.sections().iter().any(|section| section.section_id() == section_id)
+            }) {
+                return Some(&mut blocks[index]);
             }
             for block in blocks.iter_mut() {
                 if let Some(found) = find(block.blocks_mut(), section_id) {
