@@ -232,7 +232,9 @@ fn apply_seq_op(
                     object_id: message_id.clone(),
                 });
             }
+            let structure_before = structure_snapshot(ast);
             prune_messages_from_blocks(ast, &HashSet::from([message_id.clone()]));
+            record_structure_prune_delta(diagram_id, &structure_before, ast, delta);
             delta.record_removed(seq_message_ref(diagram_id, message_id));
             Ok(())
         }
@@ -621,6 +623,48 @@ fn prune_messages_from_blocks(ast: &mut SequenceAst, removed: &HashSet<ObjectId>
         return;
     }
     ast.blocks_mut().retain_mut(|block| prune_messages_from_block(block, removed));
+}
+
+#[derive(Default)]
+struct StructureSnapshot {
+    block_ids: HashSet<ObjectId>,
+    section_ids: HashSet<ObjectId>,
+}
+
+fn structure_snapshot(ast: &SequenceAst) -> StructureSnapshot {
+    StructureSnapshot {
+        block_ids: ast.collect_block_ids().into_iter().collect(),
+        section_ids: ast.collect_section_ids().into_iter().collect(),
+    }
+}
+
+fn record_structure_prune_delta(
+    diagram_id: &DiagramId,
+    before: &StructureSnapshot,
+    after: &SequenceAst,
+    delta: &mut DeltaBuilder,
+) {
+    let after_blocks: HashSet<ObjectId> = after.collect_block_ids().into_iter().collect();
+    let after_sections: HashSet<ObjectId> = after.collect_section_ids().into_iter().collect();
+
+    for block_id in &before.block_ids {
+        if !after_blocks.contains(block_id) {
+            delta.record_removed(seq_block_ref(diagram_id, block_id));
+        }
+    }
+    for section_id in &before.section_ids {
+        if !after_sections.contains(section_id) {
+            delta.record_removed(seq_section_ref(diagram_id, section_id));
+        } else {
+            // Surviving sections may have lost membership; treat as updated when prune ran.
+            delta.record_updated(seq_section_ref(diagram_id, section_id));
+        }
+    }
+    for block_id in &after_blocks {
+        if before.block_ids.contains(block_id) {
+            delta.record_updated(seq_block_ref(diagram_id, block_id));
+        }
+    }
 }
 
 fn prune_messages_from_block(block: &mut SequenceBlock, removed: &HashSet<ObjectId>) -> bool {
