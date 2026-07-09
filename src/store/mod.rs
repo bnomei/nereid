@@ -14,6 +14,7 @@
 pub mod session_folder;
 
 pub use session_folder::{
+    replace_diagram_from_mermaid, DiagramMermaidReplaceError, DiagramMermaidReplaceResult,
     DiagramMeta, DiagramStableIdMap, DiagramXRef, SessionFolder, SessionMeta, SessionMetaDiagram,
     StoreError, WriteDurability, XRefStatus,
 };

@@ -32,10 +32,10 @@ use crate::format::mermaid::{
 use crate::layout::{layout_flowchart, layout_sequence, FlowchartLayoutError, SequenceLayoutError};
 use crate::model::seq_ast::{SequenceBlock, SequenceBlockKind, SequenceSectionKind};
 use crate::model::{
-    Diagram, DiagramAst, DiagramId, DiagramKind, FlowNode, FlowchartAst, IdError, ObjectId,
-    ObjectRef, ParseObjectRefError, SequenceAst, SequenceMessageKind, Session, SessionId,
-    SymbolAnchor, SymbolAnchorError, Walkthrough, WalkthroughEdge, WalkthroughId, WalkthroughNode,
-    WalkthroughNodeId, XRef, XRefId, XRefStatus as ModelXRefStatus,
+    Diagram, DiagramAst, DiagramAstKindMismatch, DiagramId, DiagramKind, FlowNode, FlowchartAst,
+    IdError, ObjectId, ObjectRef, ParseObjectRefError, SequenceAst, SequenceMessageKind, Session,
+    SessionId, SymbolAnchor, SymbolAnchorError, Walkthrough, WalkthroughEdge, WalkthroughId,
+    WalkthroughNode, WalkthroughNodeId, XRef, XRefId, XRefStatus as ModelXRefStatus,
 };
 use crate::render::{
     render_flowchart_unicode, render_sequence_unicode, render_walkthrough_unicode,
@@ -1787,3 +1787,123 @@ include!("session_folder/helpers.rs");
 
 #[cfg(test)]
 mod tests;
+
+/// Result of replacing a diagram's AST from Mermaid while reconciling stable ids.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiagramMermaidReplaceResult {
+    pub new_rev: u64,
+    pub previous_object_ids: BTreeSet<String>,
+    pub next_object_ids: BTreeSet<String>,
+}
+
+#[derive(Debug)]
+pub enum DiagramMermaidReplaceError {
+    KindMismatch { expected: DiagramKind, found: DiagramKind },
+    ParseSequence(Box<MermaidSequenceParseError>),
+    ParseFlowchart(Box<MermaidFlowchartParseError>),
+    AstKindMismatch(DiagramAstKindMismatch),
+}
+
+impl fmt::Display for DiagramMermaidReplaceError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::KindMismatch { expected, found } => {
+                write!(f, "mermaid kind mismatch (expected {expected:?}, found {found:?})")
+            }
+            Self::ParseSequence(err) => write!(f, "cannot parse Mermaid sequence diagram: {err}"),
+            Self::ParseFlowchart(err) => write!(f, "cannot parse Mermaid flowchart diagram: {err}"),
+            Self::AstKindMismatch(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl std::error::Error for DiagramMermaidReplaceError {}
+
+fn collect_stable_object_ids(ast: &DiagramAst) -> BTreeSet<String> {
+    let mut ids = BTreeSet::new();
+    match ast {
+        DiagramAst::Sequence(seq) => {
+            for id in seq.participants().keys() {
+                ids.insert(id.to_string());
+            }
+            for msg in seq.messages() {
+                ids.insert(msg.message_id().to_string());
+            }
+            for id in seq.collect_block_ids() {
+                ids.insert(id.to_string());
+            }
+            for id in seq.collect_section_ids() {
+                ids.insert(id.to_string());
+            }
+        }
+        DiagramAst::Flowchart(flow) => {
+            for id in flow.nodes().keys() {
+                ids.insert(id.to_string());
+            }
+            for id in flow.edges().keys() {
+                ids.insert(id.to_string());
+            }
+        }
+    }
+    ids
+}
+
+/// Parse Mermaid into a diagram of the same kind, reconciling stable ids from the current AST.
+pub fn replace_diagram_from_mermaid(
+    diagram: &mut Diagram,
+    mermaid: &str,
+) -> Result<DiagramMermaidReplaceResult, DiagramMermaidReplaceError> {
+    let detected = {
+        let mut found = None;
+        for raw_line in mermaid.lines() {
+            let trimmed = raw_line.trim();
+            if trimmed.is_empty() || trimmed.starts_with("%%") {
+                continue;
+            }
+            if trimmed.starts_with("sequenceDiagram") {
+                found = Some(DiagramKind::Sequence);
+            } else if trimmed.starts_with("flowchart") || trimmed.starts_with("graph") {
+                found = Some(DiagramKind::Flowchart);
+            }
+            break;
+        }
+        found
+    };
+
+    let Some(found_kind) = detected else {
+        return Err(DiagramMermaidReplaceError::KindMismatch {
+            expected: diagram.kind(),
+            found: diagram.kind(),
+        });
+    };
+    if found_kind != diagram.kind() {
+        return Err(DiagramMermaidReplaceError::KindMismatch {
+            expected: diagram.kind(),
+            found: found_kind,
+        });
+    }
+
+    let previous_object_ids = collect_stable_object_ids(diagram.ast());
+    let sidecar = reconcile::identity_sidecar_from_diagram(diagram);
+
+    let mut ast = match found_kind {
+        DiagramKind::Sequence => DiagramAst::Sequence(
+            parse_sequence_diagram(mermaid)
+                .map_err(|err| DiagramMermaidReplaceError::ParseSequence(Box::new(err)))?,
+        ),
+        DiagramKind::Flowchart => DiagramAst::Flowchart(
+            parse_flowchart(mermaid)
+                .map_err(|err| DiagramMermaidReplaceError::ParseFlowchart(Box::new(err)))?,
+        ),
+    };
+
+    reconcile::reconcile_diagram_ast(&mut ast, &sidecar);
+    diagram.set_ast(ast).map_err(DiagramMermaidReplaceError::AstKindMismatch)?;
+    diagram.bump_rev();
+
+    Ok(DiagramMermaidReplaceResult {
+        new_rev: diagram.rev(),
+        previous_object_ids,
+        next_object_ids: collect_stable_object_ids(diagram.ast()),
+    })
+}

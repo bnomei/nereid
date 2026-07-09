@@ -53,7 +53,7 @@ Treat these as separate concerns:
 
 - Diagram lifecycle and target: `diagram_list`, `diagram_open`, `diagram_delete`, `diagram_current`, `diagram_create_from_mermaid`
 - Diagram reads: `diagram_stat`, `diagram_get_slice`, `diagram_diff`, `diagram_read`, `diagram_get_ast`, `diagram_render_text`
-- Diagram mutation: `diagram_propose_ops`, `diagram_apply_ops`
+- Diagram mutation: `diagram_propose_ops`, `diagram_apply_ops`, `diagram_replace_from_mermaid`
 - Walkthrough lifecycle and target: `walkthrough_list`, `walkthrough_open`, `walkthrough_current`
 - Walkthrough reads: `walkthrough_stat`, `walkthrough_diff`, `walkthrough_read`, `walkthrough_get_node`, `walkthrough_render_text`
 - Walkthrough mutation: `walkthrough_apply_ops`
@@ -430,6 +430,25 @@ When mutation fails due to stale `base_rev`:
 3. retry with updated `base_rev`.
 
 If diff history window is exhausted, fetch a fresh snapshot (`diagram_read` or `walkthrough_read`) and resume delta-first flow.
+
+### Bulk Mermaid replace
+
+Use `diagram_replace_from_mermaid` when a bulk rewrite is easier than structure ops:
+
+```json
+{
+  "diagram_id": "d-seq",
+  "base_rev": 3,
+  "mermaid": "sequenceDiagram\n  A->>B: Hello\n"
+}
+```
+
+Behavior:
+- Kind must match the existing diagram (sequence stays sequence).
+- Stable ids are reconciled from the previous AST (messages by fingerprint, blocks/sections by structure fingerprint, participants by name, flow nodes/edges similarly).
+- Response includes `identity.preserved` / `identity.dropped` / `identity.newly_allocated` and `dangling_xref_ids`.
+- Prefer structure ops for local alt/else/loop edits; use replace for full-source rewrites that should keep identity when content fingerprints still match.
+- Renaming message text typically allocates a new message id and may dangle xrefs that pointed at the old id.
 
 ## Reporting Discipline
 

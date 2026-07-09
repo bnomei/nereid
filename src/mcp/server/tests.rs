@@ -3794,6 +3794,107 @@ async fn apply_ops_rejects_invalid_flow_node_mermaid_id() {
 }
 
 #[tokio::test]
+async fn diagram_replace_from_mermaid_preserves_message_ids_and_reports_identity() {
+    let mut session = Session::new(SessionId::new("s-replace").expect("session id"));
+    let diagram_id = DiagramId::new("d-replace").expect("diagram id");
+    let mut ast = SequenceAst::default();
+    let p_a = oid("p:A");
+    let p_b = oid("p:B");
+    let m_alpha = oid("m:alpha");
+    ast.participants_mut().insert(p_a.clone(), SequenceParticipant::new("A"));
+    ast.participants_mut().insert(p_b.clone(), SequenceParticipant::new("B"));
+    ast.messages_mut().push(SequenceMessage::new(
+        m_alpha.clone(),
+        p_a,
+        p_b,
+        SequenceMessageKind::Sync,
+        "Hello",
+        1000,
+    ));
+    session.diagrams_mut().insert(
+        diagram_id.clone(),
+        Diagram::new(diagram_id.clone(), "Replace", DiagramAst::Sequence(ast)),
+    );
+    session.set_active_diagram_id(Some(diagram_id.clone()));
+    session.xrefs_mut().insert(
+        XRefId::new("x:1").expect("xref"),
+        XRef::new(
+            ObjectRef::from_str("d:d-replace/seq/message/m:alpha").expect("ref"),
+            ObjectRef::from_str("d:d-replace/seq/participant/p:A").expect("ref"),
+            "mentions",
+            XRefStatus::Ok,
+        ),
+    );
+    let server = NereidMcp::new(session);
+
+    let Json(replaced) = server
+        .diagram_replace_from_mermaid(Parameters(DiagramReplaceFromMermaidParams {
+            diagram_id: None,
+            base_rev: 0,
+            mermaid: "sequenceDiagram\n  A->>B: Hello\n".into(),
+        }))
+        .await
+        .expect("replace");
+
+    assert_eq!(replaced.new_rev, 1);
+    assert!(replaced.identity.preserved.iter().any(|id| id == "m:alpha"));
+    assert!(replaced.dangling_xref_ids.is_empty());
+
+    let Json(ast) = server
+        .diagram_get_ast(Parameters(DiagramTargetParams { diagram_id: None }))
+        .await
+        .expect("ast");
+    let McpDiagramAst::Sequence { messages, .. } = ast.ast else {
+        panic!("sequence");
+    };
+    assert_eq!(messages[0].message_id, "m:alpha");
+
+    // Renaming message text allocates a new id and marks the old xref dangling.
+    let Json(renamed) = server
+        .diagram_replace_from_mermaid(Parameters(DiagramReplaceFromMermaidParams {
+            diagram_id: None,
+            base_rev: 1,
+            mermaid: "sequenceDiagram\n  A->>B: Changed\n".into(),
+        }))
+        .await
+        .expect("replace rename");
+    assert!(renamed.identity.dropped.iter().any(|id| id == "m:alpha"));
+    assert!(!renamed.identity.newly_allocated.is_empty());
+    assert!(renamed.dangling_xref_ids.iter().any(|id| id == "x:1"));
+}
+
+#[tokio::test]
+async fn diagram_replace_from_mermaid_rejects_stale_base_rev_and_kind_mismatch() {
+    let server = NereidMcp::new(demo_session());
+
+    let err = match server
+        .diagram_replace_from_mermaid(Parameters(DiagramReplaceFromMermaidParams {
+            diagram_id: Some("d-seq".into()),
+            base_rev: 99,
+            mermaid: "sequenceDiagram\n  A->>B: Hi\n".into(),
+        }))
+        .await
+    {
+        Ok(_) => panic!("expected conflict"),
+        Err(err) => err,
+    };
+    assert_eq!(err.code, rmcp::model::ErrorCode::INVALID_REQUEST);
+
+    let err = match server
+        .diagram_replace_from_mermaid(Parameters(DiagramReplaceFromMermaidParams {
+            diagram_id: Some("d-seq".into()),
+            base_rev: 0,
+            mermaid: "flowchart TD\n  A --> B\n".into(),
+        }))
+        .await
+    {
+        Ok(_) => panic!("expected kind mismatch"),
+        Err(err) => err,
+    };
+    assert_eq!(err.code, rmcp::model::ErrorCode::INVALID_PARAMS);
+}
+
+#[tokio::test]
 async fn apply_ops_builds_sequence_alt_else_structure() {
     let mut session = Session::new(SessionId::new("s-structure").expect("session id"));
     let diagram_id = DiagramId::new("d-struct").expect("diagram id");

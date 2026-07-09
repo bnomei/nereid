@@ -44,6 +44,181 @@ impl NereidMcp {
         Ok(Json(ListDiagramsResponse { diagrams, context }))
     }
 
+    /// Replace an existing diagram's content from Mermaid while reconciling stable object ids
+    /// from the current AST (messages, blocks, nodes, edges). Prefer structure ops for local
+    /// edits; use this for bulk rewrites that should keep identity when fingerprints match.
+    #[tool(name = "diagram_replace_from_mermaid")]
+    pub(super) async fn diagram_replace_from_mermaid(
+        &self,
+        params: Parameters<DiagramReplaceFromMermaidParams>,
+    ) -> Result<Json<DiagramReplaceFromMermaidResponse>, ErrorData> {
+        let DiagramReplaceFromMermaidParams { diagram_id: requested_diagram_id, base_rev, mermaid } =
+            params.0;
+
+        let mut state = self.lock_state_synced().await?;
+
+        let (response, history_update) = if let Some(session_folder) = &self.session_folder {
+            let mut update = session_folder.begin_session_update().map_err(|err| {
+                ErrorData::internal_error(
+                    format!("failed to reload session before save: {err}"),
+                    Some(serde_json::json!({
+                        "diagram_id": requested_diagram_id.as_deref(),
+                        "base_rev": base_rev
+                    })),
+                )
+            })?;
+            let candidate_session = update.session_mut();
+            let diagram_id =
+                resolve_diagram_id(candidate_session, requested_diagram_id.as_deref())?;
+            let mut candidate_diagram = candidate_session
+                .diagrams()
+                .get(&diagram_id)
+                .cloned()
+                .ok_or_else(|| ErrorData::resource_not_found("diagram not found", None))?;
+
+            let current_rev = candidate_diagram.rev();
+            if base_rev != current_rev {
+                return Err(ErrorData::invalid_request(
+                    "conflict: stale base_rev",
+                    Some(serde_json::json!({
+                        "base_rev": base_rev,
+                        "current_rev": current_rev,
+                        "snapshot_tool": "diagram_stat",
+                    })),
+                ));
+            }
+
+            let replace =
+                crate::store::replace_diagram_from_mermaid(&mut candidate_diagram, &mermaid)
+                    .map_err(map_replace_error)?;
+            render_diagram_unicode(&candidate_diagram).map_err(|err| {
+                ErrorData::invalid_request(
+                    format!("cannot render diagram after replace_from_mermaid: {err}"),
+                    Some(serde_json::json!({
+                        "diagram_id": diagram_id.as_str(),
+                        "base_rev": base_rev,
+                        "render_error": err.to_string(),
+                    })),
+                )
+            })?;
+            candidate_session.diagrams_mut().insert(diagram_id.clone(), candidate_diagram);
+            retain_existing_selected_object_refs(candidate_session);
+            refresh_xref_statuses(candidate_session);
+
+            let dangling_xref_ids = candidate_session
+                .xrefs()
+                .iter()
+                .filter(|(_, xref)| xref.status() != crate::model::XRefStatus::Ok)
+                .map(|(xref_id, _)| xref_id.to_string())
+                .collect::<Vec<_>>();
+
+            let identity =
+                identity_report_from_sets(&replace.previous_object_ids, &replace.next_object_ids);
+
+            let mut history =
+                state.delta_history.get(&diagram_id).cloned().unwrap_or_else(VecDeque::new);
+            // Replace is a coarse revision step; delta history stores an empty object delta.
+            history.push_back(LastDelta {
+                from_rev: base_rev,
+                to_rev: replace.new_rev,
+                delta: crate::ops::Delta::default(),
+            });
+            while history.len() > DELTA_HISTORY_LIMIT {
+                history.pop_front();
+            }
+
+            let candidate_session = update.commit().map_err(|err| {
+                ErrorData::internal_error(
+                    format!("failed to persist session: {err}"),
+                    Some(serde_json::json!({ "diagram_id": diagram_id.as_str(), "base_rev": base_rev })),
+                )
+            })?;
+            replace_committed_session(&mut state, candidate_session);
+
+            (
+                Json(DiagramReplaceFromMermaidResponse {
+                    new_rev: replace.new_rev,
+                    diagram_id: diagram_id.as_str().to_owned(),
+                    kind: diagram_kind_label(
+                        state
+                            .session
+                            .diagrams()
+                            .get(&diagram_id)
+                            .map(|d| d.kind())
+                            .unwrap_or(DiagramKind::Sequence),
+                    )
+                    .to_owned(),
+                    identity,
+                    dangling_xref_ids,
+                }),
+                Some((diagram_id, history)),
+            )
+        } else {
+            let diagram_id = resolve_diagram_id(&state.session, requested_diagram_id.as_deref())?;
+            let mut candidate_diagram = state
+                .session
+                .diagrams()
+                .get(&diagram_id)
+                .cloned()
+                .ok_or_else(|| ErrorData::resource_not_found("diagram not found", None))?;
+            let current_rev = candidate_diagram.rev();
+            if base_rev != current_rev {
+                return Err(ErrorData::invalid_request(
+                    "conflict: stale base_rev",
+                    Some(serde_json::json!({
+                        "base_rev": base_rev,
+                        "current_rev": current_rev,
+                        "snapshot_tool": "diagram_stat",
+                    })),
+                ));
+            }
+
+            let replace =
+                crate::store::replace_diagram_from_mermaid(&mut candidate_diagram, &mermaid)
+                    .map_err(map_replace_error)?;
+            render_diagram_unicode(&candidate_diagram).map_err(|err| {
+                ErrorData::invalid_request(
+                    format!("cannot render diagram after replace_from_mermaid: {err}"),
+                    Some(serde_json::json!({
+                        "diagram_id": diagram_id.as_str(),
+                        "base_rev": base_rev,
+                        "render_error": err.to_string(),
+                    })),
+                )
+            })?;
+            let kind = diagram_kind_label(candidate_diagram.kind()).to_owned();
+            state.session.diagrams_mut().insert(diagram_id.clone(), candidate_diagram);
+            retain_existing_selected_object_refs(&mut state.session);
+            refresh_xref_statuses(&mut state.session);
+            let dangling_xref_ids = state
+                .session
+                .xrefs()
+                .iter()
+                .filter(|(_, xref)| xref.status() != crate::model::XRefStatus::Ok)
+                .map(|(xref_id, _)| xref_id.to_string())
+                .collect::<Vec<_>>();
+            let identity =
+                identity_report_from_sets(&replace.previous_object_ids, &replace.next_object_ids);
+            (
+                Json(DiagramReplaceFromMermaidResponse {
+                    new_rev: replace.new_rev,
+                    diagram_id: diagram_id.as_str().to_owned(),
+                    kind,
+                    identity,
+                    dangling_xref_ids,
+                }),
+                None,
+            )
+        };
+
+        if let Some((diagram_id, history)) = history_update {
+            state.delta_history.insert(diagram_id, history);
+        }
+        drop(state);
+        self.notify_ui_session_changed().await;
+        Ok(response)
+    }
+
     /// Create a diagram from raw Mermaid; use to bootstrap a session, then continue with
     /// `diagram_open`/`diagram_stat`.
     #[tool(name = "diagram_create_from_mermaid")]

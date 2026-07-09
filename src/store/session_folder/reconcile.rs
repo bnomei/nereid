@@ -673,3 +673,91 @@ pub(crate) fn reconcile_diagram_ast(ast: &mut DiagramAst, sidecar: &DiagramMeta)
         }
     }
 }
+
+/// Build a sidecar-shaped identity snapshot from a live diagram (path unused).
+pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> DiagramMeta {
+    use super::{sequence_blocks_meta_from_ast, DiagramFlowEdgeMeta, DiagramSequenceMessageMeta};
+    use std::path::PathBuf;
+
+    let (
+        flow_edges,
+        sequence_messages,
+        sequence_blocks,
+        flow_node_notes,
+        sequence_participant_notes,
+        flow_node_symbols,
+        sequence_participant_symbols,
+    ) = match diagram.ast() {
+        DiagramAst::Flowchart(ast) => (
+            ast.edges()
+                .iter()
+                .map(|(edge_id, edge)| DiagramFlowEdgeMeta {
+                    edge_id: edge_id.clone(),
+                    from_node_id: edge.from_node_id().clone(),
+                    to_node_id: edge.to_node_id().clone(),
+                    label: edge.label().map(ToOwned::to_owned),
+                    style: edge.style().map(ToOwned::to_owned),
+                })
+                .collect(),
+            Vec::new(),
+            Vec::new(),
+            ast.nodes()
+                .iter()
+                .filter_map(|(node_id, node)| {
+                    node.note().map(|note| (node_id.clone(), note.to_owned()))
+                })
+                .collect(),
+            BTreeMap::new(),
+            ast.nodes()
+                .iter()
+                .filter_map(|(node_id, node)| {
+                    node.symbol().map(|symbol| (node_id.clone(), symbol.clone()))
+                })
+                .collect(),
+            BTreeMap::new(),
+        ),
+        DiagramAst::Sequence(ast) => (
+            Vec::new(),
+            ast.messages_in_order()
+                .into_iter()
+                .map(|msg| DiagramSequenceMessageMeta {
+                    message_id: msg.message_id().clone(),
+                    from_participant_id: msg.from_participant_id().clone(),
+                    to_participant_id: msg.to_participant_id().clone(),
+                    kind: msg.kind(),
+                    text: msg.text().to_owned(),
+                })
+                .collect(),
+            sequence_blocks_meta_from_ast(ast),
+            BTreeMap::new(),
+            ast.participants()
+                .iter()
+                .filter_map(|(participant_id, participant)| {
+                    participant.note().map(|note| (participant_id.clone(), note.to_owned()))
+                })
+                .collect(),
+            BTreeMap::new(),
+            ast.participants()
+                .iter()
+                .filter_map(|(participant_id, participant)| {
+                    participant.symbol().map(|symbol| (participant_id.clone(), symbol.clone()))
+                })
+                .collect(),
+        ),
+    };
+
+    DiagramMeta {
+        diagram_id: diagram.diagram_id().clone(),
+        mmd_path: PathBuf::new(),
+        stable_id_map: stable_id_map_from_ast(diagram.ast()),
+        xrefs: Vec::new(),
+        flow_edges,
+        sequence_messages,
+        sequence_blocks,
+        default_symbol_repository_id: diagram.default_symbol_repository_id().map(ToOwned::to_owned),
+        flow_node_notes,
+        sequence_participant_notes,
+        flow_node_symbols,
+        sequence_participant_symbols,
+    }
+}

@@ -2813,6 +2813,104 @@
     }
   },
   {
+    "name": "diagram_replace_from_mermaid",
+    "description": "Replace an existing diagram's content from Mermaid while reconciling stable object ids\nfrom the current AST (messages, blocks, nodes, edges). Prefer structure ops for local\nedits; use this for bulk rewrites that should keep identity when fingerprints match.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "base_rev": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "diagram_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mermaid": {
+          "description": "Replacement Mermaid source; kind must match the existing diagram.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "base_rev",
+        "mermaid"
+      ],
+      "title": "DiagramReplaceFromMermaidParams",
+      "type": "object"
+    },
+    "outputSchema": {
+      "$defs": {
+        "DiagramIdentityReport": {
+          "properties": {
+            "dropped": {
+              "description": "Object ids present before replace but not after (dropped/unmatched).",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "newly_allocated": {
+              "description": "Object ids present after replace but not before (new allocations).",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "preserved": {
+              "description": "Object ids present both before and after replace.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "newly_allocated",
+            "dropped",
+            "preserved"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "dangling_xref_ids": {
+          "description": "XRef ids that are dangling after the replace (from, to, or both).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "diagram_id": {
+          "type": "string"
+        },
+        "identity": {
+          "$ref": "#/$defs/DiagramIdentityReport"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "new_rev": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "new_rev",
+        "diagram_id",
+        "kind",
+        "identity",
+        "dangling_xref_ids"
+      ],
+      "title": "DiagramReplaceFromMermaidResponse",
+      "type": "object"
+    }
+  },
+  {
     "name": "diagram_stat",
     "description": "Get a compact diagram digest (rev + counts + key names); use as the default first read\nbefore `diagram_get_slice`, typed queries, or mutation planning.",
     "inputSchema": {

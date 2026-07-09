@@ -220,7 +220,7 @@ Transports:
 Tool groups:
 
 - Diagram lifecycle and reads: `diagram_list`, `diagram_current`, `diagram_open`, `diagram_delete`, `diagram_read`, `diagram_stat`, `diagram_get_ast`, `diagram_get_slice`, `diagram_render_text`, `diagram_diff`.
-- Diagram creation and mutation: `diagram_create_from_mermaid`, `diagram_propose_ops`, `diagram_apply_ops`.
+- Diagram creation and mutation: `diagram_create_from_mermaid`, `diagram_replace_from_mermaid`, `diagram_propose_ops`, `diagram_apply_ops`.
 - Walkthroughs: `walkthrough_list`, `walkthrough_current`, `walkthrough_open`, `walkthrough_read`, `walkthrough_stat`, `walkthrough_get_node`, `walkthrough_render_text`, `walkthrough_diff`, `walkthrough_apply_ops`.
 - Collaboration state: `attention_human_read`, `attention_agent_read`, `attention_agent_set`, `attention_agent_clear`, `follow_ai_read`, `follow_ai_set`, `selection_read`, `selection_update`, `view_read_state`.
 - Cross-references and objects: `xref_list`, `xref_neighbors`, `xref_add`, `xref_remove`, `object_read`.

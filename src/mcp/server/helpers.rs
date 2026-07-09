@@ -932,6 +932,40 @@ fn apply_walkthrough_ops(
     Ok(delta)
 }
 
+fn identity_report_from_sets(
+    previous: &std::collections::BTreeSet<String>,
+    next: &std::collections::BTreeSet<String>,
+) -> DiagramIdentityReport {
+    let newly_allocated = next.difference(previous).cloned().collect::<Vec<_>>();
+    let dropped = previous.difference(next).cloned().collect::<Vec<_>>();
+    let preserved = previous.intersection(next).cloned().collect::<Vec<_>>();
+    DiagramIdentityReport { newly_allocated, dropped, preserved }
+}
+
+fn map_replace_error(err: crate::store::DiagramMermaidReplaceError) -> ErrorData {
+    use crate::store::DiagramMermaidReplaceError;
+    match err {
+        DiagramMermaidReplaceError::KindMismatch { expected, found } => ErrorData::invalid_params(
+            "mermaid kind does not match existing diagram",
+            Some(serde_json::json!({
+                "expected": format!("{expected:?}"),
+                "found": format!("{found:?}"),
+            })),
+        ),
+        DiagramMermaidReplaceError::ParseSequence(err) => ErrorData::invalid_params(
+            format!("cannot parse Mermaid sequence diagram: {err}"),
+            None,
+        ),
+        DiagramMermaidReplaceError::ParseFlowchart(err) => ErrorData::invalid_params(
+            format!("cannot parse Mermaid flowchart diagram: {err}"),
+            None,
+        ),
+        DiagramMermaidReplaceError::AstKindMismatch(err) => {
+            ErrorData::invalid_params(err.to_string(), None)
+        }
+    }
+}
+
 fn map_apply_error(err: ApplyError) -> ErrorData {
     match err {
         ApplyError::Conflict {

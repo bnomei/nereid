@@ -318,6 +318,34 @@ pub struct DiagramCreateFromMermaidResponse {
     pub active_diagram_id: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct DiagramReplaceFromMermaidParams {
+    pub diagram_id: Option<String>,
+    pub base_rev: u64,
+    /// Replacement Mermaid source; kind must match the existing diagram.
+    pub mermaid: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct DiagramIdentityReport {
+    /// Object ids present after replace but not before (new allocations).
+    pub newly_allocated: Vec<String>,
+    /// Object ids present before replace but not after (dropped/unmatched).
+    pub dropped: Vec<String>,
+    /// Object ids present both before and after replace.
+    pub preserved: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct DiagramReplaceFromMermaidResponse {
+    pub new_rev: u64,
+    pub diagram_id: String,
+    pub kind: String,
+    pub identity: DiagramIdentityReport,
+    /// XRef ids that are dangling after the replace (from, to, or both).
+    pub dangling_xref_ids: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DiagramGetAstResponse {
     pub diagram_id: String,

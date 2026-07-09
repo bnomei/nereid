@@ -247,6 +247,20 @@ Move an existing free message into a section:
 }
 ```
 
+## Bulk replace from Mermaid
+
+Prefer structure ops for local edits. Use replace when rewriting whole Mermaid source while keeping stable ids when fingerprints match:
+
+```json
+{
+  "diagram_id": "d-checkout-seq",
+  "base_rev": 9,
+  "mermaid": "sequenceDiagram\n  participant api\n  participant fraud\n  api->>fraud: validate(payment)\n"
+}
+```
+
+Inspect `identity.preserved`, `identity.dropped`, `identity.newly_allocated`, and `dangling_xref_ids` in the response.
+
 ## Cross-diagram mapping and routes
 
 Tool: `xref_add`
