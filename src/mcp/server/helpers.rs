@@ -952,6 +952,10 @@ fn map_replace_error(err: crate::store::DiagramMermaidReplaceError) -> ErrorData
                 "found": format!("{found:?}"),
             })),
         ),
+        DiagramMermaidReplaceError::MissingOrUnknownKind { first_line } => ErrorData::invalid_params(
+            "expected 'flowchart'/'graph' or 'sequenceDiagram' as the first non-empty line",
+            Some(serde_json::json!({ "first_line": first_line })),
+        ),
         DiagramMermaidReplaceError::ParseSequence(err) => ErrorData::invalid_params(
             format!("cannot parse Mermaid sequence diagram: {err}"),
             None,

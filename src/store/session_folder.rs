@@ -1799,6 +1799,7 @@ pub struct DiagramMermaidReplaceResult {
 #[derive(Debug)]
 pub enum DiagramMermaidReplaceError {
     KindMismatch { expected: DiagramKind, found: DiagramKind },
+    MissingOrUnknownKind { first_line: Option<String> },
     ParseSequence(Box<MermaidSequenceParseError>),
     ParseFlowchart(Box<MermaidFlowchartParseError>),
     AstKindMismatch(DiagramAstKindMismatch),
@@ -1810,6 +1811,15 @@ impl fmt::Display for DiagramMermaidReplaceError {
             Self::KindMismatch { expected, found } => {
                 write!(f, "mermaid kind mismatch (expected {expected:?}, found {found:?})")
             }
+            Self::MissingOrUnknownKind { first_line: None } => f.write_str(
+                "expected 'flowchart'/'graph' or 'sequenceDiagram' as the first non-empty line",
+            ),
+            Self::MissingOrUnknownKind {
+                first_line: Some(line),
+            } => write!(
+                f,
+                "expected 'flowchart'/'graph' or 'sequenceDiagram' as the first non-empty line, found: {line}"
+            ),
             Self::ParseSequence(err) => write!(f, "cannot parse Mermaid sequence diagram: {err}"),
             Self::ParseFlowchart(err) => write!(f, "cannot parse Mermaid flowchart diagram: {err}"),
             Self::AstKindMismatch(err) => write!(f, "{err}"),
@@ -1853,6 +1863,7 @@ pub fn replace_diagram_from_mermaid(
     diagram: &mut Diagram,
     mermaid: &str,
 ) -> Result<DiagramMermaidReplaceResult, DiagramMermaidReplaceError> {
+    let mut first_content_line: Option<String> = None;
     let detected = {
         let mut found = None;
         for raw_line in mermaid.lines() {
@@ -1860,6 +1871,7 @@ pub fn replace_diagram_from_mermaid(
             if trimmed.is_empty() || trimmed.starts_with("%%") {
                 continue;
             }
+            first_content_line = Some(trimmed.to_owned());
             if trimmed.starts_with("sequenceDiagram") {
                 found = Some(DiagramKind::Sequence);
             } else if trimmed.starts_with("flowchart") || trimmed.starts_with("graph") {
@@ -1871,9 +1883,8 @@ pub fn replace_diagram_from_mermaid(
     };
 
     let Some(found_kind) = detected else {
-        return Err(DiagramMermaidReplaceError::KindMismatch {
-            expected: diagram.kind(),
-            found: diagram.kind(),
+        return Err(DiagramMermaidReplaceError::MissingOrUnknownKind {
+            first_line: first_content_line,
         });
     };
     if found_kind != diagram.kind() {
