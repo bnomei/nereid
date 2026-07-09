@@ -444,22 +444,104 @@ fn attach_message_to_section(
     section_id: &ObjectId,
     delta: &mut DeltaBuilder,
 ) -> Result<(), ApplyError> {
-    ast.detach_message_from_all_sections(message_id);
-    let Some(section) = ast.find_section_mut(section_id) else {
+    // Mirror Mermaid parse: a message inside nested blocks is a member of every open
+    // ancestor section so export ranges remain nested and contiguous.
+    let Some(owner_block) = ast.find_block_for_section(section_id) else {
         return Err(ApplyError::NotFound {
             kind: ObjectKind::SeqSection,
             object_id: section_id.clone(),
         });
     };
-    if !section.message_ids().contains(message_id) {
-        section.message_ids_mut().push(message_id.clone());
+    let owner_block_id = owner_block.block_id().clone();
+    let ancestor_chain = ast.block_ancestor_chain(&owner_block_id);
+    if ancestor_chain.is_empty() {
+        return Err(ApplyError::NotFound {
+            kind: ObjectKind::SeqBlock,
+            object_id: owner_block_id,
+        });
     }
+
+    // Target leaf section, then one section per ancestor parent (outer → inner).
+    let mut membership_sections = vec![section_id.clone()];
+    for window in ancestor_chain.windows(2) {
+        let parent_id = &window[0];
+        let child_id = &window[1];
+        let parent_section_id = select_parent_section_for_nested_child(ast, parent_id, child_id)?;
+        membership_sections.push(parent_section_id);
+    }
+    membership_sections.sort_by(|a, b| a.as_str().cmp(b.as_str()));
+    membership_sections.dedup();
+
+    ast.detach_message_from_all_sections(message_id);
+
+    for membership_section_id in &membership_sections {
+        let Some(section) = ast.find_section_mut(membership_section_id) else {
+            return Err(ApplyError::NotFound {
+                kind: ObjectKind::SeqSection,
+                object_id: membership_section_id.clone(),
+            });
+        };
+        if !section.message_ids().contains(message_id) {
+            section.message_ids_mut().push(message_id.clone());
+        }
+        delta.record_updated(seq_section_ref(diagram_id, membership_section_id));
+        if let Some(block) = ast.find_block_for_section(membership_section_id) {
+            delta.record_updated(seq_block_ref(diagram_id, block.block_id()));
+        }
+    }
+
     delta.record_updated(seq_message_ref(diagram_id, message_id));
-    delta.record_updated(seq_section_ref(diagram_id, section_id));
-    if let Some(block) = ast.find_block_for_section(section_id) {
-        delta.record_updated(seq_block_ref(diagram_id, block.block_id()));
-    }
     Ok(())
+}
+
+/// Choose which parent section should contain a nested child block's messages.
+///
+/// Prefer a parent section that already lists messages belonging to the child tree;
+/// otherwise fall back to the main section, then the first section.
+fn select_parent_section_for_nested_child(
+    ast: &SequenceAst,
+    parent_block_id: &ObjectId,
+    child_block_id: &ObjectId,
+) -> Result<ObjectId, ApplyError> {
+    let Some(parent) = ast.find_block(parent_block_id) else {
+        return Err(ApplyError::NotFound {
+            kind: ObjectKind::SeqBlock,
+            object_id: parent_block_id.clone(),
+        });
+    };
+    if parent.sections().is_empty() {
+        return Err(ApplyError::InvalidSeqBlockNesting {
+            block_id: child_block_id.clone(),
+            reason: format!(
+                "parent block {} has no sections to host nested block {}",
+                parent_block_id.as_str(),
+                child_block_id.as_str()
+            ),
+        });
+    }
+
+    let child_message_ids = ast.collect_block_message_ids(child_block_id);
+    if !child_message_ids.is_empty() {
+        for section in parent.sections() {
+            if section
+                .message_ids()
+                .iter()
+                .any(|message_id| child_message_ids.contains(message_id))
+            {
+                return Ok(section.section_id().clone());
+            }
+        }
+    }
+
+    if let Some(main) = parent
+        .sections()
+        .iter()
+        .find(|section| section.kind() == SequenceSectionKind::Main)
+    {
+        return Ok(main.section_id().clone());
+    }
+
+    Ok(parent.sections()[0].section_id().clone())
 }
 
 fn validate_section_kind_for_block(

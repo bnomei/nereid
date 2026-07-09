@@ -214,6 +214,87 @@ impl SequenceAst {
         depth_of(&self.blocks, block_id, 1)
     }
 
+    /// Parent block id for a nested block, if any.
+    pub fn parent_block_id(&self, block_id: &ObjectId) -> Option<ObjectId> {
+        fn find(blocks: &[SequenceBlock], block_id: &ObjectId) -> Option<ObjectId> {
+            for block in blocks {
+                if block.blocks().iter().any(|child| child.block_id() == block_id) {
+                    return Some(block.block_id().clone());
+                }
+                if let Some(found) = find(block.blocks(), block_id) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+
+        find(&self.blocks, block_id)
+    }
+
+    /// Chain of block ids from root to `block_id` inclusive. Empty if missing.
+    pub fn block_ancestor_chain(&self, block_id: &ObjectId) -> Vec<ObjectId> {
+        fn find(blocks: &[SequenceBlock], block_id: &ObjectId, path: &mut Vec<ObjectId>) -> bool {
+            for block in blocks {
+                path.push(block.block_id().clone());
+                if block.block_id() == block_id {
+                    return true;
+                }
+                if find(block.blocks(), block_id, path) {
+                    return true;
+                }
+                path.pop();
+            }
+            false
+        }
+
+        let mut path = Vec::new();
+        if find(&self.blocks, block_id, &mut path) {
+            path
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// All section ids that currently list `message_id`.
+    pub fn sections_containing_message(&self, message_id: &ObjectId) -> Vec<ObjectId> {
+        fn walk(blocks: &[SequenceBlock], message_id: &ObjectId, out: &mut Vec<ObjectId>) {
+            for block in blocks {
+                for section in block.sections() {
+                    if section.message_ids().contains(message_id) {
+                        out.push(section.section_id().clone());
+                    }
+                }
+                walk(block.blocks(), message_id, out);
+            }
+        }
+
+        let mut out = Vec::new();
+        walk(&self.blocks, message_id, &mut out);
+        out
+    }
+
+    /// Collect every message id referenced by `block` and its nested descendants.
+    pub fn collect_block_message_ids(&self, block_id: &ObjectId) -> Vec<ObjectId> {
+        let Some(block) = self.find_block(block_id) else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        fn walk(block: &SequenceBlock, out: &mut Vec<ObjectId>) {
+            for section in block.sections() {
+                for message_id in section.message_ids() {
+                    if !out.contains(message_id) {
+                        out.push(message_id.clone());
+                    }
+                }
+            }
+            for child in block.blocks() {
+                walk(child, out);
+            }
+        }
+        walk(block, &mut out);
+        out
+    }
+
     /// Removes the block (and nested children) from the tree. Messages are not removed.
     ///
     /// Returns the removed block when found.

@@ -1554,6 +1554,99 @@ fn apply_seq_builds_alt_else_via_structure_and_membership_ops() {
 }
 
 #[test]
+fn apply_seq_builds_nested_opt_inside_alt_via_ops() {
+    use crate::format::mermaid::sequence::export_sequence_diagram;
+    use crate::model::seq_ast::{SequenceBlockKind, SequenceMessageKind, SequenceSectionKind};
+    use crate::model::Diagram;
+
+    let a = ObjectId::new("p:a").expect("id");
+    let b = ObjectId::new("p:b").expect("id");
+    let m_outer = ObjectId::new("m:outer").expect("id");
+    let m_inner = ObjectId::new("m:inner").expect("id");
+    let m_else = ObjectId::new("m:else").expect("id");
+    let alt_id = ObjectId::new("b:alt").expect("id");
+    let opt_id = ObjectId::new("b:opt").expect("id");
+    let alt_main = ObjectId::new("sec:alt:main").expect("id");
+    let alt_else = ObjectId::new("sec:alt:else").expect("id");
+    let opt_main = ObjectId::new("sec:opt:main").expect("id");
+
+    let mut ast = SequenceAst::default();
+    ast.participants_mut().insert(a.clone(), SequenceParticipant::new("A"));
+    ast.participants_mut().insert(b.clone(), SequenceParticipant::new("B"));
+    let mut diagram =
+        Diagram::new(DiagramId::new("d:nested").expect("id"), "seq", DiagramAst::Sequence(ast));
+
+    apply_ops(
+        &mut diagram,
+        0,
+        &[
+            Op::Seq(SeqOp::AddBlock {
+                block_id: alt_id.clone(),
+                kind: SequenceBlockKind::Alt,
+                header: Some("outer".to_owned()),
+                parent_block_id: None,
+                main_section_id: alt_main.clone(),
+            }),
+            Op::Seq(SeqOp::AddSection {
+                section_id: alt_else.clone(),
+                block_id: alt_id.clone(),
+                kind: SequenceSectionKind::Else,
+                header: Some("else".to_owned()),
+            }),
+            Op::Seq(SeqOp::AddBlock {
+                block_id: opt_id.clone(),
+                kind: SequenceBlockKind::Opt,
+                header: Some("warm".to_owned()),
+                parent_block_id: Some(alt_id.clone()),
+                main_section_id: opt_main.clone(),
+            }),
+            Op::Seq(SeqOp::AddMessage {
+                message_id: m_outer.clone(),
+                from_participant_id: a.clone(),
+                to_participant_id: b.clone(),
+                kind: SequenceMessageKind::Sync,
+                arrow: None,
+                text: "outer".to_owned(),
+                order_key: 1000,
+                section_id: Some(alt_main.clone()),
+            }),
+            Op::Seq(SeqOp::AddMessage {
+                message_id: m_inner.clone(),
+                from_participant_id: a.clone(),
+                to_participant_id: b.clone(),
+                kind: SequenceMessageKind::Sync,
+                arrow: None,
+                text: "inner".to_owned(),
+                order_key: 2000,
+                section_id: Some(opt_main.clone()),
+            }),
+            Op::Seq(SeqOp::AddMessage {
+                message_id: m_else.clone(),
+                from_participant_id: a.clone(),
+                to_participant_id: b.clone(),
+                kind: SequenceMessageKind::Sync,
+                arrow: None,
+                text: "else".to_owned(),
+                order_key: 3000,
+                section_id: Some(alt_else.clone()),
+            }),
+        ],
+    )
+    .expect("build nested structure");
+
+    let DiagramAst::Sequence(ast) = diagram.ast() else { panic!("seq") };
+    // Nested membership: inner message lives in opt main and ancestor alt main.
+    assert!(ast.find_section(&opt_main).expect("opt").message_ids().contains(&m_inner));
+    assert!(ast.find_section(&alt_main).expect("alt main").message_ids().contains(&m_inner));
+    assert!(ast.find_section(&alt_main).expect("alt main").message_ids().contains(&m_outer));
+
+    let exported = export_sequence_diagram(ast).expect("export nested");
+    assert!(exported.contains("alt outer"), "{exported}");
+    assert!(exported.contains("opt warm"), "{exported}");
+    assert!(exported.contains("else else"), "{exported}");
+}
+
+#[test]
 fn apply_seq_add_section_rejects_else_under_loop() {
     use crate::format::mermaid::sequence::export_sequence_diagram;
     use crate::model::seq_ast::{
