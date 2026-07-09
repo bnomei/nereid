@@ -502,6 +502,8 @@ pub(crate) fn reconcile_sequence_blocks(ast: &mut SequenceAst, sidecar: &Diagram
 
     #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
     struct BlockFingerprint {
+        /// Stable parent id when known (sidecar parent, or remapped parent during walk).
+        parent_block_id: Option<ObjectId>,
         kind: u8,
         header: Option<String>,
         sections: Vec<SectionFingerprint>,
@@ -526,6 +528,7 @@ pub(crate) fn reconcile_sequence_blocks(ast: &mut SequenceAst, sidecar: &Diagram
 
     fn fingerprint_from_meta(entry: &DiagramSequenceBlockMeta) -> BlockFingerprint {
         BlockFingerprint {
+            parent_block_id: entry.parent_block_id.clone(),
             kind: block_kind_key(entry.kind),
             header: entry.header.clone(),
             sections: entry
@@ -540,8 +543,12 @@ pub(crate) fn reconcile_sequence_blocks(ast: &mut SequenceAst, sidecar: &Diagram
         }
     }
 
-    fn fingerprint_from_block(block: &SequenceBlock) -> BlockFingerprint {
+    fn fingerprint_from_block(
+        block: &SequenceBlock,
+        parent_block_id: Option<ObjectId>,
+    ) -> BlockFingerprint {
         BlockFingerprint {
+            parent_block_id,
             kind: block_kind_key(block.kind()),
             header: block.header().map(ToOwned::to_owned),
             sections: block
@@ -567,8 +574,36 @@ pub(crate) fn reconcile_sequence_blocks(ast: &mut SequenceAst, sidecar: &Diagram
     let mut assigned_block_ids = BTreeSet::<ObjectId>::new();
     let mut assigned_section_ids = BTreeSet::<ObjectId>::new();
 
+    // Reserve sidecar stable ids so unmatched parse ids that collide are reallocated.
+    for entry in &sidecar.sequence_blocks {
+        assigned_block_ids.insert(entry.block_id.clone());
+        for section in &entry.sections {
+            assigned_section_ids.insert(section.section_id.clone());
+        }
+    }
+
+    fn allocate_unique_id(
+        preferred: &ObjectId,
+        assigned: &mut BTreeSet<ObjectId>,
+        prefix: &str,
+    ) -> ObjectId {
+        if assigned.insert(preferred.clone()) {
+            return preferred.clone();
+        }
+        let mut suffix = 1_u64;
+        loop {
+            let candidate = ObjectId::new(format!("{prefix}:reconcile:{suffix:04}"))
+                .expect("reconciled object id should be valid");
+            if assigned.insert(candidate.clone()) {
+                return candidate;
+            }
+            suffix = suffix.saturating_add(1);
+        }
+    }
+
     fn walk_match(
         blocks: &[SequenceBlock],
+        parent_stable_id: Option<ObjectId>,
         by_fingerprint: &mut BTreeMap<BlockFingerprint, VecDeque<&DiagramSequenceBlockMeta>>,
         block_remap: &mut BTreeMap<ObjectId, ObjectId>,
         section_remap: &mut BTreeMap<ObjectId, ObjectId>,
@@ -576,33 +611,64 @@ pub(crate) fn reconcile_sequence_blocks(ast: &mut SequenceAst, sidecar: &Diagram
         assigned_section_ids: &mut BTreeSet<ObjectId>,
     ) {
         for block in blocks {
-            let fingerprint = fingerprint_from_block(block);
+            let fingerprint = fingerprint_from_block(block, parent_stable_id.clone());
+            let mut target_block_id = block.block_id().clone();
             if let Some(queue) = by_fingerprint.get_mut(&fingerprint) {
                 if let Some(entry) = queue.pop_front() {
-                    let target_block_id = if assigned_block_ids.contains(&entry.block_id) {
-                        block.block_id().clone()
+                    // Sidecar ids were pre-reserved; reclaim this match.
+                    assigned_block_ids.remove(&entry.block_id);
+                    target_block_id = if assigned_block_ids.contains(&entry.block_id) {
+                        allocate_unique_id(block.block_id(), assigned_block_ids, "b")
                     } else {
+                        assigned_block_ids.insert(entry.block_id.clone());
                         entry.block_id.clone()
                     };
-                    assigned_block_ids.insert(target_block_id.clone());
-                    block_remap.insert(block.block_id().clone(), target_block_id);
+                    block_remap.insert(block.block_id().clone(), target_block_id.clone());
 
                     for (section, entry_section) in
                         block.sections().iter().zip(entry.sections.iter())
                     {
-                        let target_section_id =
-                            if assigned_section_ids.contains(&entry_section.section_id) {
-                                section.section_id().clone()
-                            } else {
-                                entry_section.section_id.clone()
-                            };
-                        assigned_section_ids.insert(target_section_id.clone());
+                        assigned_section_ids.remove(&entry_section.section_id);
+                        let target_section_id = if assigned_section_ids
+                            .contains(&entry_section.section_id)
+                        {
+                            allocate_unique_id(section.section_id(), assigned_section_ids, "sec")
+                        } else {
+                            assigned_section_ids.insert(entry_section.section_id.clone());
+                            entry_section.section_id.clone()
+                        };
                         section_remap.insert(section.section_id().clone(), target_section_id);
                     }
+
+                    walk_match(
+                        block.blocks(),
+                        Some(target_block_id),
+                        by_fingerprint,
+                        block_remap,
+                        section_remap,
+                        assigned_block_ids,
+                        assigned_section_ids,
+                    );
+                    continue;
                 }
             }
+
+            // Unmatched parse block: keep id only if free, else reallocate.
+            target_block_id = allocate_unique_id(block.block_id(), assigned_block_ids, "b");
+            if &target_block_id != block.block_id() {
+                block_remap.insert(block.block_id().clone(), target_block_id.clone());
+            }
+            for section in block.sections() {
+                let target_section_id =
+                    allocate_unique_id(section.section_id(), assigned_section_ids, "sec");
+                if &target_section_id != section.section_id() {
+                    section_remap.insert(section.section_id().clone(), target_section_id);
+                }
+            }
+
             walk_match(
                 block.blocks(),
+                Some(target_block_id),
                 by_fingerprint,
                 block_remap,
                 section_remap,
@@ -614,6 +680,7 @@ pub(crate) fn reconcile_sequence_blocks(ast: &mut SequenceAst, sidecar: &Diagram
 
     walk_match(
         ast.blocks(),
+        None,
         &mut by_fingerprint,
         &mut block_remap,
         &mut section_remap,
