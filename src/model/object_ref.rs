@@ -6,7 +6,9 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Canonical `ObjectRef` paths and category segments for stable UI/MCP addressing.
+//! Canonical `ObjectRef` paths for stable UI, MCP, and xref addressing.
+//!
+//! Form: `d:<diagram_id>/<category...>/<object_id>` (e.g. `d:flow/flow/node/n:a`).
 
 use std::fmt;
 use std::str::FromStr;

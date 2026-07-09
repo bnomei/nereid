@@ -6,9 +6,9 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Diagram format parsing and export.
+//! Mermaid-ish parse and export for supported diagram kinds.
 //!
-//! Converts between on-disk Mermaid sidecars and the internal flowchart/sequence ASTs used by
-//! layout, render, and mutation layers.
+//! Bridge between session-folder `.mmd` files and internal sequence/flowchart ASTs. Unsupported
+//! Mermaid is rejected with line-oriented errors; export is deterministic for stable diffs.
 
 pub mod mermaid;

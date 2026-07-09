@@ -6,7 +6,11 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Identity reconciliation for diagrams loaded from Mermaid + sidecar meta.
+//! Reconcile parsed Mermaid ASTs against sidecar stable-id fingerprints.
+//!
+//! Participants map by name, flow nodes by mermaid id, messages/edges by content fingerprint,
+//! and sequence blocks by kind/header/section membership plus parent id. Used on load and by
+//! `replace_diagram_from_mermaid`.
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
@@ -574,7 +578,6 @@ pub(crate) fn reconcile_sequence_blocks(ast: &mut SequenceAst, sidecar: &Diagram
     let mut assigned_block_ids = BTreeSet::<ObjectId>::new();
     let mut assigned_section_ids = BTreeSet::<ObjectId>::new();
 
-    // Reserve sidecar stable ids so unmatched parse ids that collide are reallocated.
     for entry in &sidecar.sequence_blocks {
         assigned_block_ids.insert(entry.block_id.clone());
         for section in &entry.sections {
@@ -614,7 +617,6 @@ pub(crate) fn reconcile_sequence_blocks(ast: &mut SequenceAst, sidecar: &Diagram
             let fingerprint = fingerprint_from_block(block, parent_stable_id.clone());
             if let Some(queue) = by_fingerprint.get_mut(&fingerprint) {
                 if let Some(entry) = queue.pop_front() {
-                    // Sidecar ids were pre-reserved; reclaim this match.
                     assigned_block_ids.remove(&entry.block_id);
                     let target_block_id = if assigned_block_ids.contains(&entry.block_id) {
                         allocate_unique_id(block.block_id(), assigned_block_ids, "b")
@@ -652,7 +654,6 @@ pub(crate) fn reconcile_sequence_blocks(ast: &mut SequenceAst, sidecar: &Diagram
                 }
             }
 
-            // Unmatched parse block: keep id only if free, else reallocate.
             let target_block_id = allocate_unique_id(block.block_id(), assigned_block_ids, "b");
             if &target_block_id != block.block_id() {
                 block_remap.insert(block.block_id().clone(), target_block_id.clone());

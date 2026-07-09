@@ -6,7 +6,7 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-// MCP server helpers: ID parsing, Mermaid export, delta history, and context assembly.
+// include!: MCP tool helpers (id parse, Mermaid projection, deltas, error mapping).
 
 fn diagram_kind_label(kind: DiagramKind) -> &'static str {
     match kind {
@@ -289,7 +289,6 @@ fn map_seq_block_to_mcp(block: &crate::model::seq_ast::SequenceBlock) -> McpSeqB
 }
 
 fn mermaid_for_sequence(ast: &crate::model::SequenceAst) -> String {
-    // Prefer the full exporter so alt/opt/loop/par structure is preserved for MCP reads.
     if let Ok(exported) = crate::format::mermaid::export_sequence_diagram(ast) {
         return exported;
     }

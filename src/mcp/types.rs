@@ -6,13 +6,17 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! MCP tool request/response types and JSON Schema definitions for the protocol surface.
+//! MCP tool JSON types and schemars schemas.
+//!
+//! These shapes are the agent-facing contract (underscore tool names, snake_case op tags).
+//! Keep in sync with `tool_schema.snapshot.json` after field changes.
 
 use std::collections::BTreeMap;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+/// Lightweight diagram listing row for MCP list/current responses.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DiagramSummary {
     pub diagram_id: String,
@@ -809,6 +813,7 @@ pub enum McpObject {
     },
 }
 
+/// Tagged diagram mutation op for `diagram_apply_ops` / `diagram_propose_ops`.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum McpOp {

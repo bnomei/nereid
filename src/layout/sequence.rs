@@ -6,7 +6,9 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Sequence-diagram column placement and per-message row spacing budgets.
+//! Sequence layout: participant columns and per-message row spacing budgets.
+//!
+//! Spacing grows with label pressure so renderers can draw block frames without clipping headers.
 
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -23,6 +25,7 @@ const MAX_SELF_LOOP_STUB_LEN: usize = 32;
 const SELF_LOOP_CORNER_RESERVE: usize = 2;
 const PRESSURE_PER_EXTRA_ROW: usize = 8;
 
+/// Column and row geometry for a sequence diagram after layout.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SequenceLayout {
     participant_cols: BTreeMap<ObjectId, usize>,

@@ -6,7 +6,11 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Session folder persistence: meta JSON, Mermaid sidecars, ASCII exports, and write locking.
+//! Filesystem adapter for a single session directory.
+//!
+//! Coordinates meta commit, per-diagram Mermaid/sidecar writes, walkthrough files, async text
+//! exports, and cross-process locking. Prefer begin_session_update/commit for concurrent MCP
+//! and TUI writers.
 
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
@@ -492,6 +496,7 @@ pub struct SessionXRef {
     pub status: ModelXRefStatus,
 }
 
+/// Per-diagram sidecar payload: stable ids, structure fingerprints, notes, symbols.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiagramMeta {
     pub diagram_id: DiagramId,
@@ -508,6 +513,7 @@ pub struct DiagramMeta {
     pub sequence_participant_symbols: BTreeMap<ObjectId, SymbolAnchor>,
 }
 
+/// Name/mermaid-id → stable object id maps for participants and flow nodes.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DiagramStableIdMap {
     pub by_mermaid_id: BTreeMap<String, String>,
@@ -524,6 +530,7 @@ pub struct DiagramXRef {
     pub status: XRefStatus,
 }
 
+/// Flow edge fingerprint for load-time id reconciliation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiagramFlowEdgeMeta {
     pub edge_id: ObjectId,
@@ -533,6 +540,7 @@ pub struct DiagramFlowEdgeMeta {
     pub style: Option<String>,
 }
 
+/// Sequence message fingerprint for load-time id reconciliation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiagramSequenceMessageMeta {
     pub message_id: ObjectId,
@@ -542,6 +550,7 @@ pub struct DiagramSequenceMessageMeta {
     pub text: String,
 }
 
+/// Sequence block tree fingerprint (parent + sections + membership).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiagramSequenceBlockMeta {
     pub block_id: ObjectId,
@@ -551,6 +560,7 @@ pub struct DiagramSequenceBlockMeta {
     pub sections: Vec<DiagramSequenceSectionMeta>,
 }
 
+/// Section within a sequence block fingerprint.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiagramSequenceSectionMeta {
     pub section_id: ObjectId,
@@ -559,6 +569,7 @@ pub struct DiagramSequenceSectionMeta {
     pub message_ids: Vec<ObjectId>,
 }
 
+/// Flatten sequence blocks with parent ids for sidecar persistence.
 pub(crate) fn sequence_blocks_meta_from_ast(ast: &SequenceAst) -> Vec<DiagramSequenceBlockMeta> {
     fn walk(
         blocks: &[SequenceBlock],
@@ -1782,13 +1793,12 @@ impl SessionFolder {
     }
 }
 
-// Extracted persistence and reconciliation helpers for `SessionFolder`.
 include!("session_folder/helpers.rs");
 
 #[cfg(test)]
 mod tests;
 
-/// Result of replacing a diagram's AST from Mermaid while reconciling stable ids.
+/// Object-id sets before/after a Mermaid replace (for identity reporting).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiagramMermaidReplaceResult {
     pub new_rev: u64,
@@ -1796,6 +1806,7 @@ pub struct DiagramMermaidReplaceResult {
     pub next_object_ids: BTreeSet<String>,
 }
 
+/// Failures from [`replace_diagram_from_mermaid`].
 #[derive(Debug)]
 pub enum DiagramMermaidReplaceError {
     KindMismatch { expected: DiagramKind, found: DiagramKind },

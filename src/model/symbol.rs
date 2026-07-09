@@ -6,7 +6,9 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Frigg symbol anchors attached to diagram objects.
+//! Frigg `stable_symbol_id` anchors on participants and flow nodes.
+//!
+//! Sidecar-persisted metadata (not Mermaid source) linking diagrams to code symbols.
 
 use std::fmt;
 

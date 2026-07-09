@@ -7,6 +7,8 @@
 // Unauthorized copying, modification, or distribution is prohibited.
 
 //! Flowchart layering and orthogonal edge routing on a sparse integer grid.
+//!
+//! Deterministic barycenter ordering and bounded search windows for soft occupancy detours.
 
 use std::cmp::{Ordering, Reverse};
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap};

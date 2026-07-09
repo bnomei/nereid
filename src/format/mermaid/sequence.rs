@@ -6,7 +6,11 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Mermaid-ish sequence-diagram parser and exporter for the internal sequence AST.
+//! Limited `sequenceDiagram` parse/export for Nereid's sequence AST.
+//!
+//! Supports participants, messages, and alt/opt/loop/par blocks. Message ids are positional on
+//! parse; long-term stability comes from store sidecars. Nested open blocks receive membership
+//! for every new message (export requires that multi-level membership).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;

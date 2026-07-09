@@ -6,7 +6,7 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Query MCP tools: route finding, message search, and flow reachability.
+//! Read-only MCP query tools over routes, sequence search, and flowchart analytics.
 
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::{tool, tool_router};

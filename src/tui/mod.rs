@@ -6,9 +6,10 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Terminal UI.
+//! Interactive ratatui session shell over a live diagram session.
 //!
-//! Provides the interactive TUI shell (ratatui + crossterm), including a built-in demo session.
+//! Handles focus panes, search, hint jumps, external Mermaid edit, follow-AI camera, and MCP
+//! HTTP co-hosting. Reloads the session folder when MCP mutates disk-backed state.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -556,7 +557,7 @@ fn diagram_kind_tag(kind: DiagramKind) -> &'static str {
     }
 }
 
-// Extracted panel/header/footer/help rendering helpers.
+// include!: chrome.rs
 include!("chrome.rs");
 
 #[derive(Debug, Clone)]

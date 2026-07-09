@@ -6,9 +6,11 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Core data model and AST types.
+//! Session domain model and diagram ASTs.
 //!
-//! Sessions contain diagrams (flowchart/sequence) plus walkthroughs and cross-references.
+//! Owns the in-memory truth for diagrams, walkthrough narratives, and cross-diagram `ObjectRef`
+//! links. Mermaid text and Unicode renders are projections; stable ids live here and in store
+//! sidecars, not solely in positional Mermaid parse order.
 
 pub mod diagram;
 pub(crate) mod fixtures;

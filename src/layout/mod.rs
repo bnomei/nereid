@@ -6,9 +6,10 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Layout algorithms for diagrams.
+//! Deterministic diagram layout and edge routing.
 //!
-//! This module computes node placement and edge routing for supported diagram kinds.
+//! Places sequence participants/message rows and flowchart layers on integer grids used by
+//! Unicode renderers. Layout is pure: no I/O; failures are unrouteable or incomplete graphs.
 
 pub mod flowchart;
 pub mod sequence;

@@ -6,7 +6,7 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-// Session folder helpers: Mermaid export, stable-id reconciliation, and atomic writes.
+// include!: session meta JSON codecs and atomic file writes.
 
 fn export_diagram_mmd(
     folder: &SessionFolder,

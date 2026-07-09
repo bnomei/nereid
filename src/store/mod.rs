@@ -6,10 +6,12 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Persistence for sessions on disk.
+//! Session-folder persistence and identity reconciliation.
 //!
-//! The session folder format bundles meta JSON, per-diagram `.mmd` sidecars, walkthrough JSON,
-//! cached ASCII exports, and cross-process write locking for TUI/MCP cohabitation.
+//! On-disk format: `nereid-session.meta.json`, `diagrams/*.mmd` + `*.meta.json` sidecars
+//! (stable ids, notes, symbols, sequence_blocks), walkthrough JSON, best-effort text exports,
+//! and a write lock for TUI/MCP cohabitation. Load re-parses Mermaid then reconciles ids from
+//! sidecars so xrefs survive rewrites.
 
 pub mod session_folder;
 

@@ -120,7 +120,7 @@ fn e2e_human_and_agent_collaborate_on_persisted_session() {
     let diagram_id = "d-collab";
     let expected_participant_b_ref = format!("d:{diagram_id}/seq/participant/p:b");
 
-    // Step 1 (agent/MCP): create a new diagram and persist it.
+    // Agent creates diagram.
     let server = harness.mcp(harness.load_session());
     let mermaid = "sequenceDiagram\nparticipant a\nparticipant b\n";
     let Json(created) = runtime.block_on(async {
@@ -147,7 +147,7 @@ fn e2e_human_and_agent_collaborate_on_persisted_session() {
         "expected created diagram to be present after reload"
     );
 
-    // Step 2 (human/TUI): load the persisted session and move focus to participant b.
+    // Human focuses participant b.
     let mut tui = harness.tui(reloaded);
     tui.press(KeyCode::Char('2')); // toggle+focus Objects
     tui.press(KeyCode::Down); // p:a -> p:b
@@ -159,7 +159,7 @@ fn e2e_human_and_agent_collaborate_on_persisted_session() {
     assert_eq!(human_attention.diagram_id.as_deref(), Some(diagram_id));
     assert_eq!(human_attention.object_ref.as_deref(), Some(participant_b_ref.as_str()));
 
-    // Step 3 (agent/MCP): set agent attention to participant b and confirm it renders.
+    // Agent sets attention to b.
     tui.press(KeyCode::Up); // back to p:a so highlights don't overlap focus
     let Json(update) = runtime.block_on(async {
         server
@@ -179,7 +179,7 @@ fn e2e_human_and_agent_collaborate_on_persisted_session() {
         .any(|line| line.spans.iter().any(|span| span.style.bg == Some(Color::LightBlue)));
     assert!(has_agent_highlight, "expected agent highlight to render with bright blue background");
 
-    // Step 4 (human/TUI): toggle multi-selection and ensure it persists to disk.
+    // Human multi-selects; persists.
     tui.press(KeyCode::Down); // p:a -> p:b
     tui.press(KeyCode::Char(' '));
 
@@ -188,7 +188,7 @@ fn e2e_human_and_agent_collaborate_on_persisted_session() {
         reloaded.selected_object_refs().iter().map(ToString::to_string).collect::<Vec<_>>();
     assert_eq!(selected, vec![participant_b_ref.clone()]);
 
-    // Step 5 (agent/MCP): confirm selection is available via MCP after reload.
+    // Agent reads selection after reload.
     let server = harness.mcp(reloaded);
     let Json(selection) =
         runtime.block_on(async { server.selection_get().await.expect("selection_read") });
@@ -873,7 +873,7 @@ fn e2e_flow_xref_route_and_attention_agent_set_cover_full_surface() {
     });
     assert!(!routes.routes.is_empty());
 
-    // Start a headless TUI to validate attention_agent_set -> follow-AI sync + xref jumps.
+    // Headless TUI: attention + follow-AI + xref jumps.
     let mut tui = harness.tui(harness.load_session());
     runtime.block_on(async {
         server
@@ -912,7 +912,7 @@ fn e2e_walkthrough_tools_cover_full_surface() {
     let runtime = new_runtime();
     let harness = CollabHarness::new("walkthrough-tools");
 
-    // Seed a small diagram so walkthrough refs can point somewhere realistic.
+    // Seed diagram for walkthrough refs.
     let server = harness.server();
     runtime.block_on(async {
         server

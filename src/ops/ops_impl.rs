@@ -6,7 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-// Sequence and flowchart op application: validation, AST mutation, and delta recording.
+// Included by `ops/mod.rs`: sequence/flow op application, structure validation helpers, and
+// delta recording. Not a standalone module.
 
 fn apply_seq_op(
     diagram_id: &DiagramId,
@@ -470,8 +471,7 @@ fn attach_message_to_section(
     section_id: &ObjectId,
     delta: &mut DeltaBuilder,
 ) -> Result<(), ApplyError> {
-    // Mirror Mermaid parse: a message inside nested blocks is a member of every open
-    // ancestor section so export ranges remain nested and contiguous.
+    // Nested messages must also appear on ancestor sections (Mermaid open-block semantics).
     let Some(owner_block) = ast.find_block_for_section(section_id) else {
         return Err(ApplyError::NotFound {
             kind: ObjectKind::SeqSection,
@@ -487,7 +487,6 @@ fn attach_message_to_section(
         });
     }
 
-    // Target leaf section, then one section per ancestor parent (outer → inner).
     let mut membership_sections = vec![section_id.clone()];
     for window in ancestor_chain.windows(2) {
         let parent_id = &window[0];
@@ -529,10 +528,7 @@ fn attach_message_to_section(
     Ok(())
 }
 
-/// Choose which parent section should contain a nested child block's messages.
-///
-/// Prefer a parent section that already lists messages belonging to the child tree;
-/// otherwise fall back to the main section, then the first section.
+/// Pick parent section for nested child membership: reuse one already holding child messages, else main.
 fn select_parent_section_for_nested_child(
     ast: &SequenceAst,
     parent_block_id: &ObjectId,
@@ -673,7 +669,6 @@ fn record_structure_prune_delta(
         if !after_sections.contains(section_id) {
             delta.record_removed(seq_section_ref(diagram_id, section_id));
         } else {
-            // Surviving sections may have lost membership; treat as updated when prune ran.
             delta.record_updated(seq_section_ref(diagram_id, section_id));
         }
     }

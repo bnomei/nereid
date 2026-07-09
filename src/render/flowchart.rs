@@ -6,7 +6,7 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Unicode flowchart renderer with object-ref highlight index generation.
+//! Unicode flowchart renderer: boxes, routed connectors, labels, and highlight index.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;

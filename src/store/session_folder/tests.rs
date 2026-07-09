@@ -516,7 +516,6 @@ fn save_session_exports_canonical_mmd_and_text_unicode(ctx: SessionFolderTestCtx
 
     let mut session = Session::new(SessionId::new("s1").unwrap());
 
-    // Sequence diagram
     let seq_id = DiagramId::new("d1").unwrap();
     let mut seq_ast = SequenceAst::default();
     let p_alice = ObjectId::new("p:alice").unwrap();
@@ -538,7 +537,6 @@ fn save_session_exports_canonical_mmd_and_text_unicode(ctx: SessionFolderTestCtx
     let mut seq_expected_text = render_sequence_unicode(&seq_ast, &seq_layout).unwrap();
     seq_expected_text.push('\n');
 
-    // Flowchart diagram
     let flow_id = DiagramId::new("d2").unwrap();
     let mut flow_ast = FlowchartAst::default();
     let n_start = ObjectId::new("n:start").unwrap();
@@ -562,7 +560,7 @@ fn save_session_exports_canonical_mmd_and_text_unicode(ctx: SessionFolderTestCtx
     folder.save_session(&session).unwrap();
     folder.flush_ascii_exports();
 
-    // Session meta stored relative paths.
+    // Meta paths are relative.
     let meta_str = std::fs::read_to_string(folder.meta_path()).unwrap();
     let meta_json: serde_json::Value = serde_json::from_str(&meta_str).unwrap();
     assert_eq!(meta_json["session_id"].as_str().unwrap(), "s1");
@@ -577,7 +575,6 @@ fn save_session_exports_canonical_mmd_and_text_unicode(ctx: SessionFolderTestCtx
     mmd_paths.sort();
     assert_eq!(mmd_paths, vec!["diagrams/d1.mmd", "diagrams/d2.mmd"]);
 
-    // Exported files are written under the session folder.
     let seq_mmd_path = session_dir.join("diagrams/d1.mmd");
     let seq_text_path = session_dir.join("diagrams/d1.ascii.txt");
     assert_eq!(std::fs::read_to_string(&seq_mmd_path).unwrap(), seq_expected_mmd);
@@ -1207,7 +1204,7 @@ fn save_session_and_load_session_round_trips_diagrams_and_walkthroughs(ctx: Sess
 
     let mut session = Session::new(SessionId::new("s1").unwrap());
 
-    // Sequence diagram (participant ids must match mermaid names to round-trip via `.mmd`).
+    // Participant ids match mermaid names for mmd round-trip.
     let seq_id = DiagramId::new("d1").unwrap();
     let mut seq_ast = SequenceAst::default();
     let p_alice = ObjectId::new("p:Alice").unwrap();
@@ -1230,7 +1227,6 @@ fn save_session_and_load_session_round_trips_diagrams_and_walkthroughs(ctx: Sess
         diagram
     });
 
-    // Flowchart diagram.
     let flow_id = DiagramId::new("d2").unwrap();
     let mut flow_ast = FlowchartAst::default();
     let node_start_id = ObjectId::new("n:start").unwrap();
@@ -1251,7 +1247,6 @@ fn save_session_and_load_session_round_trips_diagrams_and_walkthroughs(ctx: Sess
         diagram
     });
 
-    // Walkthrough.
     let walkthrough_id = WalkthroughId::new("w1").unwrap();
     let mut walkthrough = Walkthrough::new(walkthrough_id.clone(), "Invite acceptance");
     walkthrough.set_source(Some("docs/protocol-01.md#2.5".to_owned()));
@@ -1389,7 +1384,7 @@ fn save_and_load_session_round_trips_inline_notes_via_sidecar(ctx: SessionFolder
 
     let mut session = Session::new(SessionId::new("s1").unwrap());
 
-    // Sequence diagram (participant ids must match mermaid names to round-trip via `.mmd`).
+    // Participant ids match mermaid names for mmd round-trip.
     let seq_id = DiagramId::new("d1").unwrap();
     let mut seq_ast = SequenceAst::default();
     let p_alice = ObjectId::new("p:Alice").unwrap();
@@ -1410,7 +1405,6 @@ fn save_and_load_session_round_trips_inline_notes_via_sidecar(ctx: SessionFolder
         .diagrams_mut()
         .insert(seq_id.clone(), Diagram::new(seq_id, "Seq Notes", DiagramAst::Sequence(seq_ast)));
 
-    // Flowchart diagram.
     let flow_id = DiagramId::new("d2").unwrap();
     let mut flow_ast = FlowchartAst::default();
     let node_start_id = ObjectId::new("n:start").unwrap();
@@ -1630,7 +1624,7 @@ fn save_and_load_sequence_preserves_custom_block_and_section_ids(ctx: SessionFol
 
     folder.save_session(&session).unwrap();
 
-    // Reparse from mermaid (positional block ids) and confirm sidecar remaps back.
+    // Reload remaps positional parse ids via sidecar.
     let loaded = folder.load_session().unwrap();
     let loaded_diagram = loaded.diagrams().get(&seq_id).expect("seq diagram");
     let DiagramAst::Sequence(loaded_ast) = loaded_diagram.ast() else {

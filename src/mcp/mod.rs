@@ -6,10 +6,11 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Model Context Protocol (MCP) server surface.
+//! MCP server for agent collaboration over a Nereid session.
 //!
-//! Exposes diagram, walkthrough, xref, query, and collaboration tools over stdio or HTTP,
-//! sharing session revisions and UI attention state with the TUI when co-hosted.
+//! Tool groups: diagram lifecycle/mutation/replace, walkthroughs, xrefs, graph queries, and
+//! co-presence (`attention_*`, `selection_*`, `follow_ai_*`). Stdio (`--mcp`) or streamable HTTP
+//! alongside the TUI; durable mode reloads the session folder on each mutation.
 
 mod server;
 mod types;

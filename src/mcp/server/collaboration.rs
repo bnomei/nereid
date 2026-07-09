@@ -6,7 +6,9 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Collaboration MCP tools: human/agent attention, selection, and UI state sync.
+//! Co-presence MCP tools: human/agent attention, selection, follow-AI, view state.
+//!
+//! Coordinates the live TUI camera and working set without mutating diagram ASTs.
 
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::{tool, tool_router};

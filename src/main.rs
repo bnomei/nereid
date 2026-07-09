@@ -6,12 +6,11 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Nereid CLI entrypoint.
+//! CLI entrypoint: TUI + HTTP MCP, or stdio MCP.
 //!
-//! By default this runs the interactive TUI and serves MCP over streamable HTTP at
-//! `http://127.0.0.1:<port>/mcp`.
-//!
-//! Use `--mcp` to run the MCP server over stdio instead (intended for tool integrations).
+//! Default: load/init a session folder (or demo), start the TUI, and serve MCP on
+//! `http://127.0.0.1:<port>/mcp`. `--mcp` runs stdio-only for agent hosts. Also supports
+//! `--dump-mcp-tool-schema` for schema snapshot regeneration.
 
 use std::collections::BTreeSet;
 use std::error::Error;

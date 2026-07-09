@@ -6,7 +6,9 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Newtype identifiers for sessions, diagrams, objects, and protocol-stable refs.
+//! Newtype string ids for sessions, diagrams, objects, walkthroughs, and xrefs.
+//!
+//! Construction validates non-empty protocol-safe strings used in paths and JSON sidecars.
 
 use std::borrow::Borrow;
 use std::fmt;

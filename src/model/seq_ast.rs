@@ -6,7 +6,10 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Sequence-diagram AST: participants, ordered messages, notes, and alt/par blocks.
+//! Sequence-diagram AST: participants, ordered messages, and nested alt/opt/loop/par blocks.
+//!
+//! Message membership in sections must stay export-valid (contiguous order_key ranges). Nested
+//! structure requires messages on ancestor sections as well as the leaf section.
 
 use std::cmp::Ordering;
 use std::collections::BTreeMap;

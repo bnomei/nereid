@@ -6,7 +6,7 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Walkthrough MCP tools: list, open, render, and node-level reads.
+//! Walkthrough MCP tools: lifecycle, render, node reads, and revision-gated apply.
 
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::{tool, tool_router};

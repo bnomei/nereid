@@ -6,7 +6,7 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-// Flowchart render helpers: label layout, edge drawing, and highlight span bookkeeping.
+// include!: flowchart labels, edge drawing, and highlight span bookkeeping.
 
 /// Flowchart rendering internals:
 /// routing spans, lane assignment, collision checks, and connector drawing passes.

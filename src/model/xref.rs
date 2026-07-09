@@ -6,7 +6,9 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Cross-diagram links between `ObjectRef` endpoints with lifecycle status.
+//! Cross-diagram links between `ObjectRef` endpoints.
+//!
+//! Status tracks dangling endpoints after deletes/replaces so agents can treat them as TODOs.
 
 use std::fmt;
 use std::str::FromStr;

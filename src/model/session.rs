@@ -6,7 +6,10 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! In-memory session aggregate: diagrams, walkthroughs, xrefs, and UI selection state.
+//! In-memory session aggregate shared by TUI and MCP.
+//!
+//! Holds diagrams, walkthroughs, xrefs, active targets, and the multi-object selection set.
+//! Disk durability is the store layer's job; this type is the live working set.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -16,7 +19,7 @@ use super::object_ref::ObjectRef;
 use super::walkthrough::Walkthrough;
 use super::xref::XRef;
 
-/// The top-level container the TUI runs against.
+/// Live workspace: diagrams, walkthroughs, xrefs, active targets, and selection.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Session {
     session_id: SessionId,

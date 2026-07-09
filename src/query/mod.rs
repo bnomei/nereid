@@ -6,9 +6,10 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Read-only queries over sessions and diagrams.
+//! Read-only derived views over diagrams and session xrefs.
 //!
-//! Queries provide derived views (e.g. routes/relationships) that power the UI and MCP tools.
+//! Flow reachability, sequence search, and multi-diagram route finding for MCP query tools and
+//! TUI navigation. Never mutates session content.
 
 pub mod flow;
 pub mod sequence;

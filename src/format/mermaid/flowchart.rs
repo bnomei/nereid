@@ -6,7 +6,10 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Mermaid-ish flowchart parser and exporter for the internal flowchart AST.
+//! Limited flowchart/`graph` parse/export for Nereid's flowchart AST.
+//!
+//! Nodes (rect/round/diamond), edges, chains, and ignored `linkStyle`/`subgraph` lines. Node
+//! stable ids reconcile via mermaid id maps in diagram sidecars.
 
 use std::fmt;
 
@@ -485,9 +488,9 @@ fn ensure_node(
     let mut new_label = existing_label.clone();
     if let Some(explicit_label) = label {
         if existing_label == explicit_label {
-            // ok
+            // same label
         } else if existing_label == mermaid_id {
-            // implicit (default) label, upgrade to explicit label.
+            // upgrade implicit mermaid-id label to explicit text
             new_label = explicit_label;
         } else {
             return Err(MermaidFlowchartParseError::ConflictingNodeLabel {
@@ -503,9 +506,9 @@ fn ensure_node(
     if let Some(explicit_shape) = shape {
         let explicit_shape = explicit_shape.model_shape();
         if existing_shape == explicit_shape {
-            // ok
+            // same shape
         } else if existing_shape == NodeShape::Rect.model_shape() {
-            // upgrade from default rect shape to explicit shape.
+            // upgrade default rect to explicit shape
             new_shape = explicit_shape.to_owned();
         } else {
             return Err(MermaidFlowchartParseError::ConflictingNodeShape {

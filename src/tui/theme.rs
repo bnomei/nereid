@@ -6,7 +6,7 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! TUI color theme: environment overrides and ratatui style mapping.
+//! TUI color theme from terminal ANSI palette or `NEREID_TUI_PALETTE` overrides.
 
 use std::{env, error::Error, fmt};
 

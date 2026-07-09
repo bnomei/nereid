@@ -6,10 +6,10 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Shared UI state for cross-component coordination.
+//! Shared UI attention/follow-AI state between TUI and MCP.
 //!
-//! This lightweight state is used to propagate selection context between the interactive TUI and
-//! programmatic integrations (MCP).
+//! Carries human and agent focus refs and follow-AI so MCP tools can read or steer the live TUI
+//! without owning terminal I/O.
 
 use crate::model::{DiagramId, ObjectRef};
 

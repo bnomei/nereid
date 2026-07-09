@@ -6,11 +6,12 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Nereid — diagram session editor with terminal UI and MCP integration.
+//! Nereid — live diagram session workspace for terminals and agents.
 //!
-//! The crate layers a typed session model (diagrams, walkthroughs, cross-references) over
-//! Mermaid-ish import/export, layout/render pipelines, and folder persistence. The TUI and
-//! MCP server share session state, selection, and revision-tracked mutations.
+//! Layers a typed session model (sequence/flowchart diagrams, walkthroughs, cross-references,
+//! and Frigg symbol anchors) over Mermaid-ish import/export, layout/render, and folder
+//! persistence. Humans use the ratatui TUI; agents use the MCP tool surface. Both share the same
+//! revision-gated mutations, selection set, and attention state when co-hosted.
 
 pub mod format;
 pub mod layout;

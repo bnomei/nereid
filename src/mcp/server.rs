@@ -6,7 +6,10 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! MCP server core: session state, tool routing, persistence sync, and transport entrypoints.
+//! MCP server core: shared session lock, tool routers, and stdio/HTTP entrypoints.
+//!
+//! Holds `McpState` (session + optional folder + delta history + agent highlights) and
+//! composes tool modules. Tool handlers live in sibling files; helpers are include!'d.
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::Arc;
@@ -262,7 +265,7 @@ impl ServerHandler for NereidMcp {
     }
 }
 
-// Extracted mapping/parsing/delta helpers for MCP tool handlers.
+// include!: helpers.rs
 include!("server/helpers.rs");
 
 #[cfg(test)]

@@ -6,7 +6,9 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Flowchart AST: nodes, edges, groups, and default edge styling.
+//! Flowchart AST: nodes, directed edges, optional groups, and default edge style.
+//!
+//! Groups exist for future subgraph support; Mermaid subgraph lines are currently ignored on parse.
 
 use std::collections::BTreeMap;
 

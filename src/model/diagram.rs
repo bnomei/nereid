@@ -6,7 +6,9 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Diagram envelope: kind tag, revision counter, and typed flowchart or sequence AST.
+//! Diagram envelope: kind, revision, default symbol repository, and typed AST.
+//!
+//! `rev` is the optimistic-concurrency token for MCP/TUI mutations.
 
 use super::flow_ast::FlowchartAst;
 use super::ids::DiagramId;

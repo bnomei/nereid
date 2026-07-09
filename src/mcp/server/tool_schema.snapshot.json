@@ -222,6 +222,7 @@
     "inputSchema": {
       "$defs": {
         "McpOp": {
+          "description": "Tagged diagram mutation op for `diagram_apply_ops` / `diagram_propose_ops`.",
           "oneOf": [
             {
               "properties": {
@@ -1039,6 +1040,7 @@
     "outputSchema": {
       "$defs": {
         "DiagramSummary": {
+          "description": "Lightweight diagram listing row for MCP list/current responses.",
           "properties": {
             "diagram_id": {
               "type": "string"
@@ -1754,6 +1756,7 @@
     "outputSchema": {
       "$defs": {
         "DiagramSummary": {
+          "description": "Lightweight diagram listing row for MCP list/current responses.",
           "properties": {
             "diagram_id": {
               "type": "string"
@@ -1880,6 +1883,7 @@
     "inputSchema": {
       "$defs": {
         "McpOp": {
+          "description": "Tagged diagram mutation op for `diagram_apply_ops` / `diagram_propose_ops`.",
           "oneOf": [
             {
               "properties": {

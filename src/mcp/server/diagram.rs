@@ -6,7 +6,9 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Diagram MCP tools: list, open, render, mutate, and bootstrap from Mermaid.
+//! Diagram MCP tools: lifecycle, AST/text reads, structure ops, and Mermaid replace.
+//!
+//! Mutations require `base_rev`; replace reconciles stable ids and reports identity deltas.
 
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::{tool, tool_router};
@@ -112,7 +114,6 @@ impl NereidMcp {
 
             let mut history =
                 state.delta_history.get(&diagram_id).cloned().unwrap_or_else(VecDeque::new);
-            // Replace is a coarse revision step; delta history stores an empty object delta.
             history.push_back(LastDelta {
                 from_rev: base_rev,
                 to_rev: replace.new_rev,
@@ -191,7 +192,6 @@ impl NereidMcp {
 
             let mut history =
                 state.delta_history.get(&diagram_id).cloned().unwrap_or_else(VecDeque::new);
-            // Match the session_folder path: coarse rev step with empty object delta.
             history.push_back(LastDelta {
                 from_rev: base_rev,
                 to_rev: replace.new_rev,

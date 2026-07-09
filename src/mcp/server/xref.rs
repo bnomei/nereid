@@ -6,7 +6,7 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Cross-reference MCP tools: list, add, remove, and neighbor exploration.
+//! Xref MCP tools: list/filter, add/remove, and neighbor traversal across diagrams.
 
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::{tool, tool_router};

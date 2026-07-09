@@ -1387,12 +1387,9 @@ fn apply_seq_block_ops_update_remove_and_add_section() {
     assert_eq!(ast.find_section(&else_sec).expect("else").header(), Some("cache-miss"));
     export_sequence_diagram(ast).expect("export after header updates");
 
-    // Detach else messages by removing them so section can be removed, then re-add empty else via ops.
-    // First remove the else section's messages via message remove (also prunes membership).
     apply_ops(&mut diagram, 2, &[Op::Seq(SeqOp::RemoveMessage { message_id: m2.clone() })])
         .expect("remove else message");
 
-    // After prune, else section may be gone. Re-add else section empty, then remove it.
     apply_ops(
         &mut diagram,
         3,
@@ -1521,7 +1518,7 @@ fn apply_seq_builds_alt_else_via_structure_and_membership_ops() {
     assert!(exported.contains("A->>B: hit"));
     assert!(exported.contains("A->>B: miss"));
 
-    // Move hit message into else (invalid contiguity if main empties) should fail.
+    // Empty main section after move is export-invalid.
     let err = apply_ops(
         &mut diagram,
         1,
@@ -1533,10 +1530,6 @@ fn apply_seq_builds_alt_else_via_structure_and_membership_ops() {
     .expect_err("empty main section is invalid");
     assert!(matches!(err, super::ApplyError::InvalidSeqBlockStructure { .. }));
 
-    // Detach miss from structure so messages are free-floating, keep block empty? would fail.
-    // Instead move both into contiguous else after re-adding hit to main order... skip.
-
-    // Detach all and remove block: detach both then remove block.
     apply_ops(
         &mut diagram,
         1,
@@ -1635,7 +1628,6 @@ fn apply_seq_builds_nested_opt_inside_alt_via_ops() {
     .expect("build nested structure");
 
     let DiagramAst::Sequence(ast) = diagram.ast() else { panic!("seq") };
-    // Nested membership: inner message lives in opt main and ancestor alt main.
     assert!(ast.find_section(&opt_main).expect("opt").message_ids().contains(&m_inner));
     assert!(ast.find_section(&alt_main).expect("alt main").message_ids().contains(&m_inner));
     assert!(ast.find_section(&alt_main).expect("alt main").message_ids().contains(&m_outer));

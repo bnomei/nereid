@@ -6,10 +6,10 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Rendering for diagrams and walkthroughs.
+//! Unicode/ASCII projection of layout results for TUI and MCP text views.
 //!
-//! Renderers produce Unicode/ASCII text output as well as a stable highlight index that the TUI
-//! and MCP integrations can use for cell-accurate selection/highlighting.
+//! Each renderer returns a string grid plus a highlight index mapping cells to `ObjectRef`s so
+//! the TUI can focus objects and MCP can render selection without re-parsing geometry.
 
 use std::collections::BTreeMap;
 use std::fmt;

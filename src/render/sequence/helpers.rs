@@ -6,7 +6,7 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-// Sequence render helpers: lifeline boxes, message arrows, and block framing.
+// include!: sequence lifeline boxes, message arrows, and block framing.
 
 /// Sequence rendering internals:
 /// row/column placement, block decoration, overlays, and text composition.

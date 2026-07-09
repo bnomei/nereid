@@ -6,10 +6,12 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Mutation operations for diagrams/sessions.
+//! Revision-gated diagram mutations and change deltas.
 //!
-//! Operations are applied with optimistic concurrency (revision checks) and produce a minimal
-//! delta that the UI can use to refresh derived state.
+//! Agents and the TUI edit through typed ops (`SeqOp`, `FlowOp`) applied with a `base_rev`
+//! check. Successful batches bump the diagram revision and return added/removed/updated
+//! `ObjectRef`s for UI refresh and MCP `diagram_diff`. Structure ops must leave sequence
+//! blocks export-valid (contiguous section membership; nested messages also on ancestors).
 
 use std::collections::HashSet;
 use std::fmt;
@@ -27,7 +29,7 @@ use crate::model::{SequenceParticipant, SymbolAnchor, SymbolAnchorError, XRefId}
 /// Maximum nested block depth, matching the sequence Mermaid parser.
 pub const MAX_SEQ_BLOCK_NEST_DEPTH: usize = 8;
 
-/// Single diagram mutation tagged by AST kind (sequence, flowchart, or xref).
+/// Kind-tagged diagram mutation (sequence, flowchart, or unsupported xref batch).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Op {
     Seq(SeqOp),
@@ -35,6 +37,7 @@ pub enum Op {
     XRef(XRefOp),
 }
 
+/// Sequence-diagram mutation: participants, messages, blocks, sections, membership.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SeqOp {
     AddParticipant {
@@ -110,21 +113,25 @@ pub enum SeqOp {
     },
 }
 
+/// Partial update for a sequence block header (`Some(None)` clears).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SeqBlockPatch {
     pub header: Option<Option<String>>,
 }
 
+/// Partial update for a sequence section header (`Some(None)` clears).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SeqSectionPatch {
     pub header: Option<Option<String>>,
 }
 
+/// Partial update for a sequence participant.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SeqParticipantPatch {
     pub mermaid_name: Option<String>,
 }
 
+/// Partial update for a sequence message.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SeqMessagePatch {
     pub from_participant_id: Option<ObjectId>,
@@ -135,6 +142,7 @@ pub struct SeqMessagePatch {
     pub order_key: Option<i64>,
 }
 
+/// Flowchart mutation: nodes, edges, notes, and Frigg symbol anchors.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlowOp {
     AddNode {
@@ -178,12 +186,14 @@ pub enum FlowOp {
     },
 }
 
+/// Partial update for a flow node.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct FlowNodePatch {
     pub label: Option<String>,
     pub shape: Option<String>,
 }
 
+/// Partial update for a flow edge.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct FlowEdgePatch {
     pub from_node_id: Option<ObjectId>,
@@ -193,12 +203,14 @@ pub struct FlowEdgePatch {
     pub style: Option<String>,
 }
 
+/// Session-level xref mutation (not applied via `apply_ops` today; MCP uses dedicated tools).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum XRefOp {
     Add { xref_id: XRefId, from: ObjectRef, to: ObjectRef, kind: String, label: Option<String> },
     Remove { xref_id: XRefId },
 }
 
+/// Outcome of a successful `apply_ops` batch.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ApplyResult {
     pub new_rev: u64,
@@ -206,9 +218,7 @@ pub struct ApplyResult {
     pub delta: Delta,
 }
 
-/// Minimal delta describing which objects changed as the result of applying ops.
-///
-/// This is intentionally coarse: it reports only added/removed/updated `ObjectRef`s.
+/// Coarse object-level change set from an op batch (added / removed / updated refs).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Delta {
     pub added: Vec<ObjectRef>,
@@ -265,7 +275,12 @@ fn sort_object_refs(refs: &mut [ObjectRef]) {
     });
 }
 
-/// Apply ops with optimistic revision check; bumps diagram rev and returns a change delta.
+/// Apply ops if `base_rev` matches `diagram.rev()`, then bump revision.
+///
+/// # Errors
+///
+/// Returns [`ApplyError::Conflict`] on stale `base_rev`, kind mismatches, missing ids, invalid
+/// Mermaid identifiers, or export-invalid sequence structure after the batch.
 pub fn apply_ops(
     diagram: &mut Diagram,
     base_rev: u64,
@@ -294,8 +309,6 @@ pub fn apply_ops(
                     });
                 };
                 apply_seq_op(&diagram_id, ast, seq_op, &mut delta)?;
-                // Structure validation runs after the full batch so multi-op creates can
-                // finish attaching messages before export rules are enforced.
             }
             Op::Flow(flow_op) => {
                 let DiagramAst::Flowchart(ast) = &mut new_ast else {
@@ -329,6 +342,7 @@ pub fn apply_ops(
     Ok(ApplyResult { new_rev, applied: ops.len(), delta: delta.finish() })
 }
 
+/// High-level op family used in kind-mismatch errors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpKind {
     Seq,
@@ -336,6 +350,7 @@ pub enum OpKind {
     XRef,
 }
 
+/// Object category for existence / uniqueness errors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObjectKind {
     SeqParticipant,
@@ -346,6 +361,7 @@ pub enum ObjectKind {
     FlowEdge,
 }
 
+/// Failures from [`apply_ops`]: conflicts, missing ids, structure, identifiers.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ApplyError {
     Conflict {
@@ -468,7 +484,6 @@ impl fmt::Display for ApplyError {
 
 impl std::error::Error for ApplyError {}
 
-// Extracted op-application implementation for sequence/flow mutations.
 include!("ops_impl.rs");
 
 #[cfg(test)]
