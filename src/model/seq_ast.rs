@@ -79,6 +79,27 @@ impl SequenceAst {
         find(&self.blocks, block_id)
     }
 
+    pub fn find_block_mut(&mut self, block_id: &ObjectId) -> Option<&mut SequenceBlock> {
+        fn find<'a>(
+            blocks: &'a mut [SequenceBlock],
+            block_id: &ObjectId,
+        ) -> Option<&'a mut SequenceBlock> {
+            for index in 0..blocks.len() {
+                if blocks[index].block_id() == block_id {
+                    return Some(&mut blocks[index]);
+                }
+            }
+            for block in blocks.iter_mut() {
+                if let Some(found) = find(block.blocks_mut(), block_id) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+
+        find(&mut self.blocks, block_id)
+    }
+
     pub fn find_section(&self, section_id: &ObjectId) -> Option<&SequenceSection> {
         fn find<'a>(
             blocks: &'a [SequenceBlock],
@@ -98,6 +119,170 @@ impl SequenceAst {
         }
 
         find(&self.blocks, section_id)
+    }
+
+    pub fn find_section_mut(&mut self, section_id: &ObjectId) -> Option<&mut SequenceSection> {
+        fn find<'a>(
+            blocks: &'a mut [SequenceBlock],
+            section_id: &ObjectId,
+        ) -> Option<&'a mut SequenceSection> {
+            for block in blocks.iter_mut() {
+                if let Some(index) =
+                    block.sections().iter().position(|section| section.section_id() == section_id)
+                {
+                    return Some(&mut block.sections_mut()[index]);
+                }
+                if let Some(found) = find(block.blocks_mut(), section_id) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+
+        find(&mut self.blocks, section_id)
+    }
+
+    /// Returns the block that owns `section_id`, if any.
+    pub fn find_block_for_section(&self, section_id: &ObjectId) -> Option<&SequenceBlock> {
+        fn find<'a>(
+            blocks: &'a [SequenceBlock],
+            section_id: &ObjectId,
+        ) -> Option<&'a SequenceBlock> {
+            for block in blocks {
+                if block.sections().iter().any(|section| section.section_id() == section_id) {
+                    return Some(block);
+                }
+                if let Some(found) = find(block.blocks(), section_id) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+
+        find(&self.blocks, section_id)
+    }
+
+    pub fn find_block_for_section_mut(
+        &mut self,
+        section_id: &ObjectId,
+    ) -> Option<&mut SequenceBlock> {
+        fn find<'a>(
+            blocks: &'a mut [SequenceBlock],
+            section_id: &ObjectId,
+        ) -> Option<&'a mut SequenceBlock> {
+            for index in 0..blocks.len() {
+                if blocks[index].sections().iter().any(|section| section.section_id() == section_id)
+                {
+                    return Some(&mut blocks[index]);
+                }
+            }
+            for block in blocks.iter_mut() {
+                if let Some(found) = find(block.blocks_mut(), section_id) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+
+        find(&mut self.blocks, section_id)
+    }
+
+    /// True if any block in the tree uses `block_id`.
+    pub fn contains_block_id(&self, block_id: &ObjectId) -> bool {
+        self.find_block(block_id).is_some()
+    }
+
+    /// True if any section in the tree uses `section_id`.
+    pub fn contains_section_id(&self, section_id: &ObjectId) -> bool {
+        self.find_section(section_id).is_some()
+    }
+
+    /// Nesting depth of `block_id` (root blocks are depth 1). Returns `None` if missing.
+    pub fn block_depth(&self, block_id: &ObjectId) -> Option<usize> {
+        fn depth_of(blocks: &[SequenceBlock], block_id: &ObjectId, depth: usize) -> Option<usize> {
+            for block in blocks {
+                if block.block_id() == block_id {
+                    return Some(depth);
+                }
+                if let Some(found) = depth_of(block.blocks(), block_id, depth + 1) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+
+        depth_of(&self.blocks, block_id, 1)
+    }
+
+    /// Removes the block (and nested children) from the tree. Messages are not removed.
+    ///
+    /// Returns the removed block when found.
+    pub fn remove_block(&mut self, block_id: &ObjectId) -> Option<SequenceBlock> {
+        fn remove_from(
+            blocks: &mut Vec<SequenceBlock>,
+            block_id: &ObjectId,
+        ) -> Option<SequenceBlock> {
+            if let Some(index) = blocks.iter().position(|block| block.block_id() == block_id) {
+                return Some(blocks.remove(index));
+            }
+            for block in blocks.iter_mut() {
+                if let Some(removed) = remove_from(block.blocks_mut(), block_id) {
+                    return Some(removed);
+                }
+            }
+            None
+        }
+
+        remove_from(&mut self.blocks, block_id)
+    }
+
+    /// Removes `message_id` from every section in the tree. Returns how many memberships were cleared.
+    pub fn detach_message_from_all_sections(&mut self, message_id: &ObjectId) -> usize {
+        fn detach(blocks: &mut [SequenceBlock], message_id: &ObjectId) -> usize {
+            let mut removed = 0usize;
+            for block in blocks {
+                for section in block.sections_mut() {
+                    let before = section.message_ids().len();
+                    section.message_ids_mut().retain(|id| id != message_id);
+                    removed =
+                        removed.saturating_add(before.saturating_sub(section.message_ids().len()));
+                }
+                removed = removed.saturating_add(detach(block.blocks_mut(), message_id));
+            }
+            removed
+        }
+
+        detach(&mut self.blocks, message_id)
+    }
+
+    /// Collects every block id in pre-order (parents before nested children).
+    pub fn collect_block_ids(&self) -> Vec<ObjectId> {
+        fn walk(blocks: &[SequenceBlock], out: &mut Vec<ObjectId>) {
+            for block in blocks {
+                out.push(block.block_id().clone());
+                walk(block.blocks(), out);
+            }
+        }
+
+        let mut out = Vec::new();
+        walk(&self.blocks, &mut out);
+        out
+    }
+
+    /// Collects every section id in pre-order (block sections, then nested blocks).
+    pub fn collect_section_ids(&self) -> Vec<ObjectId> {
+        fn walk(blocks: &[SequenceBlock], out: &mut Vec<ObjectId>) {
+            for block in blocks {
+                for section in block.sections() {
+                    out.push(section.section_id().clone());
+                }
+                walk(block.blocks(), out);
+            }
+        }
+
+        let mut out = Vec::new();
+        walk(&self.blocks, &mut out);
+        out
     }
 }
 
@@ -192,6 +377,10 @@ impl SequenceBlock {
         self.header.as_deref()
     }
 
+    pub fn set_header<T: Into<String>>(&mut self, header: Option<T>) {
+        self.header = header.map(Into::into);
+    }
+
     pub fn sections(&self) -> &[SequenceSection] {
         &self.sections
     }
@@ -248,6 +437,10 @@ impl SequenceSection {
 
     pub fn header(&self) -> Option<&str> {
         self.header.as_deref()
+    }
+
+    pub fn set_header<T: Into<String>>(&mut self, header: Option<T>) {
+        self.header = header.map(Into::into);
     }
 
     pub fn message_ids(&self) -> &[ObjectId] {
@@ -356,7 +549,11 @@ impl SequenceNote {
 
 #[cfg(test)]
 mod tests {
-    use super::{SequenceBlock, SequenceParticipant, SequenceSection};
+    use super::{
+        SequenceAst, SequenceBlock, SequenceBlockKind, SequenceParticipant, SequenceSection,
+        SequenceSectionKind,
+    };
+    use crate::model::ids::ObjectId;
 
     #[test]
     fn sequence_participant_can_be_updated_in_place() {
@@ -386,5 +583,115 @@ mod tests {
     fn sequence_block_and_section_ids_are_allocated_deterministically() {
         assert_eq!(SequenceBlock::make_block_id(1).as_str(), "b:0001");
         assert_eq!(SequenceSection::make_section_id(1, 0).as_str(), "sec:0001:00");
+    }
+
+    fn oid(raw: &str) -> ObjectId {
+        ObjectId::new(raw.to_owned()).expect("valid object id")
+    }
+
+    fn sample_nested_ast() -> SequenceAst {
+        let mut ast = SequenceAst::default();
+        let nested = SequenceBlock::new(
+            oid("b:nested"),
+            SequenceBlockKind::Opt,
+            Some("warm".to_owned()),
+            vec![SequenceSection::new(
+                oid("sec:nested:main"),
+                SequenceSectionKind::Main,
+                None,
+                vec![oid("m:2")],
+            )],
+            Vec::new(),
+        );
+        let root = SequenceBlock::new(
+            oid("b:root"),
+            SequenceBlockKind::Alt,
+            Some("hit".to_owned()),
+            vec![
+                SequenceSection::new(
+                    oid("sec:root:main"),
+                    SequenceSectionKind::Main,
+                    None,
+                    vec![oid("m:1"), oid("m:2")],
+                ),
+                SequenceSection::new(
+                    oid("sec:root:else"),
+                    SequenceSectionKind::Else,
+                    Some("miss".to_owned()),
+                    vec![oid("m:3")],
+                ),
+            ],
+            vec![nested],
+        );
+        ast.blocks_mut().push(root);
+        ast
+    }
+
+    #[test]
+    fn find_block_mut_and_find_section_mut_update_nested_tree() {
+        let mut ast = sample_nested_ast();
+
+        ast.find_block_mut(&oid("b:nested")).expect("nested block").set_header(Some("warm-cache"));
+        assert_eq!(ast.find_block(&oid("b:nested")).expect("nested").header(), Some("warm-cache"));
+
+        ast.find_section_mut(&oid("sec:root:else"))
+            .expect("else section")
+            .set_header(Some("cache-miss"));
+        assert_eq!(
+            ast.find_section(&oid("sec:root:else")).expect("else").header(),
+            Some("cache-miss")
+        );
+
+        assert_eq!(
+            ast.find_block_for_section(&oid("sec:root:else")).expect("owner").block_id().as_str(),
+            "b:root"
+        );
+        assert_eq!(ast.block_depth(&oid("b:root")), Some(1));
+        assert_eq!(ast.block_depth(&oid("b:nested")), Some(2));
+        assert!(ast.contains_block_id(&oid("b:nested")));
+        assert!(ast.contains_section_id(&oid("sec:nested:main")));
+    }
+
+    #[test]
+    fn detach_message_from_all_sections_clears_memberships() {
+        let mut ast = sample_nested_ast();
+        let removed = ast.detach_message_from_all_sections(&oid("m:2"));
+        assert_eq!(removed, 2);
+        assert!(!ast
+            .find_section(&oid("sec:root:main"))
+            .expect("main")
+            .message_ids()
+            .contains(&oid("m:2")));
+        assert!(!ast
+            .find_section(&oid("sec:nested:main"))
+            .expect("nested main")
+            .message_ids()
+            .contains(&oid("m:2")));
+        assert!(ast
+            .find_section(&oid("sec:root:else"))
+            .expect("else")
+            .message_ids()
+            .contains(&oid("m:3")));
+    }
+
+    #[test]
+    fn remove_block_keeps_sibling_structure_and_messages_lists() {
+        let mut ast = sample_nested_ast();
+        let removed = ast.remove_block(&oid("b:nested")).expect("removed nested");
+        assert_eq!(removed.block_id().as_str(), "b:nested");
+        assert!(!ast.contains_block_id(&oid("b:nested")));
+        assert!(ast.contains_block_id(&oid("b:root")));
+        assert_eq!(
+            ast.find_section(&oid("sec:root:main")).expect("main").message_ids(),
+            &[oid("m:1"), oid("m:2")]
+        );
+        assert_eq!(
+            ast.collect_block_ids().iter().map(ObjectId::as_str).collect::<Vec<_>>(),
+            vec!["b:root"]
+        );
+        assert_eq!(
+            ast.collect_section_ids().iter().map(ObjectId::as_str).collect::<Vec<_>>(),
+            vec!["sec:root:main", "sec:root:else"]
+        );
     }
 }
