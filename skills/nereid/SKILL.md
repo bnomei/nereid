@@ -33,7 +33,7 @@ Treat these as separate concerns:
 - Treat AST as source of truth; rendered text and Mermaid text are projections.
 - Session files (`nereid-session.meta.json`, `diagrams/*.mmd`, `walkthroughs/*.wt.json`) are app-managed snapshots and can be rewritten frequently while Nereid runs.
 - Use canonical `ObjectRef` everywhere:
-  `d:<diagram_id>/<seq|flow>/<participant|message|node|edge>/<object_id>`.
+  `d:<diagram_id>/<seq|flow>/<participant|message|block|section|node|edge>/<object_id>`.
 - Prefer small reads first (`diagram_stat`, `diagram_get_slice`, `diagram_diff`, `walkthrough_diff`).
 - Use typed query tools (`seq.*`, `flow.*`, `xref.*`, `route_find`) before large snapshots.
 - Gate edits with `base_rev` and keep ops minimal.
@@ -343,6 +343,71 @@ Escalate to global reads (`diagram_read`, `diagram_get_ast`, `diagram_render_tex
 - Keep op batches minimal and scoped to one local intent.
 - Use stable IDs for all new objects.
 - Re-read `diagram_stat` or `diagram_diff` after apply to confirm resulting rev/state.
+
+### Sequence structure ops
+
+Prefer structured ops over rewriting Mermaid when editing `alt` / `opt` / `loop` / `par`:
+
+| Op `type` | Purpose |
+|---|---|
+| `seq_add_block` | Create block + main section (`kind`: `alt`/`opt`/`loop`/`par`) |
+| `seq_update_block` | Patch block header |
+| `seq_remove_block` | Remove block tree; messages remain |
+| `seq_add_section` | Add `else` (under `alt`) or `and` (under `par`) |
+| `seq_update_section` | Patch section header |
+| `seq_remove_section` | Remove empty non-main section |
+| `seq_set_message_section` | Attach/move/detach message membership (`section_id: null` detaches) |
+| `seq_add_message` | Optional `section_id` to place message on create |
+
+Rules agents must follow:
+- Batch create block + sections + messages with contiguous `order_key` order in one `diagram_apply_ops`.
+- Messages in a section must be contiguous in global message order; empty sections are invalid.
+- Nested blocks need `parent_block_id` and must sit inside one parent section’s message range.
+- After structural edits, confirm with `diagram_get_ast` or `object_read` on `seq/block` / `seq/section` refs (and `diagram_read` for Mermaid with blocks).
+
+Example batch (add `alt`/`else` with two messages):
+```json
+{
+  "diagram_id": "d-seq",
+  "base_rev": 0,
+  "ops": [
+    {
+      "type": "seq_add_block",
+      "block_id": "b:cache",
+      "kind": "alt",
+      "header": "cache",
+      "main_section_id": "sec:cache:main"
+    },
+    {
+      "type": "seq_add_section",
+      "section_id": "sec:cache:else",
+      "block_id": "b:cache",
+      "kind": "else",
+      "header": "miss"
+    },
+    {
+      "type": "seq_add_message",
+      "message_id": "m:hit",
+      "from_participant_id": "p:A",
+      "to_participant_id": "p:B",
+      "kind": "sync",
+      "text": "hit",
+      "order_key": 1000,
+      "section_id": "sec:cache:main"
+    },
+    {
+      "type": "seq_add_message",
+      "message_id": "m:miss",
+      "from_participant_id": "p:A",
+      "to_participant_id": "p:B",
+      "kind": "sync",
+      "text": "miss",
+      "order_key": 2000,
+      "section_id": "sec:cache:else"
+    }
+  ]
+}
+```
 
 ## Walkthrough and Evidence Artifacts
 

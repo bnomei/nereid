@@ -135,7 +135,7 @@ Tool: `diagram_get_slice`
 ```
 
 Canonical object ref format:
-`d:<diagram_id>/<seq|flow>/<participant|message|node|edge>/<object_id>`
+`d:<diagram_id>/<seq|flow>/<participant|message|block|section|node|edge>/<object_id>`
 
 ## Safe mutation pattern
 
@@ -186,6 +186,64 @@ Canonical object ref format:
       "order_key": 35
     }
   ]
+}
+```
+
+## Sequence structure (alt/else)
+
+Batch structure + membership in one apply so empty sections never become the committed state.
+Messages in each section must be contiguous by `order_key`.
+
+```json
+{
+  "diagram_id": "d-checkout-seq",
+  "base_rev": 8,
+  "ops": [
+    {
+      "type": "seq_add_block",
+      "block_id": "b:cache",
+      "kind": "alt",
+      "header": "cache",
+      "main_section_id": "sec:cache:main"
+    },
+    {
+      "type": "seq_add_section",
+      "section_id": "sec:cache:else",
+      "block_id": "b:cache",
+      "kind": "else",
+      "header": "miss"
+    },
+    {
+      "type": "seq_add_message",
+      "message_id": "m:hit",
+      "from_participant_id": "p:api",
+      "to_participant_id": "p:cache",
+      "kind": "sync",
+      "text": "hit",
+      "order_key": 40,
+      "section_id": "sec:cache:main"
+    },
+    {
+      "type": "seq_add_message",
+      "message_id": "m:miss",
+      "from_participant_id": "p:api",
+      "to_participant_id": "p:db",
+      "kind": "sync",
+      "text": "miss",
+      "order_key": 50,
+      "section_id": "sec:cache:else"
+    }
+  ]
+}
+```
+
+Move an existing free message into a section:
+
+```json
+{
+  "type": "seq_set_message_section",
+  "message_id": "m:fraud-check",
+  "section_id": "sec:cache:main"
 }
 ```
 
