@@ -236,14 +236,6 @@ fn map_mcp_seq_block_kind(kind: McpSeqBlockKind) -> crate::model::seq_ast::Seque
     }
 }
 
-fn map_mcp_seq_section_kind(kind: McpSeqSectionKind) -> crate::model::seq_ast::SequenceSectionKind {
-    match kind {
-        McpSeqSectionKind::Main => crate::model::seq_ast::SequenceSectionKind::Main,
-        McpSeqSectionKind::Else => crate::model::seq_ast::SequenceSectionKind::Else,
-        McpSeqSectionKind::And => crate::model::seq_ast::SequenceSectionKind::And,
-    }
-}
-
 fn map_mcp_seq_section_add_kind(
     kind: McpSeqSectionAddKind,
 ) -> crate::model::seq_ast::SequenceSectionKind {

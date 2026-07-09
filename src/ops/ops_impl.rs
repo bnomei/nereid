@@ -334,7 +334,10 @@ fn apply_seq_op(
             );
 
             if let Some(parent_id) = parent_block_id {
-                let parent = ast.find_block_mut(parent_id).expect("parent existence checked");
+                let parent = ast.find_block_mut(parent_id).ok_or_else(|| ApplyError::NotFound {
+                    kind: ObjectKind::SeqBlock,
+                    object_id: parent_id.clone(),
+                })?;
                 parent.blocks_mut().push(block);
             } else {
                 ast.blocks_mut().push(block);
@@ -394,7 +397,10 @@ fn apply_seq_op(
                 });
             }
 
-            let block = ast.find_block_mut(block_id).expect("block existence checked");
+            let block = ast.find_block_mut(block_id).ok_or_else(|| ApplyError::NotFound {
+                kind: ObjectKind::SeqBlock,
+                object_id: block_id.clone(),
+            })?;
             block.sections_mut().push(SequenceSection::new(
                 section_id.clone(),
                 *kind,
@@ -426,11 +432,14 @@ fn apply_seq_op(
                 });
             };
             let block_id = block.block_id().clone();
-            let section = block
-                .sections()
-                .iter()
-                .find(|section| section.section_id() == section_id)
-                .expect("section ownership checked");
+            let Some(section) =
+                block.sections().iter().find(|section| section.section_id() == section_id)
+            else {
+                return Err(ApplyError::NotFound {
+                    kind: ObjectKind::SeqSection,
+                    object_id: section_id.clone(),
+                });
+            };
             if section.kind() == SequenceSectionKind::Main {
                 return Err(ApplyError::InvalidSeqSectionIsMain {
                     section_id: section_id.clone(),
@@ -442,7 +451,10 @@ fn apply_seq_op(
                 });
             }
 
-            let block = ast.find_block_mut(&block_id).expect("block ownership checked");
+            let block = ast.find_block_mut(&block_id).ok_or_else(|| ApplyError::NotFound {
+                kind: ObjectKind::SeqBlock,
+                object_id: block_id.clone(),
+            })?;
             block.sections_mut().retain(|section| section.section_id() != section_id);
             delta.record_removed(seq_section_ref(diagram_id, section_id));
             delta.record_updated(seq_block_ref(diagram_id, &block_id));
