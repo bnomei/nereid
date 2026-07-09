@@ -613,7 +613,7 @@ fn inflate_row_positions_with_spacing_budget(
     }
 }
 
-// Extracted sequence rendering internals and block drawing helpers.
+// include!: sequence block/message drawing internals.
 include!("sequence/helpers.rs");
 
 #[cfg(test)]

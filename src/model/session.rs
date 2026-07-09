@@ -32,6 +32,7 @@ pub struct Session {
 }
 
 impl Session {
+    /// Create an empty session with the given id (no diagrams yet).
     pub fn new(session_id: SessionId) -> Self {
         Self {
             session_id,
@@ -72,6 +73,7 @@ impl Session {
         &mut self.xrefs
     }
 
+    /// Whether `object_ref` resolves to a live participant, message, block, section, node, or edge.
     pub fn object_ref_exists(&self, object_ref: &ObjectRef) -> bool {
         let Some(diagram) = self.diagrams.get(object_ref.diagram_id()) else {
             return false;
@@ -105,6 +107,7 @@ impl Session {
         }
     }
 
+    /// Inverse of [`Self::object_ref_exists`] for dangling xref status updates.
     pub fn object_ref_is_missing(&self, object_ref: &ObjectRef) -> bool {
         !self.object_ref_exists(object_ref)
     }
@@ -113,6 +116,7 @@ impl Session {
         self.active_diagram_id.as_ref()
     }
 
+    /// Set the session-default diagram for tools that omit `diagram_id`.
     pub fn set_active_diagram_id(&mut self, diagram_id: Option<DiagramId>) {
         self.active_diagram_id = diagram_id;
     }
@@ -125,6 +129,7 @@ impl Session {
         self.active_walkthrough_id = walkthrough_id;
     }
 
+    /// Multi-object working set shared by TUI selection and MCP `selection_*` tools.
     pub fn selected_object_refs(&self) -> &BTreeSet<ObjectRef> {
         &self.selected_object_refs
     }

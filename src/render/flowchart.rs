@@ -822,7 +822,7 @@ pub fn render_flowchart_unicode_annotated_with_options(
     Ok(AnnotatedRender { text, highlight_index })
 }
 
-// Extracted flowchart rendering internals and routing helpers.
+// include!: flowchart routing/drawing internals.
 include!("flowchart/helpers.rs");
 
 #[cfg(test)]

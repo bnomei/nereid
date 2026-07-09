@@ -38,7 +38,6 @@ pub(crate) fn canvas_to_string_trimmed(canvas: &Canvas) -> String {
     for y in 0..canvas.height() {
         let mut line = String::with_capacity(canvas.width());
         for x in 0..canvas.width() {
-            // (x, y) is in bounds by construction.
             let ch = canvas.get(x, y).expect("in bounds");
             line.push(ch);
         }

@@ -487,36 +487,36 @@ fn ensure_node(
 
     let mut new_label = existing_label.clone();
     if let Some(explicit_label) = label {
-        if existing_label == explicit_label {
-            // same label
-        } else if existing_label == mermaid_id {
-            // upgrade implicit mermaid-id label to explicit text
-            new_label = explicit_label;
-        } else {
-            return Err(MermaidFlowchartParseError::ConflictingNodeLabel {
-                line_no,
-                mermaid_id: mermaid_id.clone(),
-                existing_label,
-                new_label: explicit_label,
-            });
+        if existing_label != explicit_label {
+            if existing_label == mermaid_id {
+                // upgrade implicit mermaid-id label to explicit text
+                new_label = explicit_label;
+            } else {
+                return Err(MermaidFlowchartParseError::ConflictingNodeLabel {
+                    line_no,
+                    mermaid_id: mermaid_id.clone(),
+                    existing_label,
+                    new_label: explicit_label,
+                });
+            }
         }
     }
 
     let mut new_shape = existing_shape.clone();
     if let Some(explicit_shape) = shape {
         let explicit_shape = explicit_shape.model_shape();
-        if existing_shape == explicit_shape {
-            // same shape
-        } else if existing_shape == NodeShape::Rect.model_shape() {
-            // upgrade default rect to explicit shape
-            new_shape = explicit_shape.to_owned();
-        } else {
-            return Err(MermaidFlowchartParseError::ConflictingNodeShape {
-                line_no,
-                mermaid_id: mermaid_id.clone(),
-                existing_shape,
-                new_shape: explicit_shape.to_owned(),
-            });
+        if existing_shape != explicit_shape {
+            if existing_shape == NodeShape::Rect.model_shape() {
+                // upgrade default rect to explicit shape
+                new_shape = explicit_shape.to_owned();
+            } else {
+                return Err(MermaidFlowchartParseError::ConflictingNodeShape {
+                    line_no,
+                    mermaid_id: mermaid_id.clone(),
+                    existing_shape,
+                    new_shape: explicit_shape.to_owned(),
+                });
+            }
         }
     }
 
@@ -638,7 +638,6 @@ pub fn parse_flowchart(input: &str) -> Result<FlowchartAst, MermaidFlowchartPars
             }
         }
 
-        // Parse simple edge or edge chain.
         let Some((first_raw, first_op, tail)) = split_once_edge_operator(trimmed) else {
             let node_spec = parse_node_spec(trimmed, line_no)?;
             ensure_node(&mut ast, node_spec, line_no)?;

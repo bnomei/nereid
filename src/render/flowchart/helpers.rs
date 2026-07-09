@@ -123,13 +123,10 @@ fn detour_y_for_long_horizontal_hop(
     from: NodeRender,
     to: NodeRender,
 ) -> Option<usize> {
-    // Route rows on node centers (even grid y) can project through intermediate node interiors on
-    // multi-layer horizontal hops. Nudge toward a nearby non-center row to preserve clearance while
-    // keeping endpoint stubs deterministic.
+    // Nudge even-grid center rows off node interiors on multi-layer hops.
     if route_y % 2 == 0 {
         if route_y == 0 {
-            // The top row has no "above" inter-row lane; move into the first inter-row corridor
-            // below the row instead of grazing the node bottom border.
+            // Top row: use first inter-row corridor below, not the bottom border.
             return Some(y.saturating_add(box_height));
         }
         let offset = STUB_ROW_KEEPOUT_RADIUS.saturating_add(1);
@@ -139,8 +136,7 @@ fn detour_y_for_long_horizontal_hop(
             y.saturating_add(offset)
         };
 
-        // When climbing from a lower row back to the top row, bias one additional cell upward to
-        // reduce horizontal overlap with top-row same-row connectors in dense fixtures.
+        // Climbing to top row: extra upward bias to clear same-row connectors.
         if from.mid_y() > to.mid_y() && to.mid_y() == 1 {
             detour = detour.saturating_sub(1);
         }
@@ -326,8 +322,7 @@ fn connector_vertical_occupancy_mask(
                 if x0 == x1 {
                     mark_vline(&mut occupied, width, height, x0, y0, y1);
                 } else if y0 != y1 {
-                    // Shouldn't happen: routed polylines are orthogonal. Mirror the renderer's
-                    // deterministic fallback (an L).
+                    // Non-orthogonal route: deterministic L fallback.
                     mark_vline(&mut occupied, width, height, x1, y0, y1);
                 }
             }
@@ -346,7 +341,6 @@ fn connector_vertical_occupancy_mask(
             continue;
         }
 
-        // Fallback connector (same logic as `draw_connector_pass` vertical).
         let from_y = from.mid_y();
         let to_y = to.mid_y();
         if from_y != to_y {
@@ -470,7 +464,7 @@ fn routed_connector_spans_bridged(
         } else if y0 == y1 {
             spans.extend(hline_spans_bridged(y0, x0, x1, vertical_occupied, width));
         } else {
-            // Routing should be orthogonal; fall back to a deterministic L to avoid crashing.
+            // Non-orthogonal route: L fallback.
             spans.extend(hline_spans_bridged(y0, x0, x1, vertical_occupied, width));
             spans.extend(vline_spans(x1, y0, y1));
         }
@@ -2509,7 +2503,7 @@ fn draw_routed_connector(
                 if x0 == x1 {
                     canvas.draw_vline(x0, y0, y1)?;
                 } else if y0 != y1 {
-                    // Routing should be orthogonal; fall back to a deterministic L to avoid crashing.
+                    // Non-orthogonal route: L fallback.
                     canvas.draw_vline(x1, y0, y1)?;
                 }
             }
@@ -2532,7 +2526,7 @@ fn draw_routed_connector(
                 if y0 == y1 {
                     draw_hline_bridge_vertical(canvas, x0, x1, y0)?;
                 } else if x0 != x1 {
-                    // Routing should be orthogonal; fall back to a deterministic L to avoid crashing.
+                    // Non-orthogonal route: L fallback.
                     draw_hline_bridge_vertical(canvas, x0, x1, y0)?;
                 }
             }

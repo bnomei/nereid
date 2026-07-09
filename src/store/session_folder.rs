@@ -646,14 +646,17 @@ pub struct SessionUpdate<'a> {
 }
 
 impl<'a> SessionUpdate<'a> {
+    /// Borrow the in-memory session (panics after commit).
     pub fn session(&self) -> &Session {
         self.session.as_ref().expect("session update is committed")
     }
 
+    /// Mutably borrow the in-memory session (panics after commit).
     pub fn session_mut(&mut self) -> &mut Session {
         self.session.as_mut().expect("session update is committed")
     }
 
+    /// Write the session to disk and release the update (single-use).
     pub fn commit(mut self) -> Result<Session, StoreError> {
         let session = self.session.take().expect("session update is committed once");
         self.folder.save_session_locked(&session)?;
@@ -775,6 +778,7 @@ fn is_windows_device_name(base: &str) -> bool {
 }
 
 impl SessionFolder {
+    /// Open a session folder at `root` (does not create or load until save/load is called).
     pub fn new(root: impl Into<PathBuf>) -> Self {
         Self {
             root: root.into(),
@@ -937,6 +941,9 @@ impl SessionFolder {
         session
     }
 
+    /// Load an existing session, or seed a default flowchart when the folder is empty.
+    ///
+    /// Refuses to invent meta if `diagrams/*.mmd` already exists without session meta.
     pub fn load_or_init_session(&self) -> Result<Session, StoreError> {
         match self.load_session() {
             Ok(session) => Ok(session),
@@ -975,11 +982,13 @@ impl SessionFolder {
         Ok(false)
     }
 
+    /// Persist the full session under the write lock (diagrams, walkthroughs, meta).
     pub fn save_session(&self, session: &Session) -> Result<(), StoreError> {
         let _guard = self.lock_session_write()?;
         self.save_session_locked(session)
     }
 
+    /// Lock, reload from disk, and return a [`SessionUpdate`] for concurrent-safe mutation.
     pub fn begin_session_update(&self) -> Result<SessionUpdate<'_>, StoreError> {
         let guard = self.lock_session_write()?;
         let session = self.load_session()?;
@@ -1483,6 +1492,7 @@ impl SessionFolder {
         Ok(())
     }
 
+    /// Load meta + diagrams (parse Mermaid, reconcile sidecars) + walkthroughs into memory.
     pub fn load_session(&self) -> Result<Session, StoreError> {
         let meta = self.load_meta()?;
 
@@ -1869,7 +1879,9 @@ fn collect_stable_object_ids(ast: &DiagramAst) -> BTreeSet<String> {
     ids
 }
 
-/// Parse Mermaid into a diagram of the same kind, reconciling stable ids from the current AST.
+/// Parse Mermaid into the same diagram kind, reconciling stable ids from the current AST.
+///
+/// Kind must match; returns identity id sets for MCP reporting. Does not persist by itself.
 pub fn replace_diagram_from_mermaid(
     diagram: &mut Diagram,
     mermaid: &str,

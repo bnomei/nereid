@@ -1015,9 +1015,7 @@ pub fn export_sequence_diagram(ast: &SequenceAst) -> Result<String, MermaidSeque
                     }
                     out.push('\n');
                 }
-                ExportEvent::BlockClose { .. } => {
-                    // Block closes are emitted from `after`.
-                }
+                ExportEvent::BlockClose { .. } => {}
             }
         }
 

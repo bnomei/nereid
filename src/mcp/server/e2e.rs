@@ -120,7 +120,6 @@ fn e2e_human_and_agent_collaborate_on_persisted_session() {
     let diagram_id = "d-collab";
     let expected_participant_b_ref = format!("d:{diagram_id}/seq/participant/p:b");
 
-    // Agent creates diagram.
     let server = harness.mcp(harness.load_session());
     let mermaid = "sequenceDiagram\nparticipant a\nparticipant b\n";
     let Json(created) = runtime.block_on(async {
@@ -147,7 +146,6 @@ fn e2e_human_and_agent_collaborate_on_persisted_session() {
         "expected created diagram to be present after reload"
     );
 
-    // Human focuses participant b.
     let mut tui = harness.tui(reloaded);
     tui.press(KeyCode::Char('2')); // toggle+focus Objects
     tui.press(KeyCode::Down); // p:a -> p:b
@@ -159,7 +157,6 @@ fn e2e_human_and_agent_collaborate_on_persisted_session() {
     assert_eq!(human_attention.diagram_id.as_deref(), Some(diagram_id));
     assert_eq!(human_attention.object_ref.as_deref(), Some(participant_b_ref.as_str()));
 
-    // Agent sets attention to b.
     tui.press(KeyCode::Up); // back to p:a so highlights don't overlap focus
     let Json(update) = runtime.block_on(async {
         server
@@ -179,7 +176,6 @@ fn e2e_human_and_agent_collaborate_on_persisted_session() {
         .any(|line| line.spans.iter().any(|span| span.style.bg == Some(Color::LightBlue)));
     assert!(has_agent_highlight, "expected agent highlight to render with bright blue background");
 
-    // Human multi-selects; persists.
     tui.press(KeyCode::Down); // p:a -> p:b
     tui.press(KeyCode::Char(' '));
 
@@ -188,7 +184,6 @@ fn e2e_human_and_agent_collaborate_on_persisted_session() {
         reloaded.selected_object_refs().iter().map(ToString::to_string).collect::<Vec<_>>();
     assert_eq!(selected, vec![participant_b_ref.clone()]);
 
-    // Agent reads selection after reload.
     let server = harness.mcp(reloaded);
     let Json(selection) =
         runtime.block_on(async { server.selection_get().await.expect("selection_read") });

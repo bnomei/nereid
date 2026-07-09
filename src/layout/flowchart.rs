@@ -319,7 +319,6 @@ fn sort_layer_by_barycenter(
 pub fn layout_flowchart(ast: &FlowchartAst) -> Result<FlowchartLayout, FlowchartLayoutError> {
     let topo = topo_sort_nodes(ast)?;
 
-    // Rebuild adjacency + predecessors with validated nodes.
     let mut outgoing = BTreeMap::<ObjectId, Vec<ObjectId>>::new();
     let mut predecessors = BTreeMap::<ObjectId, Vec<ObjectId>>::new();
     for node_id in ast.nodes().keys() {
@@ -352,7 +351,7 @@ pub fn layout_flowchart(ast: &FlowchartAst) -> Result<FlowchartLayout, Flowchart
         layers[layer].push(node_id.clone());
     }
 
-    // Start deterministic: ObjectId ordering within each layer.
+    // Deterministic base order before barycenter sweep.
     for layer_nodes in layers.iter_mut() {
         sort_object_ids_lexical(layer_nodes);
     }
@@ -1089,7 +1088,6 @@ fn shortest_path_4dir_soft_occupancy<'a>(
                     continue;
                 };
 
-                // Vertical then horizontal.
                 relax(
                     MoveDir::Vertical,
                     MoveDir::Horizontal,
@@ -1097,7 +1095,6 @@ fn shortest_path_4dir_soft_occupancy<'a>(
                     next,
                     next_idx,
                 );
-                // Horizontal then vertical.
                 relax(
                     MoveDir::Horizontal,
                     MoveDir::Vertical,
@@ -1112,7 +1109,6 @@ fn shortest_path_4dir_soft_occupancy<'a>(
         let dx_to_goal = (goal.x - current_point.x).abs();
         let dy_to_goal = (goal.y - current_point.y).abs();
         if dx_to_goal == 1 && dy_to_goal == 1 {
-            // Vertical then horizontal.
             relax(
                 MoveDir::Vertical,
                 MoveDir::Horizontal,
@@ -1120,7 +1116,6 @@ fn shortest_path_4dir_soft_occupancy<'a>(
                 goal,
                 goal_idx,
             );
-            // Horizontal then vertical.
             relax(
                 MoveDir::Horizontal,
                 MoveDir::Vertical,

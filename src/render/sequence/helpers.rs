@@ -516,12 +516,10 @@ fn draw_self_message(
         return Ok(());
     }
 
-    // Top run with a real right corner.
     if stub_end > from_x {
         canvas.draw_hline(from_x, stub_end.saturating_sub(1), y)?;
     }
     canvas.set(stub_end, y, super::UNICODE_BOX_TOP_RIGHT)?;
-    // Bottom run with a real right corner.
     if stub_end > from_x.saturating_add(1) {
         canvas.draw_hline(from_x.saturating_add(1), stub_end.saturating_sub(1), y1)?;
     }
@@ -664,7 +662,7 @@ fn draw_sequence_block(
         .unwrap_or(0);
     let mut block_end_row = section_ranges.iter().map(|r| r.end_row).max().unwrap_or(0);
 
-    // Defensive: clamp to the layout’s message rows.
+    // Clamp to layout message rows.
     if let Some(max_row) = layout_max_row(message_row_by_id) {
         block_start_row = block_start_row.min(max_row);
         block_end_row = block_end_row.min(max_row);

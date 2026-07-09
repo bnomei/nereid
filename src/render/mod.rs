@@ -148,24 +148,19 @@ fn box_edges_from_char(ch: char) -> Option<BoxEdges> {
 
 fn box_char_from_edges(edges: BoxEdges) -> char {
     match edges.0 {
-        // Empty shouldn't normally occur for box cells; treat as blank.
         0 => ' ',
-        // Straight segments (including endpoints).
         1..=3 => UNICODE_BOX_HORIZONTAL,
         4 | 8 | 12 => UNICODE_BOX_VERTICAL,
-        // Corners.
         10 => UNICODE_BOX_TOP_LEFT,
         9 => UNICODE_BOX_TOP_RIGHT,
         6 => UNICODE_BOX_BOTTOM_LEFT,
         5 => UNICODE_BOX_BOTTOM_RIGHT,
-        // Tees.
         14 => UNICODE_BOX_TEE_RIGHT,
         13 => UNICODE_BOX_TEE_LEFT,
         11 => UNICODE_BOX_TEE_DOWN,
         7 => UNICODE_BOX_TEE_UP,
-        // Cross.
         15 => UNICODE_BOX_CROSS,
-        // Unreachable with 4 bits; keep a deterministic fallback.
+        // Unreachable 4-bit pattern; deterministic fallback.
         _ => UNICODE_BOX_CROSS,
     }
 }
