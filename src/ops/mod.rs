@@ -15,12 +15,17 @@ use std::collections::HashSet;
 use std::fmt;
 
 use crate::format::mermaid::flowchart::MermaidIdentError;
-use crate::model::seq_ast::{SequenceBlock, SequenceSection, SequenceSectionKind};
+use crate::model::seq_ast::{
+    SequenceBlock, SequenceBlockKind, SequenceSection, SequenceSectionKind,
+};
 use crate::model::{
     CategoryPath, Diagram, DiagramAst, DiagramId, DiagramKind, FlowEdge, FlowNode, FlowchartAst,
 };
 use crate::model::{ObjectId, ObjectRef, SequenceAst, SequenceMessage, SequenceMessageKind};
 use crate::model::{SequenceParticipant, SymbolAnchor, SymbolAnchorError, XRefId};
+
+/// Maximum nested block depth, matching the sequence Mermaid parser.
+pub const MAX_SEQ_BLOCK_NEST_DEPTH: usize = 8;
 
 /// Single diagram mutation tagged by AST kind (sequence, flowchart, or xref).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,6 +72,43 @@ pub enum SeqOp {
     RemoveMessage {
         message_id: ObjectId,
     },
+    AddBlock {
+        block_id: ObjectId,
+        kind: SequenceBlockKind,
+        header: Option<String>,
+        parent_block_id: Option<ObjectId>,
+        main_section_id: ObjectId,
+    },
+    UpdateBlock {
+        block_id: ObjectId,
+        patch: SeqBlockPatch,
+    },
+    RemoveBlock {
+        block_id: ObjectId,
+    },
+    AddSection {
+        section_id: ObjectId,
+        block_id: ObjectId,
+        kind: SequenceSectionKind,
+        header: Option<String>,
+    },
+    UpdateSection {
+        section_id: ObjectId,
+        patch: SeqSectionPatch,
+    },
+    RemoveSection {
+        section_id: ObjectId,
+    },
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SeqBlockPatch {
+    pub header: Option<Option<String>>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SeqSectionPatch {
+    pub header: Option<Option<String>>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -243,6 +285,8 @@ pub fn apply_ops(
                     });
                 };
                 apply_seq_op(&diagram_id, ast, seq_op, &mut delta)?;
+                // Structure validation runs after the full batch so multi-op creates can
+                // finish attaching messages before export rules are enforced.
             }
             Op::Flow(flow_op) => {
                 let DiagramAst::Flowchart(ast) = &mut new_ast else {
@@ -257,6 +301,10 @@ pub fn apply_ops(
                 return Err(ApplyError::UnsupportedOp { op_kind: OpKind::XRef });
             }
         }
+    }
+
+    if let DiagramAst::Sequence(ast) = &new_ast {
+        validate_sequence_block_structure(ast)?;
     }
 
     diagram.set_ast(new_ast).map_err(|mismatch| {
@@ -283,23 +331,73 @@ pub enum OpKind {
 pub enum ObjectKind {
     SeqParticipant,
     SeqMessage,
+    SeqBlock,
+    SeqSection,
     FlowNode,
     FlowEdge,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ApplyError {
-    Conflict { base_rev: u64, current_rev: u64 },
-    KindMismatch { diagram_kind: DiagramKind, op_kind: OpKind },
-    UnsupportedOp { op_kind: OpKind },
-    AlreadyExists { kind: ObjectKind, object_id: ObjectId },
-    NotFound { kind: ObjectKind, object_id: ObjectId },
-    MissingFlowNode { node_id: ObjectId },
-    InvalidSeqParticipantMermaidName { mermaid_name: String, reason: MermaidIdentError },
-    DuplicateSeqParticipantMermaidName { mermaid_name: String, participant_id: ObjectId },
-    InvalidFlowNodeMermaidId { mermaid_id: String, reason: MermaidIdentError },
-    DuplicateFlowNodeMermaidId { mermaid_id: String, node_id: ObjectId },
-    InvalidSymbolAnchor { source: SymbolAnchorError },
+    Conflict {
+        base_rev: u64,
+        current_rev: u64,
+    },
+    KindMismatch {
+        diagram_kind: DiagramKind,
+        op_kind: OpKind,
+    },
+    UnsupportedOp {
+        op_kind: OpKind,
+    },
+    AlreadyExists {
+        kind: ObjectKind,
+        object_id: ObjectId,
+    },
+    NotFound {
+        kind: ObjectKind,
+        object_id: ObjectId,
+    },
+    MissingFlowNode {
+        node_id: ObjectId,
+    },
+    InvalidSeqParticipantMermaidName {
+        mermaid_name: String,
+        reason: MermaidIdentError,
+    },
+    DuplicateSeqParticipantMermaidName {
+        mermaid_name: String,
+        participant_id: ObjectId,
+    },
+    InvalidFlowNodeMermaidId {
+        mermaid_id: String,
+        reason: MermaidIdentError,
+    },
+    DuplicateFlowNodeMermaidId {
+        mermaid_id: String,
+        node_id: ObjectId,
+    },
+    InvalidSymbolAnchor {
+        source: SymbolAnchorError,
+    },
+    InvalidSeqSectionKind {
+        block_id: ObjectId,
+        block_kind: SequenceBlockKind,
+        section_kind: SequenceSectionKind,
+    },
+    InvalidSeqSectionNotEmpty {
+        section_id: ObjectId,
+    },
+    InvalidSeqSectionIsMain {
+        section_id: ObjectId,
+    },
+    InvalidSeqBlockNesting {
+        block_id: ObjectId,
+        reason: String,
+    },
+    InvalidSeqBlockStructure {
+        reason: String,
+    },
 }
 
 impl fmt::Display for ApplyError {
@@ -335,6 +433,26 @@ impl fmt::Display for ApplyError {
                 write!(f, "flow node Mermaid id '{mermaid_id}' is already used by node {node_id}")
             }
             Self::InvalidSymbolAnchor { source } => write!(f, "{source}"),
+            Self::InvalidSeqSectionKind { block_id, block_kind, section_kind } => write!(
+                f,
+                "section kind {section_kind:?} is not valid under block {block_id} ({block_kind:?})"
+            ),
+            Self::InvalidSeqSectionNotEmpty { section_id } => write!(
+                f,
+                "section {section_id} still has messages; detach them before removing the section"
+            ),
+            Self::InvalidSeqSectionIsMain { section_id } => {
+                write!(f, "cannot remove main section {section_id}")
+            }
+            Self::InvalidSeqBlockNesting { block_id, reason } => {
+                write!(f, "invalid block nesting for {block_id}: {reason}")
+            }
+            Self::InvalidSeqBlockStructure { reason } => {
+                write!(
+                    f,
+                    "invalid sequence block structure: {reason} (section messages must be contiguous in order_key order)"
+                )
+            }
         }
     }
 }

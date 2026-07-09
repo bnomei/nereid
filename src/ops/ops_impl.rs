@@ -224,7 +224,228 @@ fn apply_seq_op(
             delta.record_removed(seq_message_ref(diagram_id, message_id));
             Ok(())
         }
+        SeqOp::AddBlock {
+            block_id,
+            kind,
+            header,
+            parent_block_id,
+            main_section_id,
+        } => {
+            if ast.contains_block_id(block_id) {
+                return Err(ApplyError::AlreadyExists {
+                    kind: ObjectKind::SeqBlock,
+                    object_id: block_id.clone(),
+                });
+            }
+            if ast.contains_section_id(main_section_id) {
+                return Err(ApplyError::AlreadyExists {
+                    kind: ObjectKind::SeqSection,
+                    object_id: main_section_id.clone(),
+                });
+            }
+
+            let parent_depth = if let Some(parent_id) = parent_block_id {
+                let Some(depth) = ast.block_depth(parent_id) else {
+                    return Err(ApplyError::NotFound {
+                        kind: ObjectKind::SeqBlock,
+                        object_id: parent_id.clone(),
+                    });
+                };
+                if depth >= MAX_SEQ_BLOCK_NEST_DEPTH {
+                    return Err(ApplyError::InvalidSeqBlockNesting {
+                        block_id: block_id.clone(),
+                        reason: format!(
+                            "parent nest depth {depth} already at max {MAX_SEQ_BLOCK_NEST_DEPTH}"
+                        ),
+                    });
+                }
+                depth
+            } else {
+                0
+            };
+            let _ = parent_depth;
+
+            let block = SequenceBlock::new(
+                block_id.clone(),
+                *kind,
+                header.clone(),
+                vec![SequenceSection::new(
+                    main_section_id.clone(),
+                    SequenceSectionKind::Main,
+                    None,
+                    Vec::new(),
+                )],
+                Vec::new(),
+            );
+
+            if let Some(parent_id) = parent_block_id {
+                let parent = ast.find_block_mut(parent_id).expect("parent existence checked");
+                parent.blocks_mut().push(block);
+            } else {
+                ast.blocks_mut().push(block);
+            }
+
+            delta.record_added(seq_block_ref(diagram_id, block_id));
+            delta.record_added(seq_section_ref(diagram_id, main_section_id));
+            Ok(())
+        }
+        SeqOp::UpdateBlock { block_id, patch } => {
+            let Some(block) = ast.find_block_mut(block_id) else {
+                return Err(ApplyError::NotFound {
+                    kind: ObjectKind::SeqBlock,
+                    object_id: block_id.clone(),
+                });
+            };
+            if let Some(header) = &patch.header {
+                block.set_header(header.clone());
+            }
+            delta.record_updated(seq_block_ref(diagram_id, block_id));
+            Ok(())
+        }
+        SeqOp::RemoveBlock { block_id } => {
+            let Some(removed) = ast.remove_block(block_id) else {
+                return Err(ApplyError::NotFound {
+                    kind: ObjectKind::SeqBlock,
+                    object_id: block_id.clone(),
+                });
+            };
+            record_removed_block_tree(diagram_id, &removed, delta);
+            Ok(())
+        }
+        SeqOp::AddSection {
+            section_id,
+            block_id,
+            kind,
+            header,
+        } => {
+            if ast.contains_section_id(section_id) {
+                return Err(ApplyError::AlreadyExists {
+                    kind: ObjectKind::SeqSection,
+                    object_id: section_id.clone(),
+                });
+            }
+            let Some(block) = ast.find_block(block_id) else {
+                return Err(ApplyError::NotFound {
+                    kind: ObjectKind::SeqBlock,
+                    object_id: block_id.clone(),
+                });
+            };
+            validate_section_kind_for_block(block.kind(), *kind, block_id)?;
+            if *kind == SequenceSectionKind::Main {
+                return Err(ApplyError::InvalidSeqSectionKind {
+                    block_id: block_id.clone(),
+                    block_kind: block.kind(),
+                    section_kind: *kind,
+                });
+            }
+
+            let block = ast.find_block_mut(block_id).expect("block existence checked");
+            block.sections_mut().push(SequenceSection::new(
+                section_id.clone(),
+                *kind,
+                header.clone(),
+                Vec::new(),
+            ));
+            delta.record_added(seq_section_ref(diagram_id, section_id));
+            delta.record_updated(seq_block_ref(diagram_id, block_id));
+            Ok(())
+        }
+        SeqOp::UpdateSection { section_id, patch } => {
+            let Some(section) = ast.find_section_mut(section_id) else {
+                return Err(ApplyError::NotFound {
+                    kind: ObjectKind::SeqSection,
+                    object_id: section_id.clone(),
+                });
+            };
+            if let Some(header) = &patch.header {
+                section.set_header(header.clone());
+            }
+            delta.record_updated(seq_section_ref(diagram_id, section_id));
+            Ok(())
+        }
+        SeqOp::RemoveSection { section_id } => {
+            let Some(block) = ast.find_block_for_section(section_id) else {
+                return Err(ApplyError::NotFound {
+                    kind: ObjectKind::SeqSection,
+                    object_id: section_id.clone(),
+                });
+            };
+            let block_id = block.block_id().clone();
+            let section = block
+                .sections()
+                .iter()
+                .find(|section| section.section_id() == section_id)
+                .expect("section ownership checked");
+            if section.kind() == SequenceSectionKind::Main {
+                return Err(ApplyError::InvalidSeqSectionIsMain {
+                    section_id: section_id.clone(),
+                });
+            }
+            if !section.message_ids().is_empty() {
+                return Err(ApplyError::InvalidSeqSectionNotEmpty {
+                    section_id: section_id.clone(),
+                });
+            }
+
+            let block = ast.find_block_mut(&block_id).expect("block ownership checked");
+            block.sections_mut().retain(|section| section.section_id() != section_id);
+            delta.record_removed(seq_section_ref(diagram_id, section_id));
+            delta.record_updated(seq_block_ref(diagram_id, &block_id));
+            Ok(())
+        }
     }
+}
+
+fn validate_section_kind_for_block(
+    block_kind: SequenceBlockKind,
+    section_kind: SequenceSectionKind,
+    block_id: &ObjectId,
+) -> Result<(), ApplyError> {
+    let ok = match (block_kind, section_kind) {
+        (_, SequenceSectionKind::Main) => true,
+        (SequenceBlockKind::Alt, SequenceSectionKind::Else) => true,
+        (SequenceBlockKind::Par, SequenceSectionKind::And) => true,
+        (SequenceBlockKind::Opt | SequenceBlockKind::Loop, SequenceSectionKind::Else | SequenceSectionKind::And) => {
+            false
+        }
+        (SequenceBlockKind::Alt, SequenceSectionKind::And) => false,
+        (SequenceBlockKind::Par, SequenceSectionKind::Else) => false,
+    };
+    if ok {
+        Ok(())
+    } else {
+        Err(ApplyError::InvalidSeqSectionKind {
+            block_id: block_id.clone(),
+            block_kind,
+            section_kind,
+        })
+    }
+}
+
+fn record_removed_block_tree(
+    diagram_id: &DiagramId,
+    block: &SequenceBlock,
+    delta: &mut DeltaBuilder,
+) {
+    for section in block.sections() {
+        delta.record_removed(seq_section_ref(diagram_id, section.section_id()));
+    }
+    for nested in block.blocks() {
+        record_removed_block_tree(diagram_id, nested, delta);
+    }
+    delta.record_removed(seq_block_ref(diagram_id, block.block_id()));
+}
+
+fn validate_sequence_block_structure(ast: &SequenceAst) -> Result<(), ApplyError> {
+    if ast.blocks().is_empty() {
+        return Ok(());
+    }
+    crate::format::mermaid::export_sequence_diagram(ast).map_err(|err| {
+        ApplyError::InvalidSeqBlockStructure {
+            reason: err.to_string(),
+        }
+    })?;
+    Ok(())
 }
 
 fn sort_seq_messages(ast: &mut SequenceAst) {
@@ -653,6 +874,14 @@ fn seq_participant_ref(diagram_id: &DiagramId, participant_id: &ObjectId) -> Obj
 
 fn seq_message_ref(diagram_id: &DiagramId, message_id: &ObjectId) -> ObjectRef {
     object_ref(diagram_id, &["seq", "message"], message_id)
+}
+
+fn seq_block_ref(diagram_id: &DiagramId, block_id: &ObjectId) -> ObjectRef {
+    object_ref(diagram_id, &["seq", "block"], block_id)
+}
+
+fn seq_section_ref(diagram_id: &DiagramId, section_id: &ObjectId) -> ObjectRef {
+    object_ref(diagram_id, &["seq", "section"], section_id)
 }
 
 fn flow_node_ref(diagram_id: &DiagramId, node_id: &ObjectId) -> ObjectRef {

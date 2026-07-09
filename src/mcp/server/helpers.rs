@@ -986,6 +986,40 @@ fn map_apply_error(err: ApplyError) -> ErrorData {
             "invalid symbol anchor",
             Some(serde_json::json!({ "reason": source.to_string() })),
         ),
+        ApplyError::InvalidSeqSectionKind {
+            block_id,
+            block_kind,
+            section_kind,
+        } => ErrorData::invalid_params(
+            "invalid section kind for block",
+            Some(serde_json::json!({
+                "block_id": block_id.to_string(),
+                "block_kind": format!("{block_kind:?}"),
+                "section_kind": format!("{section_kind:?}"),
+            })),
+        ),
+        ApplyError::InvalidSeqSectionNotEmpty { section_id } => ErrorData::invalid_params(
+            "section still has messages",
+            Some(serde_json::json!({ "section_id": section_id.to_string() })),
+        ),
+        ApplyError::InvalidSeqSectionIsMain { section_id } => ErrorData::invalid_params(
+            "cannot remove main section",
+            Some(serde_json::json!({ "section_id": section_id.to_string() })),
+        ),
+        ApplyError::InvalidSeqBlockNesting { block_id, reason } => ErrorData::invalid_params(
+            "invalid sequence block nesting",
+            Some(serde_json::json!({
+                "block_id": block_id.to_string(),
+                "reason": reason,
+            })),
+        ),
+        ApplyError::InvalidSeqBlockStructure { reason } => ErrorData::invalid_params(
+            "invalid sequence block structure",
+            Some(serde_json::json!({
+                "reason": reason,
+                "hint": "section messages must be contiguous in order_key order",
+            })),
+        ),
     }
 }
 

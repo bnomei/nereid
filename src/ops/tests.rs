@@ -1295,3 +1295,202 @@ fn remove_message_keeps_parent_block_when_nested_content_survives() {
     assert_eq!(ast.blocks()[0].blocks().len(), 1, "nested block should be preserved");
     export_sequence_diagram(ast).expect("export after pruning parent section");
 }
+
+#[test]
+fn apply_seq_block_ops_update_remove_and_add_section() {
+    use super::{SeqBlockPatch, SeqSectionPatch};
+    use crate::format::mermaid::sequence::export_sequence_diagram;
+    use crate::model::seq_ast::{
+        SequenceBlock, SequenceBlockKind, SequenceMessage, SequenceMessageKind, SequenceSection,
+        SequenceSectionKind,
+    };
+    use crate::model::Diagram;
+
+    let a = ObjectId::new("p:a").expect("id");
+    let b = ObjectId::new("p:b").expect("id");
+    let m1 = ObjectId::new("m:0001").expect("id");
+    let m2 = ObjectId::new("m:0002").expect("id");
+    let block_id = ObjectId::new("b:alt").expect("id");
+    let main_sec = ObjectId::new("sec:alt:main").expect("id");
+    let else_sec = ObjectId::new("sec:alt:else").expect("id");
+
+    let mut ast = SequenceAst::default();
+    ast.participants_mut().insert(a.clone(), SequenceParticipant::new("A"));
+    ast.participants_mut().insert(b.clone(), SequenceParticipant::new("B"));
+    ast.messages_mut().push(SequenceMessage::new(
+        m1.clone(),
+        a.clone(),
+        b.clone(),
+        SequenceMessageKind::Sync,
+        "hit",
+        1000,
+    ));
+    ast.messages_mut().push(SequenceMessage::new(
+        m2.clone(),
+        a.clone(),
+        b.clone(),
+        SequenceMessageKind::Sync,
+        "miss",
+        2000,
+    ));
+    ast.blocks_mut().push(SequenceBlock::new(
+        block_id.clone(),
+        SequenceBlockKind::Alt,
+        Some("cache".to_owned()),
+        vec![
+            SequenceSection::new(
+                main_sec.clone(),
+                SequenceSectionKind::Main,
+                None,
+                vec![m1.clone()],
+            ),
+            SequenceSection::new(
+                else_sec.clone(),
+                SequenceSectionKind::Else,
+                Some("miss".to_owned()),
+                vec![m2.clone()],
+            ),
+        ],
+        Vec::new(),
+    ));
+
+    let mut diagram =
+        Diagram::new(DiagramId::new("d:blocks").expect("id"), "seq", DiagramAst::Sequence(ast));
+
+    apply_ops(
+        &mut diagram,
+        0,
+        &[Op::Seq(SeqOp::UpdateBlock {
+            block_id: block_id.clone(),
+            patch: SeqBlockPatch { header: Some(Some("cache-lookup".to_owned())) },
+        })],
+    )
+    .expect("update block");
+
+    apply_ops(
+        &mut diagram,
+        1,
+        &[Op::Seq(SeqOp::UpdateSection {
+            section_id: else_sec.clone(),
+            patch: SeqSectionPatch { header: Some(Some("cache-miss".to_owned())) },
+        })],
+    )
+    .expect("update section");
+
+    let DiagramAst::Sequence(ast) = diagram.ast() else { panic!("sequence") };
+    assert_eq!(ast.find_block(&block_id).expect("block").header(), Some("cache-lookup"));
+    assert_eq!(ast.find_section(&else_sec).expect("else").header(), Some("cache-miss"));
+    export_sequence_diagram(ast).expect("export after header updates");
+
+    // Detach else messages by removing them so section can be removed, then re-add empty else via ops.
+    // First remove the else section's messages via message remove (also prunes membership).
+    apply_ops(&mut diagram, 2, &[Op::Seq(SeqOp::RemoveMessage { message_id: m2.clone() })])
+        .expect("remove else message");
+
+    // After prune, else section may be gone. Re-add else section empty, then remove it.
+    apply_ops(
+        &mut diagram,
+        3,
+        &[Op::Seq(SeqOp::AddSection {
+            section_id: ObjectId::new("sec:alt:else2").expect("id"),
+            block_id: block_id.clone(),
+            kind: SequenceSectionKind::Else,
+            header: Some("empty".to_owned()),
+        })],
+    )
+    .expect_err("empty else section must fail export validation");
+
+    apply_ops(&mut diagram, 3, &[Op::Seq(SeqOp::RemoveBlock { block_id: block_id.clone() })])
+        .expect("remove block");
+
+    let DiagramAst::Sequence(ast) = diagram.ast() else { panic!("sequence") };
+    assert!(!ast.contains_block_id(&block_id));
+    assert!(ast.messages().iter().any(|msg| msg.message_id() == &m1));
+    assert!(export_sequence_diagram(ast).is_ok());
+}
+
+#[test]
+fn apply_seq_add_block_alone_fails_export_validation_until_messages_attached() {
+    use crate::model::seq_ast::SequenceBlockKind;
+    use crate::model::Diagram;
+
+    let a = ObjectId::new("p:a").expect("id");
+    let b = ObjectId::new("p:b").expect("id");
+    let mut ast = SequenceAst::default();
+    ast.participants_mut().insert(a, SequenceParticipant::new("A"));
+    ast.participants_mut().insert(b, SequenceParticipant::new("B"));
+    let mut diagram = Diagram::new(
+        DiagramId::new("d:empty-block").expect("id"),
+        "seq",
+        DiagramAst::Sequence(ast),
+    );
+
+    let err = apply_ops(
+        &mut diagram,
+        0,
+        &[Op::Seq(SeqOp::AddBlock {
+            block_id: ObjectId::new("b:1").expect("id"),
+            kind: SequenceBlockKind::Loop,
+            header: Some("retry".to_owned()),
+            parent_block_id: None,
+            main_section_id: ObjectId::new("sec:1:main").expect("id"),
+        })],
+    )
+    .expect_err("empty block is not export-valid");
+
+    assert!(matches!(err, super::ApplyError::InvalidSeqBlockStructure { .. }));
+    assert_eq!(diagram.rev(), 0);
+}
+
+#[test]
+fn apply_seq_add_section_rejects_else_under_loop() {
+    use crate::format::mermaid::sequence::export_sequence_diagram;
+    use crate::model::seq_ast::{
+        SequenceBlock, SequenceBlockKind, SequenceMessage, SequenceMessageKind, SequenceSection,
+        SequenceSectionKind,
+    };
+    use crate::model::Diagram;
+
+    let a = ObjectId::new("p:a").expect("id");
+    let b = ObjectId::new("p:b").expect("id");
+    let m1 = ObjectId::new("m:1").expect("id");
+    let block_id = ObjectId::new("b:loop").expect("id");
+    let main_sec = ObjectId::new("sec:loop:main").expect("id");
+
+    let mut ast = SequenceAst::default();
+    ast.participants_mut().insert(a.clone(), SequenceParticipant::new("A"));
+    ast.participants_mut().insert(b.clone(), SequenceParticipant::new("B"));
+    ast.messages_mut().push(SequenceMessage::new(
+        m1.clone(),
+        a,
+        b,
+        SequenceMessageKind::Sync,
+        "again",
+        1000,
+    ));
+    ast.blocks_mut().push(SequenceBlock::new(
+        block_id.clone(),
+        SequenceBlockKind::Loop,
+        Some("retry".to_owned()),
+        vec![SequenceSection::new(main_sec, SequenceSectionKind::Main, None, vec![m1])],
+        Vec::new(),
+    ));
+    let mut diagram =
+        Diagram::new(DiagramId::new("d:loop").expect("id"), "seq", DiagramAst::Sequence(ast));
+    let DiagramAst::Sequence(seq) = diagram.ast() else { panic!("seq") };
+    export_sequence_diagram(seq).expect("baseline export");
+
+    let err = apply_ops(
+        &mut diagram,
+        0,
+        &[Op::Seq(SeqOp::AddSection {
+            section_id: ObjectId::new("sec:loop:else").expect("id"),
+            block_id,
+            kind: SequenceSectionKind::Else,
+            header: None,
+        })],
+    )
+    .expect_err("else under loop");
+
+    assert!(matches!(err, super::ApplyError::InvalidSeqSectionKind { .. }));
+}
