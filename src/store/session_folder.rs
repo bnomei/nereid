@@ -47,6 +47,10 @@ const SESSION_WRITE_LOCK_FILENAME: &str = ".nereid-session.write.lock";
 const SESSION_WRITE_LOCK_RETRY_DELAY: Duration = Duration::from_millis(10);
 const SESSION_WRITE_LOCK_TIMEOUT: Duration = Duration::from_secs(30);
 
+mod reconcile;
+
+use reconcile::{reconcile_diagram_ast, stable_id_map_from_ast};
+
 #[derive(Debug)]
 enum AsciiExportTask {
     Diagram {
@@ -1456,20 +1460,7 @@ impl SessionFolder {
             };
 
             if let Some(sidecar) = sidecar.as_ref() {
-                match &mut ast {
-                    DiagramAst::Flowchart(flow_ast) => {
-                        reconcile_flowchart_nodes(flow_ast, sidecar);
-                        reconcile_flowchart_edges(flow_ast, sidecar);
-                        reconcile_flowchart_notes(flow_ast, sidecar);
-                        reconcile_flowchart_symbols(flow_ast, sidecar);
-                    }
-                    DiagramAst::Sequence(seq_ast) => {
-                        reconcile_sequence_participants(seq_ast, sidecar);
-                        reconcile_sequence_messages(seq_ast, sidecar);
-                        reconcile_sequence_participant_notes(seq_ast, sidecar);
-                        reconcile_sequence_participant_symbols(seq_ast, sidecar);
-                    }
-                }
+                reconcile_diagram_ast(&mut ast, sidecar);
             }
 
             let mut diagram = Diagram::new(diagram_id.clone(), diagram_meta.name, ast);
