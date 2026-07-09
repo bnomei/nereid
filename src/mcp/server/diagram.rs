@@ -105,12 +105,7 @@ impl NereidMcp {
             retain_existing_selected_object_refs(candidate_session);
             refresh_xref_statuses(candidate_session);
 
-            let dangling_xref_ids = candidate_session
-                .xrefs()
-                .iter()
-                .filter(|(_, xref)| xref.status() != crate::model::XRefStatus::Ok)
-                .map(|(xref_id, _)| xref_id.to_string())
-                .collect::<Vec<_>>();
+            let dangling_xref_ids = dangling_xref_ids_for_diagram(candidate_session, &diagram_id);
 
             let identity =
                 identity_report_from_sets(&replace.previous_object_ids, &replace.next_object_ids);
@@ -190,13 +185,7 @@ impl NereidMcp {
             state.session.diagrams_mut().insert(diagram_id.clone(), candidate_diagram);
             retain_existing_selected_object_refs(&mut state.session);
             refresh_xref_statuses(&mut state.session);
-            let dangling_xref_ids = state
-                .session
-                .xrefs()
-                .iter()
-                .filter(|(_, xref)| xref.status() != crate::model::XRefStatus::Ok)
-                .map(|(xref_id, _)| xref_id.to_string())
-                .collect::<Vec<_>>();
+            let dangling_xref_ids = dangling_xref_ids_for_diagram(&state.session, &diagram_id);
             let identity =
                 identity_report_from_sets(&replace.previous_object_ids, &replace.next_object_ids);
 

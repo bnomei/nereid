@@ -942,6 +942,20 @@ fn identity_report_from_sets(
     DiagramIdentityReport { newly_allocated, dropped, preserved }
 }
 
+fn dangling_xref_ids_for_diagram(session: &Session, diagram_id: &DiagramId) -> Vec<String> {
+    session
+        .xrefs()
+        .iter()
+        .filter(|(_, xref)| {
+            if xref.status() == crate::model::XRefStatus::Ok {
+                return false;
+            }
+            xref.from().diagram_id() == diagram_id || xref.to().diagram_id() == diagram_id
+        })
+        .map(|(xref_id, _)| xref_id.to_string())
+        .collect()
+}
+
 fn map_replace_error(err: crate::store::DiagramMermaidReplaceError) -> ErrorData {
     use crate::store::DiagramMermaidReplaceError;
     match err {
