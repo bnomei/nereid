@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-07-09
+- Added sequence structure ops for alt/opt/loop/par blocks, sections, and message membership (including nested ancestor membership).
+- Added `diagram_replace_from_mermaid` with identity reconciliation (messages, blocks/sections, participants/nodes/edges) and dangling-xref reporting scoped to the target diagram.
+- Persisted sequence block/section ids in diagram sidecars so reloads and replaces keep custom structure refs when fingerprints match.
+- Hardened MCP/ops deltas and replace history so `diagram_diff` and structure consumers stay consistent after membership moves, message prune, and in-memory replace.
+
 ## [0.7.0] - 2026-07-07
 - Added a Vim/Helix-style `:` diagram switcher in the TUI with fuzzy matching, `Tab` completion, and `[SEQ]`/`[FLO]` match rows.
 - Surfaced the diagram switcher in the TUI footer/help and README key reference.

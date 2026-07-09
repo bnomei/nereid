@@ -14,7 +14,8 @@ Use Nereid when you want to:
 
 - browse and edit sequence diagrams and flowcharts from a terminal,
 - keep diagrams, walkthroughs, cross-references, selections, and active state in a local session folder,
-- expose typed MCP tools for diagram navigation, mutation, xrefs, walkthroughs, and graph queries,
+- expose typed MCP tools for diagram navigation, structured mutation (including sequence blocks), xrefs, walkthroughs, and graph queries,
+- replace Mermaid sources with identity-preserving reconcile when fingerprints still match,
 - export Mermaid sources plus text previews for reviewable, file-based workflows.
 
 Nereid is source-available for noncommercial use only. Commercial use, product use, paid service use, internal business use, redistribution, sublicensing, or modified distribution requires separate written permission. See [License](#license).
@@ -220,7 +221,7 @@ Transports:
 Tool groups:
 
 - Diagram lifecycle and reads: `diagram_list`, `diagram_current`, `diagram_open`, `diagram_delete`, `diagram_read`, `diagram_stat`, `diagram_get_ast`, `diagram_get_slice`, `diagram_render_text`, `diagram_diff`.
-- Diagram creation and mutation: `diagram_create_from_mermaid`, `diagram_replace_from_mermaid`, `diagram_propose_ops`, `diagram_apply_ops`.
+- Diagram creation and mutation: `diagram_create_from_mermaid`, `diagram_replace_from_mermaid`, `diagram_propose_ops`, `diagram_apply_ops` (sequence structure ops for blocks/sections/membership).
 - Walkthroughs: `walkthrough_list`, `walkthrough_current`, `walkthrough_open`, `walkthrough_read`, `walkthrough_stat`, `walkthrough_get_node`, `walkthrough_render_text`, `walkthrough_diff`, `walkthrough_apply_ops`.
 - Collaboration state: `attention_human_read`, `attention_agent_read`, `attention_agent_set`, `attention_agent_clear`, `follow_ai_read`, `follow_ai_set`, `selection_read`, `selection_update`, `view_read_state`.
 - Cross-references and objects: `xref_list`, `xref_neighbors`, `xref_add`, `xref_remove`, `object_read`.
@@ -237,7 +238,11 @@ Examples:
 ```text
 d:demo-flow/flow/node/n:a
 d:demo-seq/seq/message/m:0001
+d:demo-seq/seq/block/b:0000
+d:demo-seq/seq/section/sec:0000:00
 ```
+
+Prefer structure ops for local alt/opt/loop/par edits. Use `diagram_replace_from_mermaid` for bulk Mermaid rewrites; matching fingerprints keep stable ids, and the response reports preserved/dropped/new ids plus dangling xrefs on the target diagram.
 
 The reviewable schema snapshot lives at [src/mcp/server/tool_schema.snapshot.json](src/mcp/server/tool_schema.snapshot.json). Regenerate it after changing tool names, descriptions, input schemas, or output schemas:
 
@@ -255,8 +260,8 @@ The repository includes a persisted demo session in [data/demo-session](data/dem
 Playbook prompts for MCP clients live in [tests/playbooks](tests/playbooks). Example tasks include:
 
 - "From the demo index, list every nav xref that lands in a sequence diagram."
-- "In the flowchart demo with alpha/beta edges, return the local neighborhood around node A."
 - "Create a temporary flowchart diagram, delete it, and confirm it is gone from `diagram_list`."
+- "Build an alt/else block with structure ops, or replace Mermaid while preserving message ids."
 
 ## Development
 
