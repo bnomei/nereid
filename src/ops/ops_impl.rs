@@ -119,6 +119,7 @@ fn apply_seq_op(
             arrow,
             text,
             order_key,
+            section_id,
         } => {
             if ast.messages().iter().any(|m| m.message_id() == message_id) {
                 return Err(ApplyError::AlreadyExists {
@@ -138,6 +139,14 @@ fn apply_seq_op(
                     object_id: to_participant_id.clone(),
                 });
             }
+            if let Some(section_id) = section_id {
+                if !ast.contains_section_id(section_id) {
+                    return Err(ApplyError::NotFound {
+                        kind: ObjectKind::SeqSection,
+                        object_id: section_id.clone(),
+                    });
+                }
+            }
             let mut message = SequenceMessage::new(
                 message_id.clone(),
                 from_participant_id.clone(),
@@ -150,6 +159,9 @@ fn apply_seq_op(
             ast.messages_mut().push(message);
             sort_seq_messages(ast);
             delta.record_added(seq_message_ref(diagram_id, message_id));
+            if let Some(section_id) = section_id {
+                attach_message_to_section(diagram_id, ast, message_id, section_id, delta)?;
+            }
             Ok(())
         }
         SeqOp::UpdateMessage { message_id, patch } => {
@@ -222,6 +234,35 @@ fn apply_seq_op(
             }
             prune_messages_from_blocks(ast, &HashSet::from([message_id.clone()]));
             delta.record_removed(seq_message_ref(diagram_id, message_id));
+            Ok(())
+        }
+        SeqOp::SetMessageSection {
+            message_id,
+            section_id,
+        } => {
+            if !ast.messages().iter().any(|m| m.message_id() == message_id) {
+                return Err(ApplyError::NotFound {
+                    kind: ObjectKind::SeqMessage,
+                    object_id: message_id.clone(),
+                });
+            }
+            match section_id {
+                Some(section_id) => {
+                    if !ast.contains_section_id(section_id) {
+                        return Err(ApplyError::NotFound {
+                            kind: ObjectKind::SeqSection,
+                            object_id: section_id.clone(),
+                        });
+                    }
+                    attach_message_to_section(diagram_id, ast, message_id, section_id, delta)?;
+                }
+                None => {
+                    let detached = ast.detach_message_from_all_sections(message_id);
+                    if detached > 0 {
+                        delta.record_updated(seq_message_ref(diagram_id, message_id));
+                    }
+                }
+            }
             Ok(())
         }
         SeqOp::AddBlock {
@@ -394,6 +435,31 @@ fn apply_seq_op(
             Ok(())
         }
     }
+}
+
+fn attach_message_to_section(
+    diagram_id: &DiagramId,
+    ast: &mut SequenceAst,
+    message_id: &ObjectId,
+    section_id: &ObjectId,
+    delta: &mut DeltaBuilder,
+) -> Result<(), ApplyError> {
+    ast.detach_message_from_all_sections(message_id);
+    let Some(section) = ast.find_section_mut(section_id) else {
+        return Err(ApplyError::NotFound {
+            kind: ObjectKind::SeqSection,
+            object_id: section_id.clone(),
+        });
+    };
+    if !section.message_ids().contains(message_id) {
+        section.message_ids_mut().push(message_id.clone());
+    }
+    delta.record_updated(seq_message_ref(diagram_id, message_id));
+    delta.record_updated(seq_section_ref(diagram_id, section_id));
+    if let Some(block) = ast.find_block_for_section(section_id) {
+        delta.record_updated(seq_block_ref(diagram_id, block.block_id()));
+    }
+    Ok(())
 }
 
 fn validate_section_kind_for_block(

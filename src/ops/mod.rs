@@ -64,6 +64,8 @@ pub enum SeqOp {
         arrow: Option<String>,
         text: String,
         order_key: i64,
+        /// When set, attach the new message to this section after creation.
+        section_id: Option<ObjectId>,
     },
     UpdateMessage {
         message_id: ObjectId,
@@ -71,6 +73,13 @@ pub enum SeqOp {
     },
     RemoveMessage {
         message_id: ObjectId,
+    },
+    /// Attach, move, or detach a message's block-section membership.
+    ///
+    /// `section_id: None` detaches the message from every section.
+    SetMessageSection {
+        message_id: ObjectId,
+        section_id: Option<ObjectId>,
     },
     AddBlock {
         block_id: ObjectId,

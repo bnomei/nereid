@@ -1187,6 +1187,7 @@ fn mcp_op_to_internal(op: &McpOp) -> Result<Op, ErrorData> {
             arrow: arrow.clone(),
             text: text.clone(),
             order_key: *order_key,
+            section_id: None,
         }),
         McpOp::SeqUpdateMessage {
             message_id,

@@ -325,6 +325,7 @@ fn apply_seq_add_message_rejects_missing_from_participant() {
             arrow: None,
             text: "hi".to_owned(),
             order_key: 0,
+            section_id: None,
         }),
     ];
 
@@ -364,6 +365,7 @@ fn apply_seq_add_message_rejects_missing_to_participant() {
             arrow: None,
             text: "hi".to_owned(),
             order_key: 0,
+            section_id: None,
         }),
     ];
 
@@ -408,6 +410,7 @@ fn apply_seq_update_message_rejects_missing_from_participant() {
             arrow: None,
             text: "hi".to_owned(),
             order_key: 0,
+            section_id: None,
         }),
         Op::Seq(SeqOp::UpdateMessage {
             message_id,
@@ -459,6 +462,7 @@ fn apply_seq_update_message_rejects_missing_to_participant() {
             arrow: None,
             text: "hi".to_owned(),
             order_key: 0,
+            section_id: None,
         }),
         Op::Seq(SeqOp::UpdateMessage {
             message_id,
@@ -1041,6 +1045,7 @@ fn apply_seq_remove_participant_records_cascading_message_removal_in_delta() {
             arrow: None,
             text: "hi".to_owned(),
             order_key: 0,
+            section_id: None,
         }),
     ];
     apply_ops(&mut diagram, 0, &setup_ops).expect("setup apply");
@@ -1440,6 +1445,112 @@ fn apply_seq_add_block_alone_fails_export_validation_until_messages_attached() {
 
     assert!(matches!(err, super::ApplyError::InvalidSeqBlockStructure { .. }));
     assert_eq!(diagram.rev(), 0);
+}
+
+#[test]
+fn apply_seq_builds_alt_else_via_structure_and_membership_ops() {
+    use crate::format::mermaid::sequence::export_sequence_diagram;
+    use crate::model::seq_ast::{SequenceBlockKind, SequenceMessageKind, SequenceSectionKind};
+    use crate::model::Diagram;
+
+    let a = ObjectId::new("p:a").expect("id");
+    let b = ObjectId::new("p:b").expect("id");
+    let m1 = ObjectId::new("m:hit").expect("id");
+    let m2 = ObjectId::new("m:miss").expect("id");
+    let block_id = ObjectId::new("b:cache").expect("id");
+    let main_sec = ObjectId::new("sec:cache:main").expect("id");
+    let else_sec = ObjectId::new("sec:cache:else").expect("id");
+
+    let mut ast = SequenceAst::default();
+    ast.participants_mut().insert(a.clone(), SequenceParticipant::new("A"));
+    ast.participants_mut().insert(b.clone(), SequenceParticipant::new("B"));
+    let mut diagram =
+        Diagram::new(DiagramId::new("d:alt").expect("id"), "seq", DiagramAst::Sequence(ast));
+
+    let result = apply_ops(
+        &mut diagram,
+        0,
+        &[
+            Op::Seq(SeqOp::AddBlock {
+                block_id: block_id.clone(),
+                kind: SequenceBlockKind::Alt,
+                header: Some("cache".to_owned()),
+                parent_block_id: None,
+                main_section_id: main_sec.clone(),
+            }),
+            Op::Seq(SeqOp::AddSection {
+                section_id: else_sec.clone(),
+                block_id: block_id.clone(),
+                kind: SequenceSectionKind::Else,
+                header: Some("miss".to_owned()),
+            }),
+            Op::Seq(SeqOp::AddMessage {
+                message_id: m1.clone(),
+                from_participant_id: a.clone(),
+                to_participant_id: b.clone(),
+                kind: SequenceMessageKind::Sync,
+                arrow: None,
+                text: "hit".to_owned(),
+                order_key: 1000,
+                section_id: Some(main_sec.clone()),
+            }),
+            Op::Seq(SeqOp::AddMessage {
+                message_id: m2.clone(),
+                from_participant_id: a.clone(),
+                to_participant_id: b.clone(),
+                kind: SequenceMessageKind::Sync,
+                arrow: None,
+                text: "miss".to_owned(),
+                order_key: 2000,
+                section_id: Some(else_sec.clone()),
+            }),
+        ],
+    )
+    .expect("build alt/else");
+
+    assert_eq!(result.new_rev, 1);
+    assert!(result.delta.added.iter().any(|r| r.object_id() == &block_id));
+    assert!(result.delta.added.iter().any(|r| r.object_id() == &else_sec));
+
+    let DiagramAst::Sequence(ast) = diagram.ast() else { panic!("seq") };
+    assert_eq!(ast.find_section(&main_sec).expect("main").message_ids(), &[m1.clone()]);
+    assert_eq!(ast.find_section(&else_sec).expect("else").message_ids(), &[m2.clone()]);
+    let exported = export_sequence_diagram(ast).expect("export alt");
+    assert!(exported.contains("alt cache"));
+    assert!(exported.contains("else miss"));
+    assert!(exported.contains("A->>B: hit"));
+    assert!(exported.contains("A->>B: miss"));
+
+    // Move hit message into else (invalid contiguity if main empties) should fail.
+    let err = apply_ops(
+        &mut diagram,
+        1,
+        &[Op::Seq(SeqOp::SetMessageSection {
+            message_id: m1.clone(),
+            section_id: Some(else_sec.clone()),
+        })],
+    )
+    .expect_err("empty main section is invalid");
+    assert!(matches!(err, super::ApplyError::InvalidSeqBlockStructure { .. }));
+
+    // Detach miss from structure so messages are free-floating, keep block empty? would fail.
+    // Instead move both into contiguous else after re-adding hit to main order... skip.
+
+    // Detach all and remove block: detach both then remove block.
+    apply_ops(
+        &mut diagram,
+        1,
+        &[
+            Op::Seq(SeqOp::SetMessageSection { message_id: m1.clone(), section_id: None }),
+            Op::Seq(SeqOp::SetMessageSection { message_id: m2.clone(), section_id: None }),
+            Op::Seq(SeqOp::RemoveBlock { block_id: block_id.clone() }),
+        ],
+    )
+    .expect("detach and remove block");
+
+    let DiagramAst::Sequence(ast) = diagram.ast() else { panic!("seq") };
+    assert!(!ast.contains_block_id(&block_id));
+    assert_eq!(ast.messages().len(), 2);
 }
 
 #[test]
