@@ -958,8 +958,153 @@ impl NereidMcp {
             )
         })?;
         let (mut objects, mut edges) = match diagram.ast() {
-            DiagramAst::Class(_) | DiagramAst::Er(_) | DiagramAst::Gantt(_) => {
-                (Vec::new(), Vec::new())
+            DiagramAst::Class(ast) => {
+                // Object-id adjacency (class nodes + relation endpoints).
+                let mut adjacency: BTreeMap<ObjectId, BTreeSet<ObjectId>> = BTreeMap::new();
+                for id in ast.classes().keys() {
+                    adjacency.insert(id.clone(), BTreeSet::new());
+                }
+                for rel in ast.relations().values() {
+                    let from = rel.from_class_id();
+                    let to = rel.to_class_id();
+                    if adjacency.contains_key(from) && adjacency.contains_key(to) {
+                        adjacency.get_mut(from).expect("from").insert(to.clone());
+                        adjacency.get_mut(to).expect("to").insert(from.clone());
+                    }
+                }
+                let segments = center_ref_parsed.category().segments();
+                let starts: Vec<ObjectId> = match segments {
+                    [a, b] if a.as_str() == "class" && b.as_str() == "class" => {
+                        let id = center_ref_parsed.object_id().clone();
+                        if !ast.classes().contains_key(&id) {
+                            return Err(ErrorData::resource_not_found(
+                                "class not found",
+                                Some(serde_json::json!({ "class_id": id.as_str() })),
+                            ));
+                        }
+                        vec![id]
+                    }
+                    [a, b] if a.as_str() == "class" && b.as_str() == "relation" => {
+                        let rel = ast.relations().get(center_ref_parsed.object_id()).ok_or_else(
+                            || {
+                                ErrorData::resource_not_found(
+                                    "class relation not found",
+                                    Some(serde_json::json!({
+                                        "relation_id": center_ref_parsed.object_id().as_str()
+                                    })),
+                                )
+                            },
+                        )?;
+                        vec![rel.from_class_id().clone(), rel.to_class_id().clone()]
+                    }
+                    _ => {
+                        return Err(ErrorData::invalid_params(
+                            "center_ref is not a class diagram object",
+                            Some(serde_json::json!({ "center_ref": center_ref })),
+                        ));
+                    }
+                };
+                let nodes = bfs_within_radius(&adjacency, starts, max_hops);
+                let mut rel_ids = BTreeSet::new();
+                for (rid, rel) in ast.relations() {
+                    if nodes.contains(rel.from_class_id()) && nodes.contains(rel.to_class_id()) {
+                        rel_ids.insert(rid.clone());
+                    }
+                }
+                let objects = nodes
+                    .into_iter()
+                    .map(|id| format!("d:{}/class/class/{}", diagram_id.as_str(), id))
+                    .collect();
+                let edges = rel_ids
+                    .into_iter()
+                    .map(|id| format!("d:{}/class/relation/{}", diagram_id.as_str(), id))
+                    .collect();
+                (objects, edges)
+            }
+            DiagramAst::Er(ast) => {
+                let mut adjacency: BTreeMap<ObjectId, BTreeSet<ObjectId>> = BTreeMap::new();
+                for id in ast.entities().keys() {
+                    adjacency.insert(id.clone(), BTreeSet::new());
+                }
+                for rel in ast.relationships().values() {
+                    let from = rel.from_entity_id();
+                    let to = rel.to_entity_id();
+                    if adjacency.contains_key(from) && adjacency.contains_key(to) {
+                        adjacency.get_mut(from).expect("from").insert(to.clone());
+                        adjacency.get_mut(to).expect("to").insert(from.clone());
+                    }
+                }
+                let segments = center_ref_parsed.category().segments();
+                let starts: Vec<ObjectId> = match segments {
+                    [a, b] if a.as_str() == "er" && b.as_str() == "entity" => {
+                        let id = center_ref_parsed.object_id().clone();
+                        if !ast.entities().contains_key(&id) {
+                            return Err(ErrorData::resource_not_found(
+                                "entity not found",
+                                Some(serde_json::json!({ "entity_id": id.as_str() })),
+                            ));
+                        }
+                        vec![id]
+                    }
+                    [a, b] if a.as_str() == "er" && b.as_str() == "relationship" => {
+                        let rel = ast
+                            .relationships()
+                            .get(center_ref_parsed.object_id())
+                            .ok_or_else(|| {
+                                ErrorData::resource_not_found(
+                                    "relationship not found",
+                                    Some(serde_json::json!({
+                                        "relationship_id": center_ref_parsed.object_id().as_str()
+                                    })),
+                                )
+                            })?;
+                        vec![rel.from_entity_id().clone(), rel.to_entity_id().clone()]
+                    }
+                    _ => {
+                        return Err(ErrorData::invalid_params(
+                            "center_ref is not an er diagram object",
+                            Some(serde_json::json!({ "center_ref": center_ref })),
+                        ));
+                    }
+                };
+                let nodes = bfs_within_radius(&adjacency, starts, max_hops);
+                let mut rel_ids = BTreeSet::new();
+                for (rid, rel) in ast.relationships() {
+                    if nodes.contains(rel.from_entity_id()) && nodes.contains(rel.to_entity_id()) {
+                        rel_ids.insert(rid.clone());
+                    }
+                }
+                let objects = nodes
+                    .into_iter()
+                    .map(|id| format!("d:{}/er/entity/{}", diagram_id.as_str(), id))
+                    .collect();
+                let edges = rel_ids
+                    .into_iter()
+                    .map(|id| format!("d:{}/er/relationship/{}", diagram_id.as_str(), id))
+                    .collect();
+                (objects, edges)
+            }
+            DiagramAst::Gantt(ast) => {
+                // Gantt has no structural edges; return the center task (if valid) only.
+                let segments = center_ref_parsed.category().segments();
+                match segments {
+                    [a, b] if a.as_str() == "gantt" && b.as_str() == "task" => {
+                        let id = center_ref_parsed.object_id().clone();
+                        if !ast.tasks().contains_key(&id) {
+                            return Err(ErrorData::resource_not_found(
+                                "gantt task not found",
+                                Some(serde_json::json!({ "task_id": id.as_str() })),
+                            ));
+                        }
+                        (vec![format!("d:{}/gantt/task/{}", diagram_id.as_str(), id)], Vec::new())
+                    }
+                    _ => {
+                        return Err(ErrorData::invalid_params(
+                            "center_ref is not a gantt task object",
+                            Some(serde_json::json!({ "center_ref": center_ref })),
+                        ));
+                    }
+                }
             }
             DiagramAst::Flowchart(ast) => {
                 let segments = center_ref_parsed.category().segments();
