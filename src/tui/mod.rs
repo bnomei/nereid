@@ -4352,15 +4352,26 @@ fn demo_session_fallback() -> Session {
     let flow_diagram =
         Diagram::new(flow_id.clone(), "Flowchart demo", DiagramAst::Flowchart(flow_ast));
 
-    let class_mmd =
-        "classDiagram\nClass01 <|-- AveryLongClass : Cool\nClass01 : size()\nClass01 : int chimp\n";
+    let class_mmd = include_str!("../../data/demo-session/diagrams/demo-class.mmd");
     let class_ast = crate::format::mermaid::parse_class_diagram(class_mmd).expect("class parse");
     let class_id = DiagramId::new("demo-class").expect("diagram id");
     let class_diagram = Diagram::new(class_id.clone(), "Class demo", DiagramAst::Class(class_ast));
 
+    let er_mmd = include_str!("../../data/demo-session/diagrams/demo-er.mmd");
+    let er_ast = crate::format::mermaid::parse_er_diagram(er_mmd).expect("er parse");
+    let er_id = DiagramId::new("demo-er").expect("diagram id");
+    let er_diagram = Diagram::new(er_id.clone(), "ER demo", DiagramAst::Er(er_ast));
+
+    let gantt_mmd = include_str!("../../data/demo-session/diagrams/demo-gantt.mmd");
+    let gantt_ast = crate::format::mermaid::parse_gantt_diagram(gantt_mmd).expect("gantt parse");
+    let gantt_id = DiagramId::new("demo-gantt").expect("diagram id");
+    let gantt_diagram = Diagram::new(gantt_id.clone(), "Gantt demo", DiagramAst::Gantt(gantt_ast));
+
     session.diagrams_mut().insert(seq_id.clone(), seq_diagram);
     session.diagrams_mut().insert(flow_id.clone(), flow_diagram);
     session.diagrams_mut().insert(class_id, class_diagram);
+    session.diagrams_mut().insert(er_id, er_diagram);
+    session.diagrams_mut().insert(gantt_id, gantt_diagram);
     // Prefer a sequence diagram with highlight spans for default TUI hint modes.
     session.set_active_diagram_id(Some(seq_id));
 
