@@ -572,6 +572,7 @@ fn mermaid_node_shape(label: &str, shape: Option<&str>) -> String {
 
 fn delta_response_from_history(
     history: &VecDeque<LastDelta>,
+    diagram_id: &DiagramId,
     since_rev: u64,
     current_rev: u64,
 ) -> Option<DiagramDeltaResponse> {
@@ -595,6 +596,9 @@ fn delta_response_from_history(
         }
         for r in &delta.delta.updated {
             updated.insert(r.to_string());
+        }
+        if delta.diagram_metadata_updated {
+            updated.insert(diagram_meta_ref(diagram_id));
         }
 
         expected_from = delta.to_rev;
@@ -632,6 +636,10 @@ fn delta_response_from_history(
         to_rev: current_rev,
         changes,
     })
+}
+
+fn diagram_meta_ref(diagram_id: &DiagramId) -> String {
+    format!("d:{}/meta", diagram_id.as_str())
 }
 
 fn walkthrough_delta_response_from_history(

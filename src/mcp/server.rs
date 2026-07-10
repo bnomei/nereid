@@ -46,6 +46,7 @@ struct LastDelta {
     from_rev: u64,
     to_rev: u64,
     delta: crate::ops::Delta,
+    diagram_metadata_updated: bool,
 }
 
 #[derive(Debug, Clone, Default)]

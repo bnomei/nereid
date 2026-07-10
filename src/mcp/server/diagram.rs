@@ -206,13 +206,12 @@ fn stable_object_snapshots(
                 snapshots.insert(
                     object_ref(diagram_id, edge_category.clone(), edge_id),
                     format!(
-                        "from={};to={};label={:?};connector={:?};style={:?};default_edge_style={:?}",
+                        "from={};to={};label={:?};connector={:?};style={:?}",
                         edge.from_node_id(),
                         edge.to_node_id(),
                         edge.label(),
                         edge.connector(),
-                        edge.style(),
-                        flow.default_edge_style()
+                        edge.style()
                     ),
                 );
             }
@@ -226,7 +225,7 @@ fn replace_delta_from_asts(
     diagram_id: &DiagramId,
     previous_ast: &DiagramAst,
     next_ast: &DiagramAst,
-) -> crate::ops::Delta {
+) -> (crate::ops::Delta, bool) {
     let previous = stable_object_snapshots(diagram_id, previous_ast);
     let next = stable_object_snapshots(diagram_id, next_ast);
 
@@ -248,7 +247,13 @@ fn replace_delta_from_asts(
         }
     }
 
-    delta
+    let diagram_metadata_updated = matches!(
+        (previous_ast, next_ast),
+        (DiagramAst::Flowchart(previous), DiagramAst::Flowchart(next))
+            if previous.default_edge_style() != next.default_edge_style()
+    );
+
+    (delta, diagram_metadata_updated)
 }
 
 #[tool_router(router = diagram_tool_router, vis = "pub(super)")]
@@ -325,7 +330,7 @@ impl NereidMcp {
             let replace =
                 crate::store::replace_diagram_from_mermaid(&mut candidate_diagram, &mermaid)
                     .map_err(map_replace_error)?;
-            let delta =
+            let (delta, diagram_metadata_updated) =
                 replace_delta_from_asts(&diagram_id, &previous_ast, candidate_diagram.ast());
             render_diagram_unicode(&candidate_diagram).map_err(|err| {
                 ErrorData::invalid_request(
@@ -348,7 +353,12 @@ impl NereidMcp {
 
             let mut history =
                 state.delta_history.get(&diagram_id).cloned().unwrap_or_else(VecDeque::new);
-            history.push_back(LastDelta { from_rev: base_rev, to_rev: replace.new_rev, delta });
+            history.push_back(LastDelta {
+                from_rev: base_rev,
+                to_rev: replace.new_rev,
+                delta,
+                diagram_metadata_updated,
+            });
             while history.len() > DELTA_HISTORY_LIMIT {
                 history.pop_front();
             }
@@ -403,7 +413,7 @@ impl NereidMcp {
             let replace =
                 crate::store::replace_diagram_from_mermaid(&mut candidate_diagram, &mermaid)
                     .map_err(map_replace_error)?;
-            let delta =
+            let (delta, diagram_metadata_updated) =
                 replace_delta_from_asts(&diagram_id, &previous_ast, candidate_diagram.ast());
             render_diagram_unicode(&candidate_diagram).map_err(|err| {
                 ErrorData::invalid_request(
@@ -425,7 +435,12 @@ impl NereidMcp {
 
             let mut history =
                 state.delta_history.get(&diagram_id).cloned().unwrap_or_else(VecDeque::new);
-            history.push_back(LastDelta { from_rev: base_rev, to_rev: replace.new_rev, delta });
+            history.push_back(LastDelta {
+                from_rev: base_rev,
+                to_rev: replace.new_rev,
+                delta,
+                diagram_metadata_updated,
+            });
             while history.len() > DELTA_HISTORY_LIMIT {
                 history.pop_front();
             }
@@ -1543,7 +1558,8 @@ impl NereidMcp {
             return Err(delta_unavailable(since_rev, current_rev, supported_since_rev));
         }
 
-        let Some(delta) = delta_response_from_history(history, since_rev, current_rev) else {
+        let Some(delta) = delta_response_from_history(history, &diagram_id, since_rev, current_rev)
+        else {
             return Err(delta_unavailable(since_rev, current_rev, supported_since_rev));
         };
 
@@ -1628,6 +1644,7 @@ impl NereidMcp {
                     from_rev: base_rev,
                     to_rev: result.new_rev,
                     delta: result.delta.clone(),
+                    diagram_metadata_updated: false,
                 });
                 while history.len() > DELTA_HISTORY_LIMIT {
                     history.pop_front();
@@ -1717,6 +1734,7 @@ impl NereidMcp {
             from_rev: base_rev,
             to_rev: result.new_rev,
             delta: result.delta.clone(),
+            diagram_metadata_updated: false,
         });
         while history.len() > DELTA_HISTORY_LIMIT {
             history.pop_front();
