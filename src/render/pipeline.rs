@@ -126,6 +126,9 @@ pub fn render_graph_unicode_annotated_with_options(
 }
 
 /// Annotated graph paint with explicit node/edge category segments for scene-native diagrams.
+///
+/// When `highlight_categories` is `Some` (class/ER entry points), always uses scene-native paint
+/// so dashed strokes and `class/*`/`er/*` refs are never lost to the flowchart bridge.
 pub fn render_graph_unicode_annotated_with_categories(
     diagram_id: &DiagramId,
     model: &GraphModel,
@@ -133,16 +136,40 @@ pub fn render_graph_unicode_annotated_with_categories(
     highlight_categories: Option<crate::render::graph_paint::GraphHighlightCategories<'_>>,
 ) -> Result<AnnotatedRender, PipelineRenderError> {
     let layout = layout_graph(model)?;
-    if crate::render::graph_paint::graph_model_needs_scene_paint(model) {
-        // Never default to CLASS — that mis-tags flowcharts if they ever take the scene path.
-        let categories = highlight_categories
-            .unwrap_or(crate::render::graph_paint::GraphHighlightCategories::FLOW);
+    if let Some(categories) = highlight_categories {
         return Ok(crate::render::graph_paint::render_graph_model_with_compartments_annotated(
             diagram_id, model, &layout, options, categories,
         )?);
     }
+    if crate::render::graph_paint::graph_model_needs_scene_paint(model) {
+        return Ok(crate::render::graph_paint::render_graph_model_with_compartments_annotated(
+            diagram_id,
+            model,
+            &layout,
+            options,
+            crate::render::graph_paint::GraphHighlightCategories::FLOW,
+        )?);
+    }
     let ast = model.to_flowchart_ast();
     Ok(render_flowchart_unicode_annotated_with_options(diagram_id, &ast, &layout, options)?)
+}
+
+/// Class diagrams always use scene-native paint (dashed links, compartments, class/* hints).
+pub fn render_class_unicode_with_options(
+    model: &GraphModel,
+    options: RenderOptions,
+) -> Result<String, PipelineRenderError> {
+    let layout = layout_graph(model)?;
+    Ok(crate::render::graph_paint::render_graph_model_with_compartments(model, &layout, options)?)
+}
+
+/// ER diagrams always use scene-native paint (cardinality caps, er/* hints).
+pub fn render_er_unicode_with_options(
+    model: &GraphModel,
+    options: RenderOptions,
+) -> Result<String, PipelineRenderError> {
+    let layout = layout_graph(model)?;
+    Ok(crate::render::graph_paint::render_graph_model_with_compartments(model, &layout, options)?)
 }
 
 /// Layout + paint a track-family scene (sequence / gantt).
@@ -206,8 +233,21 @@ pub fn render_ast_unicode_with_options(
     ast: &DiagramAst,
     options: RenderOptions,
 ) -> Result<String, PipelineRenderError> {
-    let scene = lower_diagram_ast(ast);
-    render_scene_unicode_with_options(&scene, options)
+    match ast {
+        // Always scene-native so dashed links and non-flow caps cannot fall through to flowchart.
+        DiagramAst::Class(class) => {
+            let model = crate::render::lower::lower_class(class);
+            render_class_unicode_with_options(&model, options)
+        }
+        DiagramAst::Er(er) => {
+            let model = crate::render::lower::lower_er(er);
+            render_er_unicode_with_options(&model, options)
+        }
+        other => {
+            let scene = lower_diagram_ast(other);
+            render_scene_unicode_with_options(&scene, options)
+        }
+    }
 }
 
 /// Lower a domain AST then annotated-render through the coherent pipeline.
