@@ -68,8 +68,18 @@ pub(crate) fn stable_id_map_from_ast(ast: &DiagramAst) -> DiagramStableIdMap {
             }
             DiagramStableIdMap { by_mermaid_id: BTreeMap::new(), by_name }
         }
-        DiagramAst::Gantt(_) => {
-            DiagramStableIdMap { by_mermaid_id: BTreeMap::new(), by_name: BTreeMap::new() }
+        DiagramAst::Gantt(gantt_ast) => {
+            let mut by_mermaid_id = BTreeMap::new();
+            let mut by_name = BTreeMap::new();
+            for (task_id, task) in gantt_ast.tasks() {
+                if let Some(tag) = task.mermaid_tag().filter(|t| !t.is_empty()) {
+                    by_mermaid_id.entry(tag.to_owned()).or_insert_with(|| task_id.to_string());
+                }
+                if !task.name().is_empty() {
+                    by_name.entry(task.name().to_owned()).or_insert_with(|| task_id.to_string());
+                }
+            }
+            DiagramStableIdMap { by_mermaid_id, by_name }
         }
     }
 }
@@ -527,9 +537,34 @@ pub(crate) fn reconcile_er_notes(ast: &mut crate::model::ErAst, sidecar: &Diagra
 }
 
 pub(crate) fn reconcile_gantt_notes(ast: &mut crate::model::GanttAst, sidecar: &DiagramMeta) {
-    for (task_id, note) in &sidecar.gantt_task_notes {
-        if let Some(task) = ast.tasks_mut().get_mut(task_id) {
+    // Prefer exact id hit, then remapping via mermaid_tag (parse-order ids rebind on reorder).
+    let tag_to_current: BTreeMap<String, ObjectId> = ast
+        .tasks()
+        .iter()
+        .filter_map(|(id, task)| {
+            task.mermaid_tag().filter(|t| !t.is_empty()).map(|t| (t.to_owned(), id.clone()))
+        })
+        .collect();
+
+    // Invert stable map: old ObjectId -> mermaid tag (when the sidecar recorded tag→id).
+    let mut old_id_to_tag = BTreeMap::<ObjectId, String>::new();
+    for (tag, raw_id) in &sidecar.stable_id_map.by_mermaid_id {
+        if let Some(old_id) = parse_stable_object_id(raw_id) {
+            old_id_to_tag.entry(old_id).or_insert_with(|| tag.clone());
+        }
+    }
+
+    for (note_task_id, note) in &sidecar.gantt_task_notes {
+        if let Some(task) = ast.tasks_mut().get_mut(note_task_id) {
             task.set_note(Some(note.clone()));
+            continue;
+        }
+        if let Some(tag) = old_id_to_tag.get(note_task_id) {
+            if let Some(current_id) = tag_to_current.get(tag) {
+                if let Some(task) = ast.tasks_mut().get_mut(current_id) {
+                    task.set_note(Some(note.clone()));
+                }
+            }
         }
     }
     for (lane_id, note) in &sidecar.gantt_lane_notes {
