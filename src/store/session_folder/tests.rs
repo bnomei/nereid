@@ -16,17 +16,18 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use rstest::{fixture, rstest};
 
 use super::{
-    DiagramMeta, DiagramStableIdMap, DiagramXRef, SessionFolder, SessionMeta, SessionMetaDiagram,
-    StoreError, XRefStatus as StoreXRefStatus,
+    replace_diagram_from_mermaid, DiagramMeta, DiagramStableIdMap, DiagramXRef, SessionFolder,
+    SessionMeta, SessionMetaDiagram, StoreError, XRefStatus as StoreXRefStatus,
 };
 use crate::format::mermaid::{export_flowchart, export_sequence_diagram};
 use crate::layout::{layout_flowchart, layout_sequence};
 use crate::model::{
-    CategoryPath, ClassAst, ClassNode, Diagram, DiagramAst, DiagramId, DiagramKind, ErAst,
-    ErEntity, FlowEdge, FlowNode, FlowchartAst, ObjectId, ObjectRef, SequenceAst, SequenceMessage,
-    SequenceMessageKind, SequenceParticipant, Session, SessionId, SymbolAnchor, Walkthrough,
-    WalkthroughEdge, WalkthroughId, WalkthroughNode, WalkthroughNodeId, XRef, XRefId,
-    XRefStatus as ModelXRefStatus,
+    CategoryPath, ClassAst, ClassNode, ClassRelation, ClassRelationKind, Diagram, DiagramAst,
+    DiagramId, DiagramKind, ErAst, ErCardinality, ErEntity, ErRelationship, ErStroke, FlowEdge,
+    FlowNode, FlowchartAst, GanttAst, GanttSection, GanttTask, GanttTaskStart, ObjectId, ObjectRef,
+    SequenceAst, SequenceMessage, SequenceMessageKind, SequenceParticipant, Session, SessionId,
+    SymbolAnchor, Walkthrough, WalkthroughEdge, WalkthroughId, WalkthroughNode, WalkthroughNodeId,
+    XRef, XRefId, XRefStatus as ModelXRefStatus,
 };
 use crate::render::{
     render_flowchart_unicode, render_sequence_unicode, render_walkthrough_unicode,
@@ -423,6 +424,7 @@ fn save_diagram_meta_stores_relative_paths_and_load_resolves_them(ctx: SessionFo
         stable_id_map: DiagramStableIdMap {
             by_mermaid_id,
             by_name: std::collections::BTreeMap::new(),
+            by_fingerprint: std::collections::BTreeMap::new(),
         },
         xrefs: vec![DiagramXRef {
             xref_id: "x1".to_owned(),
@@ -433,6 +435,9 @@ fn save_diagram_meta_stores_relative_paths_and_load_resolves_them(ctx: SessionFo
             status: StoreXRefStatus::DanglingTo,
         }],
         flow_edges: Vec::new(),
+        class_relations: Vec::new(),
+        er_relationships: Vec::new(),
+        gantt_sections: Vec::new(),
         sequence_messages: Vec::new(),
         sequence_blocks: Vec::new(),
         default_symbol_repository_id: None,
@@ -471,6 +476,9 @@ fn save_diagram_meta_rejects_paths_outside_session(ctx: SessionFolderTestCtx) {
         stable_id_map: DiagramStableIdMap::default(),
         xrefs: Vec::new(),
         flow_edges: Vec::new(),
+        class_relations: Vec::new(),
+        er_relationships: Vec::new(),
+        gantt_sections: Vec::new(),
         sequence_messages: Vec::new(),
         sequence_blocks: Vec::new(),
         default_symbol_repository_id: None,
@@ -1499,6 +1507,463 @@ fn save_and_load_session_round_trips_class_and_er_notes_via_sidecar(ctx: Session
         }
         other => panic!("expected er diagram, got {other:?}"),
     }
+}
+
+#[rstest]
+fn save_and_load_preserves_class_er_and_gantt_stable_ids(ctx: SessionFolderTestCtx) {
+    let folder = &ctx.folder;
+    let mut session = Session::new(SessionId::new("s:new-kinds").unwrap());
+
+    let class_diagram_id = DiagramId::new("d-class-stable").unwrap();
+    let class_a = ObjectId::new("class:domain-a").unwrap();
+    let class_b = ObjectId::new("class:domain-b").unwrap();
+    let class_relation_id = ObjectId::new("relation:domain-link").unwrap();
+    let mut class_ast = ClassAst::default();
+    let mut class_node = ClassNode::new("A");
+    class_node.set_note(Some("class note"));
+    class_ast.classes_mut().insert(class_a.clone(), class_node);
+    class_ast.classes_mut().insert(class_b.clone(), ClassNode::new("B"));
+    class_ast.relations_mut().insert(
+        class_relation_id.clone(),
+        ClassRelation::new(class_a.clone(), class_b.clone(), ClassRelationKind::Association)
+            .with_label(Some("links"))
+            .with_raw_connector(Some("-->")),
+    );
+    session.diagrams_mut().insert(
+        class_diagram_id.clone(),
+        Diagram::new(class_diagram_id, "Class", DiagramAst::Class(class_ast)),
+    );
+
+    let er_diagram_id = DiagramId::new("d-er-stable").unwrap();
+    let er_customer = ObjectId::new("entity:customer-stable").unwrap();
+    let er_order = ObjectId::new("entity:order-stable").unwrap();
+    let er_relationship_id = ObjectId::new("relationship:places-stable").unwrap();
+    let mut er_ast = ErAst::default();
+    let mut customer = ErEntity::new("CUSTOMER");
+    customer.set_note(Some("entity note"));
+    er_ast.entities_mut().insert(er_customer.clone(), customer);
+    er_ast.entities_mut().insert(er_order.clone(), ErEntity::new("ORDER"));
+    er_ast.relationships_mut().insert(
+        er_relationship_id.clone(),
+        ErRelationship::new(
+            er_customer.clone(),
+            er_order.clone(),
+            ErCardinality::ExactlyOne,
+            ErCardinality::ZeroOrMore,
+        )
+        .with_stroke(ErStroke::Identifying)
+        .with_label(Some("places"))
+        .with_raw_connector(Some("||--o{")),
+    );
+    session
+        .diagrams_mut()
+        .insert(er_diagram_id.clone(), Diagram::new(er_diagram_id, "ER", DiagramAst::Er(er_ast)));
+
+    let gantt_diagram_id = DiagramId::new("d-gantt-stable").unwrap();
+    let task_a = ObjectId::new("task:stable-a").unwrap();
+    let task_b = ObjectId::new("task:stable-b").unwrap();
+    let section_id = ObjectId::new("section:stable-plan").unwrap();
+    let mut gantt_ast = GanttAst::default();
+    gantt_ast.set_date_format(Some("YYYY-MM-DD"));
+    let mut first = GanttTask::new(
+        task_a.clone(),
+        "First",
+        GanttTaskStart::Date("2026-01-01".to_owned()),
+        2,
+        "2d",
+    )
+    .with_mermaid_tag(Some("a"));
+    first.set_note(Some("task note"));
+    gantt_ast.tasks_mut().insert(task_a.clone(), first);
+    gantt_ast.tasks_mut().insert(
+        task_b.clone(),
+        GanttTask::new(task_b.clone(), "Second", GanttTaskStart::After(task_a.clone()), 3, "3d")
+            .with_mermaid_tag(Some("b")),
+    );
+    let mut section = GanttSection::new(section_id.clone(), "Plan");
+    *section.task_ids_mut() = vec![task_a.clone(), task_b.clone()];
+    gantt_ast.sections_mut().push(section);
+    session.diagrams_mut().insert(
+        gantt_diagram_id.clone(),
+        Diagram::new(gantt_diagram_id, "Gantt", DiagramAst::Gantt(gantt_ast)),
+    );
+
+    folder.save_session(&session).unwrap();
+    let loaded = folder.load_session().unwrap();
+
+    assert_eq!(loaded, session);
+    let DiagramAst::Class(class) =
+        loaded.diagrams().get(&DiagramId::new("d-class-stable").unwrap()).unwrap().ast()
+    else {
+        panic!("expected class diagram");
+    };
+    assert!(class.classes().contains_key(&class_a));
+    assert!(class.relations().contains_key(&class_relation_id));
+
+    let DiagramAst::Er(er) =
+        loaded.diagrams().get(&DiagramId::new("d-er-stable").unwrap()).unwrap().ast()
+    else {
+        panic!("expected ER diagram");
+    };
+    assert!(er.entities().contains_key(&er_customer));
+    assert!(er.relationships().contains_key(&er_relationship_id));
+
+    let DiagramAst::Gantt(gantt) =
+        loaded.diagrams().get(&DiagramId::new("d-gantt-stable").unwrap()).unwrap().ast()
+    else {
+        panic!("expected Gantt diagram");
+    };
+    assert!(gantt.tasks().contains_key(&task_a));
+    assert_eq!(gantt.sections()[0].section_id(), &section_id);
+    assert!(matches!(
+        gantt.tasks().get(&task_b).unwrap().start(),
+        GanttTaskStart::After(dependency) if dependency == &task_a
+    ));
+}
+
+#[test]
+fn replace_class_mermaid_preserves_relation_ids_across_reorder_and_insertion() {
+    let class_a = ObjectId::new("class:a").unwrap();
+    let class_b = ObjectId::new("class:b").unwrap();
+    let class_c = ObjectId::new("class:c").unwrap();
+    let relation_ab = ObjectId::new("relation:ab").unwrap();
+    let relation_bc = ObjectId::new("relation:bc").unwrap();
+    let mut ast = ClassAst::default();
+    ast.classes_mut().insert(class_a.clone(), ClassNode::new("A"));
+    ast.classes_mut().insert(class_b.clone(), ClassNode::new("B"));
+    ast.classes_mut().insert(class_c.clone(), ClassNode::new("C"));
+    ast.relations_mut().insert(
+        relation_ab.clone(),
+        ClassRelation::new(class_a.clone(), class_b.clone(), ClassRelationKind::Association)
+            .with_label(Some("ab"))
+            .with_raw_connector(Some("-->")),
+    );
+    ast.relations_mut().insert(
+        relation_bc.clone(),
+        ClassRelation::new(class_b.clone(), class_c.clone(), ClassRelationKind::Association)
+            .with_label(Some("bc"))
+            .with_raw_connector(Some("-->")),
+    );
+    let mut diagram =
+        Diagram::new(DiagramId::new("d-class").unwrap(), "Class", DiagramAst::Class(ast));
+
+    replace_diagram_from_mermaid(
+        &mut diagram,
+        "classDiagram\nC --> A : ca\nB --> C : bc\nA --> B : ab\n",
+    )
+    .unwrap();
+
+    let DiagramAst::Class(ast) = diagram.ast() else { panic!("expected class") };
+    let ab = ast.relations().get(&relation_ab).expect("stable AB relation");
+    assert_eq!(ab.from_class_id(), &class_a);
+    assert_eq!(ab.to_class_id(), &class_b);
+    let bc = ast.relations().get(&relation_bc).expect("stable BC relation");
+    assert_eq!(bc.from_class_id(), &class_b);
+    assert_eq!(bc.to_class_id(), &class_c);
+    assert_eq!(ast.relations().len(), 3);
+}
+
+#[test]
+fn replace_er_mermaid_preserves_relationship_ids_across_reorder_and_insertion() {
+    let entity_a = ObjectId::new("entity:a").unwrap();
+    let entity_b = ObjectId::new("entity:b").unwrap();
+    let entity_c = ObjectId::new("entity:c").unwrap();
+    let relationship_ab = ObjectId::new("relationship:ab").unwrap();
+    let relationship_bc = ObjectId::new("relationship:bc").unwrap();
+    let mut ast = ErAst::default();
+    ast.entities_mut().insert(entity_a.clone(), ErEntity::new("A"));
+    ast.entities_mut().insert(entity_b.clone(), ErEntity::new("B"));
+    ast.entities_mut().insert(entity_c.clone(), ErEntity::new("C"));
+    ast.relationships_mut().insert(
+        relationship_ab.clone(),
+        ErRelationship::new(
+            entity_a.clone(),
+            entity_b.clone(),
+            ErCardinality::ExactlyOne,
+            ErCardinality::ZeroOrMore,
+        )
+        .with_label(Some("ab")),
+    );
+    ast.relationships_mut().insert(
+        relationship_bc.clone(),
+        ErRelationship::new(
+            entity_b.clone(),
+            entity_c.clone(),
+            ErCardinality::ExactlyOne,
+            ErCardinality::ZeroOrMore,
+        )
+        .with_label(Some("bc")),
+    );
+    let mut diagram = Diagram::new(DiagramId::new("d-er").unwrap(), "ER", DiagramAst::Er(ast));
+
+    replace_diagram_from_mermaid(
+        &mut diagram,
+        "erDiagram\nC ||--o{ A : ca\nB ||--o{ C : bc\nA ||--o{ B : ab\n",
+    )
+    .unwrap();
+
+    let DiagramAst::Er(ast) = diagram.ast() else { panic!("expected ER") };
+    let ab = ast.relationships().get(&relationship_ab).expect("stable AB relationship");
+    assert_eq!(ab.from_entity_id(), &entity_a);
+    assert_eq!(ab.to_entity_id(), &entity_b);
+    let bc = ast.relationships().get(&relationship_bc).expect("stable BC relationship");
+    assert_eq!(bc.from_entity_id(), &entity_b);
+    assert_eq!(bc.to_entity_id(), &entity_c);
+    assert_eq!(ast.relationships().len(), 3);
+}
+
+#[test]
+fn replace_gantt_mermaid_preserves_task_and_section_ids_across_section_reorder() {
+    let task_a = ObjectId::new("task:a-stable").unwrap();
+    let task_b = ObjectId::new("task:b-stable").unwrap();
+    let task_c = ObjectId::new("task:c-stable").unwrap();
+    let section_first = ObjectId::new("section:first-stable").unwrap();
+    let section_second = ObjectId::new("section:second-stable").unwrap();
+    let mut ast = GanttAst::default();
+    ast.set_date_format(Some("YYYY-MM-DD"));
+    let mut a =
+        GanttTask::new(task_a.clone(), "A", GanttTaskStart::Date("2026-01-01".to_owned()), 2, "2d")
+            .with_mermaid_tag(Some("a"));
+    a.set_note(Some("keep with A"));
+    ast.tasks_mut().insert(task_a.clone(), a);
+    ast.tasks_mut().insert(
+        task_b.clone(),
+        GanttTask::new(task_b.clone(), "B", GanttTaskStart::After(task_a.clone()), 2, "2d")
+            .with_mermaid_tag(Some("b")),
+    );
+    ast.tasks_mut().insert(
+        task_c.clone(),
+        GanttTask::new(task_c.clone(), "C", GanttTaskStart::Date("2026-01-03".to_owned()), 1, "1d")
+            .with_mermaid_tag(Some("c")),
+    );
+    let mut first = GanttSection::new(section_first.clone(), "First");
+    *first.task_ids_mut() = vec![task_a.clone(), task_b.clone()];
+    let mut second = GanttSection::new(section_second.clone(), "Second");
+    *second.task_ids_mut() = vec![task_c.clone()];
+    *ast.sections_mut() = vec![first, second];
+    let mut diagram =
+        Diagram::new(DiagramId::new("d-gantt").unwrap(), "Gantt", DiagramAst::Gantt(ast));
+
+    replace_diagram_from_mermaid(
+        &mut diagram,
+        "gantt\ndateFormat YYYY-MM-DD\nsection Second\nC :c, 2026-01-03, 1d\nsection First\nA :a, 2026-01-01, 2d\nB :b, after a, 2d\n",
+    )
+    .unwrap();
+
+    let DiagramAst::Gantt(ast) = diagram.ast() else { panic!("expected Gantt") };
+    assert_eq!(ast.tasks().get(&task_a).unwrap().note(), Some("keep with A"));
+    assert!(matches!(
+        ast.tasks().get(&task_b).unwrap().start(),
+        GanttTaskStart::After(dependency) if dependency == &task_a
+    ));
+    assert_eq!(ast.sections()[0].section_id(), &section_second);
+    assert_eq!(ast.sections()[1].section_id(), &section_first);
+}
+
+#[test]
+fn replace_gantt_mermaid_does_not_let_inserted_task_steal_parse_order_id() {
+    let ast = crate::format::mermaid::parse_gantt_diagram(
+        "gantt\nsection Main\nA :a, 2026-01-01, 2d\nB :b, after a, 2d\n",
+    )
+    .unwrap();
+    let task_a = ast
+        .tasks()
+        .iter()
+        .find_map(|(id, task)| (task.mermaid_tag() == Some("a")).then_some(id.clone()))
+        .unwrap();
+    let task_b = ast
+        .tasks()
+        .iter()
+        .find_map(|(id, task)| (task.mermaid_tag() == Some("b")).then_some(id.clone()))
+        .unwrap();
+    let mut diagram =
+        Diagram::new(DiagramId::new("d-gantt-insert").unwrap(), "Gantt", DiagramAst::Gantt(ast));
+
+    replace_diagram_from_mermaid(
+        &mut diagram,
+        "gantt\nsection Main\nNew :n, 2025-12-31, 1d\nA :a, 2026-01-01, 2d\nB :b, after a, 2d\n",
+    )
+    .unwrap();
+
+    let DiagramAst::Gantt(ast) = diagram.ast() else { panic!("expected Gantt") };
+    assert_eq!(ast.tasks().get(&task_a).and_then(GanttTask::mermaid_tag), Some("a"));
+    assert_eq!(ast.tasks().get(&task_b).and_then(GanttTask::mermaid_tag), Some("b"));
+    let new_id = ast
+        .tasks()
+        .iter()
+        .find_map(|(id, task)| (task.mermaid_tag() == Some("n")).then_some(id))
+        .unwrap();
+    assert_ne!(new_id, &task_a);
+    assert_ne!(new_id, &task_b);
+    assert!(matches!(
+        ast.tasks().get(&task_b).unwrap().start(),
+        GanttTaskStart::After(dependency) if dependency == &task_a
+    ));
+}
+
+#[test]
+fn replace_gantt_mermaid_preserves_untagged_duplicate_name_tasks_by_fingerprint() {
+    let mut ast = crate::format::mermaid::parse_gantt_diagram(
+        "gantt\ndateFormat YYYY-MM-DD\nsection Main\nReview :2026-01-01, 2d\nReview :2026-01-10, 4d\n",
+    )
+    .unwrap();
+    let early_id = ast
+        .tasks()
+        .iter()
+        .find_map(|(id, task)| {
+            matches!(task.start(), GanttTaskStart::Date(date) if date == "2026-01-01")
+                .then_some(id.clone())
+        })
+        .unwrap();
+    let late_id = ast
+        .tasks()
+        .iter()
+        .find_map(|(id, task)| {
+            matches!(task.start(), GanttTaskStart::Date(date) if date == "2026-01-10")
+                .then_some(id.clone())
+        })
+        .unwrap();
+    ast.tasks_mut().get_mut(&early_id).unwrap().set_note(Some("early review"));
+    ast.tasks_mut().get_mut(&late_id).unwrap().set_note(Some("late review"));
+    let mut diagram = Diagram::new(
+        DiagramId::new("d-gantt-duplicates").unwrap(),
+        "Gantt",
+        DiagramAst::Gantt(ast),
+    );
+
+    replace_diagram_from_mermaid(
+        &mut diagram,
+        "gantt\ndateFormat YYYY-MM-DD\nsection Main\nReview :2026-01-10, 4d\nReview :2026-01-01, 2d\n",
+    )
+    .unwrap();
+
+    let DiagramAst::Gantt(ast) = diagram.ast() else { panic!("expected Gantt") };
+    assert_eq!(ast.tasks()[&early_id].note(), Some("early review"));
+    assert!(matches!(
+        ast.tasks()[&early_id].start(),
+        GanttTaskStart::Date(date) if date == "2026-01-01"
+    ));
+    assert_eq!(ast.tasks()[&late_id].note(), Some("late review"));
+    assert!(matches!(
+        ast.tasks()[&late_id].start(),
+        GanttTaskStart::Date(date) if date == "2026-01-10"
+    ));
+}
+
+#[test]
+fn replace_gantt_mermaid_preserves_identical_untagged_tasks_across_sections() {
+    let mut ast = crate::format::mermaid::parse_gantt_diagram(
+        "gantt\ndateFormat YYYY-MM-DD\nsection Alpha\nReview :2026-01-01, 2d\nsection Beta\nReview :2026-01-01, 2d\n",
+    )
+    .unwrap();
+    let alpha_id = ast.sections()[0].task_ids()[0].clone();
+    let beta_id = ast.sections()[1].task_ids()[0].clone();
+    ast.tasks_mut().get_mut(&alpha_id).unwrap().set_note(Some("alpha review"));
+    ast.tasks_mut().get_mut(&beta_id).unwrap().set_note(Some("beta review"));
+    let mut diagram =
+        Diagram::new(DiagramId::new("d-gantt-identical").unwrap(), "Gantt", DiagramAst::Gantt(ast));
+
+    replace_diagram_from_mermaid(
+        &mut diagram,
+        "gantt\ndateFormat YYYY-MM-DD\nsection Beta\nReview :2026-01-01, 2d\nsection Alpha\nReview :2026-01-01, 2d\n",
+    )
+    .unwrap();
+
+    let DiagramAst::Gantt(ast) = diagram.ast() else { panic!("expected Gantt") };
+    assert_eq!(ast.tasks()[&alpha_id].note(), Some("alpha review"));
+    assert_eq!(ast.tasks()[&beta_id].note(), Some("beta review"));
+    assert_eq!(ast.sections()[0].name(), "Beta");
+    assert_eq!(ast.sections()[0].task_ids(), &[beta_id]);
+    assert_eq!(ast.sections()[1].name(), "Alpha");
+    assert_eq!(ast.sections()[1].task_ids(), &[alpha_id]);
+}
+
+#[test]
+fn replace_gantt_mermaid_preserves_section_id_when_task_is_inserted() {
+    let section_id = ObjectId::new("section:build-stable").unwrap();
+    let task_id = ObjectId::new("task:design-stable").unwrap();
+    let mut ast = GanttAst::default();
+    ast.tasks_mut().insert(
+        task_id.clone(),
+        GanttTask::new(
+            task_id.clone(),
+            "Design",
+            GanttTaskStart::Date("2026-01-01".to_owned()),
+            2,
+            "2d",
+        )
+        .with_mermaid_tag(Some("design")),
+    );
+    let mut section = GanttSection::new(section_id.clone(), "Build");
+    section.task_ids_mut().push(task_id);
+    ast.sections_mut().push(section);
+    let mut diagram = Diagram::new(
+        DiagramId::new("d-gantt-section-insert").unwrap(),
+        "Gantt",
+        DiagramAst::Gantt(ast),
+    );
+
+    replace_diagram_from_mermaid(
+        &mut diagram,
+        "gantt\ndateFormat YYYY-MM-DD\nsection Build\nDesign :design, 2026-01-01, 2d\nShip :ship, after design, 1d\n",
+    )
+    .unwrap();
+
+    let DiagramAst::Gantt(ast) = diagram.ast() else { panic!("expected Gantt") };
+    assert_eq!(ast.sections()[0].section_id(), &section_id);
+    assert_eq!(ast.sections()[0].task_ids().len(), 2);
+}
+
+#[rstest]
+fn load_migrates_legacy_gantt_lane_notes_xrefs_and_selection(ctx: SessionFolderTestCtx) {
+    let folder = &ctx.folder;
+    let diagram_id = DiagramId::new("gantt-legacy-lanes").unwrap();
+    let mut ast = crate::format::mermaid::parse_gantt_diagram(
+        "gantt\ndateFormat YYYY-MM-DD\nsection Build\nDesign :design, 2026-01-01, 8d\n",
+    )
+    .unwrap();
+    let task_id = ast.sections()[0].task_ids()[0].clone();
+    let canonical_lane_id = ObjectId::new("lane:2026-01-01").unwrap();
+    ast.set_lane_note(canonical_lane_id.clone(), Some("legacy kickoff"));
+    let mut session = Session::new(SessionId::new("s:gantt-legacy-lanes").unwrap());
+    session.diagrams_mut().insert(
+        diagram_id.clone(),
+        Diagram::new(diagram_id.clone(), "Gantt", DiagramAst::Gantt(ast)),
+    );
+    let lane_ref = ObjectRef::new(
+        diagram_id.clone(),
+        CategoryPath::new(vec!["gantt".to_owned(), "lane".to_owned()]).unwrap(),
+        canonical_lane_id.clone(),
+    );
+    let task_ref = ObjectRef::new(
+        diagram_id.clone(),
+        CategoryPath::new(vec!["gantt".to_owned(), "task".to_owned()]).unwrap(),
+        task_id,
+    );
+    session.selected_object_refs_mut().insert(lane_ref.clone());
+    let xref_id = XRefId::new("x:legacy-lane").unwrap();
+    session.xrefs_mut().insert(
+        xref_id.clone(),
+        XRef::new(lane_ref.clone(), task_ref, "anchors", ModelXRefStatus::Ok),
+    );
+    folder.save_session(&session).unwrap();
+
+    let meta_path = folder.meta_path();
+    let meta = std::fs::read_to_string(&meta_path).unwrap();
+    std::fs::write(&meta_path, meta.replace("lane:2026-01-01", "lane:0000")).unwrap();
+    let mmd_path = folder.default_diagram_mmd_path(&diagram_id);
+    let sidecar_path = folder.diagram_meta_path(&mmd_path).unwrap();
+    let sidecar = std::fs::read_to_string(&sidecar_path).unwrap();
+    std::fs::write(&sidecar_path, sidecar.replace("lane:2026-01-01", "lane:0000")).unwrap();
+
+    let loaded = folder.load_session().unwrap();
+    let DiagramAst::Gantt(ast) = loaded.diagrams()[&diagram_id].ast() else {
+        panic!("expected Gantt")
+    };
+    assert_eq!(ast.lane_note(&canonical_lane_id), Some("legacy kickoff"));
+    assert!(loaded.selected_object_refs().contains(&lane_ref));
+    assert_eq!(loaded.xrefs()[&xref_id].from(), &lane_ref);
+    assert_eq!(loaded.xrefs()[&xref_id].status(), ModelXRefStatus::Ok);
 }
 
 #[rstest]

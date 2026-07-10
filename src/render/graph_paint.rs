@@ -377,6 +377,11 @@ pub(crate) fn inter_layer_corridor_widths(
             continue;
         };
         if from_l == to_l {
+            if edge.from_node_id() == edge.to_node_id() {
+                if let Some(gap) = gaps.get_mut(from_l) {
+                    *gap = (*gap).max(edge_corridor_need(edge));
+                }
+            }
             continue;
         }
         let need = edge_corridor_need(edge);
@@ -430,7 +435,21 @@ fn render_graph_model_with_compartments_inner(
     }
 
     let gap_widths = inter_layer_corridor_widths(model, layout);
-    let (layer_x0, width) = layer_x0_from_metrics(&layer_inner_widths, &gap_widths);
+    let (layer_x0, base_width) = layer_x0_from_metrics(&layer_inner_widths, &gap_widths);
+    let last_layer = layout.layers().len().saturating_sub(1);
+    let trailing_self_loop_width = model
+        .edges()
+        .values()
+        .filter(|edge| edge.from_node_id() == edge.to_node_id())
+        .filter(|edge| {
+            layout
+                .placement(edge.from_node_id())
+                .is_some_and(|placement| placement.layer() == last_layer)
+        })
+        .map(edge_corridor_need)
+        .max()
+        .unwrap_or(0);
+    let width = base_width.saturating_add(trailing_self_loop_width);
 
     #[derive(Clone, Copy)]
     struct Placed {
@@ -499,6 +518,55 @@ fn render_graph_model_with_compartments_inner(
             continue;
         };
         let spans = edge_spans.entry(edge_id.clone()).or_default();
+
+        if edge.from_node_id() == edge.to_node_id() {
+            let layer = layout.placement(edge.from_node_id()).map(|p| p.layer()).unwrap_or(0);
+            let loop_x = if layer < gap_widths.len() {
+                from.x1.saturating_add(gap_widths[layer]).min(width.saturating_sub(1))
+            } else {
+                width.saturating_sub(1)
+            };
+            let corridor_start = from.x1.saturating_add(1);
+            if corridor_start <= loop_x {
+                draw_hline_stroke(&mut canvas, corridor_start, loop_x, from.y0, edge.stroke())?;
+                draw_hline_stroke(&mut canvas, corridor_start, loop_x, from.y1, edge.stroke())?;
+                draw_vline_stroke(&mut canvas, loop_x, from.y0, from.y1, edge.stroke())?;
+                push_hline_span(spans, from.y0, corridor_start, loop_x);
+                push_hline_span(spans, from.y1, corridor_start, loop_x);
+                push_vline_spans(spans, loop_x, from.y0, from.y1);
+
+                if let Some(ch) = edge.start_cap().glyph(1, 0) {
+                    pending_caps.push(PendingCap { x: corridor_start, y: from.y0, ch });
+                    spans.push((from.y0, corridor_start, corridor_start));
+                }
+                if let Some(ch) = edge.end_cap().glyph(1, 0) {
+                    pending_caps.push(PendingCap { x: corridor_start, y: from.y1, ch });
+                    spans.push((from.y1, corridor_start, corridor_start));
+                }
+                if let Some(label) = edge.label() {
+                    let label_left = corridor_start
+                        .saturating_add(usize::from(edge.start_cap() != CapKind::None))
+                        .saturating_add(GRAPH_EDGE_LABEL_SIDE_PAD);
+                    let label_right = loop_x.saturating_sub(GRAPH_EDGE_LABEL_SIDE_PAD);
+                    if label_left <= label_right {
+                        let max_label = label_right.saturating_sub(label_left).saturating_add(1);
+                        let clipped = truncate_with_ellipsis(label, max_label);
+                        let clipped_len = text_len(&clipped);
+                        if clipped_len > 0 {
+                            let label_x = label_left
+                                .saturating_add(max_label.saturating_sub(clipped_len) / 2);
+                            pending_labels.push((label_x, from.y0, clipped));
+                            spans.push((
+                                from.y0,
+                                label_x,
+                                label_x.saturating_add(clipped_len.saturating_sub(1)),
+                            ));
+                        }
+                    }
+                }
+            }
+            continue;
+        }
 
         let left_to_right = from.x1 < to.x0;
         let right_to_left = to.x1 < from.x0;
@@ -789,6 +857,7 @@ mod tests {
             CapKind::ExactlyOne,
             CapKind::CrowFoot,
             CapKind::ZeroOrOne,
+            CapKind::ZeroOrMore,
         ] {
             let ch = graph_cap_glyph(kind, 1, 0).expect("glyph");
             assert!(ch.len_utf8() > 0);
@@ -887,6 +956,10 @@ mod tests {
                 | '⊃'
                 | '∪'
                 | '∩'
+                | '⋉'
+                | '⋊'
+                | '⋏'
+                | '⋎'
         )
     }
 

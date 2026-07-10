@@ -39,10 +39,11 @@ use crate::format::mermaid::{
 use crate::layout::{layout_flowchart, layout_sequence, FlowchartLayoutError, SequenceLayoutError};
 use crate::model::seq_ast::{SequenceBlock, SequenceBlockKind, SequenceSectionKind};
 use crate::model::{
-    Diagram, DiagramAst, DiagramAstKindMismatch, DiagramId, DiagramKind, FlowNode, FlowchartAst,
-    IdError, ObjectId, ObjectRef, ParseObjectRefError, SequenceAst, SequenceMessageKind, Session,
-    SessionId, SymbolAnchor, SymbolAnchorError, Walkthrough, WalkthroughEdge, WalkthroughId,
-    WalkthroughNode, WalkthroughNodeId, XRef, XRefId, XRefStatus as ModelXRefStatus,
+    ClassRelationKind, Diagram, DiagramAst, DiagramAstKindMismatch, DiagramId, DiagramKind,
+    ErCardinality, ErStroke, FlowNode, FlowchartAst, IdError, ObjectId, ObjectRef,
+    ParseObjectRefError, SequenceAst, SequenceMessageKind, Session, SessionId, SymbolAnchor,
+    SymbolAnchorError, Walkthrough, WalkthroughEdge, WalkthroughId, WalkthroughNode,
+    WalkthroughNodeId, XRef, XRefId, XRefStatus as ModelXRefStatus,
 };
 use crate::render::{
     render_flowchart_unicode, render_sequence_unicode, render_walkthrough_unicode,
@@ -52,6 +53,33 @@ use crate::render::{
 const SESSION_META_FILENAME: &str = "nereid-session.meta.json";
 const LEGACY_SESSION_META_FILENAME: &str = "session.meta.json";
 const SESSION_WRITE_LOCK_FILENAME: &str = ".nereid-session.write.lock";
+
+fn migrate_legacy_gantt_lane_ref(session: &Session, object_ref: ObjectRef) -> ObjectRef {
+    let [left, right] = object_ref.category().segments() else {
+        return object_ref;
+    };
+    if left != "gantt" || right != "lane" {
+        return object_ref;
+    }
+    let Some(day) = object_ref
+        .object_id()
+        .as_str()
+        .strip_prefix("lane:")
+        .filter(|suffix| suffix.len() == 4 && suffix.chars().all(|ch| ch.is_ascii_digit()))
+        .and_then(|suffix| suffix.parse::<u32>().ok())
+    else {
+        return object_ref;
+    };
+    let Some(DiagramAst::Gantt(ast)) =
+        session.diagrams().get(object_ref.diagram_id()).map(Diagram::ast)
+    else {
+        return object_ref;
+    };
+    let Some(lane_id) = ast.lane_id_for_relative_day(day) else {
+        return object_ref;
+    };
+    ObjectRef::new(object_ref.diagram_id().clone(), object_ref.category().clone(), lane_id)
+}
 const SESSION_WRITE_LOCK_RETRY_DELAY: Duration = Duration::from_millis(10);
 const SESSION_WRITE_LOCK_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -610,6 +638,9 @@ pub struct DiagramMeta {
     pub stable_id_map: DiagramStableIdMap,
     pub xrefs: Vec<DiagramXRef>,
     pub flow_edges: Vec<DiagramFlowEdgeMeta>,
+    pub class_relations: Vec<DiagramClassRelationMeta>,
+    pub er_relationships: Vec<DiagramErRelationshipMeta>,
+    pub gantt_sections: Vec<DiagramGanttSectionMeta>,
     pub sequence_messages: Vec<DiagramSequenceMessageMeta>,
     pub sequence_blocks: Vec<DiagramSequenceBlockMeta>,
     pub default_symbol_repository_id: Option<String>,
@@ -628,6 +659,8 @@ pub struct DiagramMeta {
 pub struct DiagramStableIdMap {
     pub by_mermaid_id: BTreeMap<String, String>,
     pub by_name: BTreeMap<String, String>,
+    /// Semantic fingerprints for objects without an explicit Mermaid id/tag.
+    pub by_fingerprint: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -648,6 +681,37 @@ pub struct DiagramFlowEdgeMeta {
     pub to_node_id: ObjectId,
     pub label: Option<String>,
     pub style: Option<String>,
+}
+
+/// Class relation fingerprint for load-time id reconciliation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiagramClassRelationMeta {
+    pub relation_id: ObjectId,
+    pub from_class_id: ObjectId,
+    pub to_class_id: ObjectId,
+    pub kind: ClassRelationKind,
+    pub label: Option<String>,
+    pub raw_connector: Option<String>,
+}
+
+/// ER relationship fingerprint for load-time id reconciliation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiagramErRelationshipMeta {
+    pub relationship_id: ObjectId,
+    pub from_entity_id: ObjectId,
+    pub to_entity_id: ObjectId,
+    pub from_card: ErCardinality,
+    pub to_card: ErCardinality,
+    pub stroke: ErStroke,
+    pub label: Option<String>,
+}
+
+/// Gantt section fingerprint for load-time id reconciliation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiagramGanttSectionMeta {
+    pub section_id: ObjectId,
+    pub name: String,
+    pub task_ids: Vec<ObjectId>,
 }
 
 /// Sequence message fingerprint for load-time id reconciliation.
@@ -710,6 +774,46 @@ pub(crate) fn sequence_blocks_meta_from_ast(ast: &SequenceAst) -> Vec<DiagramSeq
     let mut out = Vec::new();
     walk(ast.blocks(), None, &mut out);
     out
+}
+
+fn class_relations_meta_from_ast(ast: &crate::model::ClassAst) -> Vec<DiagramClassRelationMeta> {
+    ast.relations()
+        .iter()
+        .map(|(relation_id, relation)| DiagramClassRelationMeta {
+            relation_id: relation_id.clone(),
+            from_class_id: relation.from_class_id().clone(),
+            to_class_id: relation.to_class_id().clone(),
+            kind: relation.kind(),
+            label: relation.label().map(ToOwned::to_owned),
+            raw_connector: relation.raw_connector().map(ToOwned::to_owned),
+        })
+        .collect()
+}
+
+fn er_relationships_meta_from_ast(ast: &crate::model::ErAst) -> Vec<DiagramErRelationshipMeta> {
+    ast.relationships()
+        .iter()
+        .map(|(relationship_id, relationship)| DiagramErRelationshipMeta {
+            relationship_id: relationship_id.clone(),
+            from_entity_id: relationship.from_entity_id().clone(),
+            to_entity_id: relationship.to_entity_id().clone(),
+            from_card: relationship.from_card(),
+            to_card: relationship.to_card(),
+            stroke: relationship.stroke(),
+            label: relationship.label().map(ToOwned::to_owned),
+        })
+        .collect()
+}
+
+fn gantt_sections_meta_from_ast(ast: &crate::model::GanttAst) -> Vec<DiagramGanttSectionMeta> {
+    ast.sections()
+        .iter()
+        .map(|section| DiagramGanttSectionMeta {
+            section_id: section.section_id().clone(),
+            name: section.name().to_owned(),
+            task_ids: section.task_ids().to_vec(),
+        })
+        .collect()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1333,6 +1437,30 @@ impl SessionFolder {
                     | DiagramAst::Gantt(_) => Vec::new(),
                 };
 
+                let class_relations = match diagram.ast() {
+                    DiagramAst::Class(ast) => class_relations_meta_from_ast(ast),
+                    DiagramAst::Sequence(_)
+                    | DiagramAst::Flowchart(_)
+                    | DiagramAst::Er(_)
+                    | DiagramAst::Gantt(_) => Vec::new(),
+                };
+
+                let er_relationships = match diagram.ast() {
+                    DiagramAst::Er(ast) => er_relationships_meta_from_ast(ast),
+                    DiagramAst::Sequence(_)
+                    | DiagramAst::Flowchart(_)
+                    | DiagramAst::Class(_)
+                    | DiagramAst::Gantt(_) => Vec::new(),
+                };
+
+                let gantt_sections = match diagram.ast() {
+                    DiagramAst::Gantt(ast) => gantt_sections_meta_from_ast(ast),
+                    DiagramAst::Sequence(_)
+                    | DiagramAst::Flowchart(_)
+                    | DiagramAst::Class(_)
+                    | DiagramAst::Er(_) => Vec::new(),
+                };
+
                 let sequence_messages = match diagram.ast() {
                     DiagramAst::Sequence(ast) => ast
                         .messages_in_order()
@@ -1473,6 +1601,9 @@ impl SessionFolder {
                     stable_id_map: stable_id_map_from_ast(diagram.ast()),
                     xrefs: Vec::new(),
                     flow_edges,
+                    class_relations,
+                    er_relationships,
+                    gantt_sections,
                     sequence_messages,
                     sequence_blocks,
                     default_symbol_repository_id: diagram
@@ -1684,7 +1815,7 @@ impl SessionFolder {
         let mut session = Session::new(meta.session_id);
         session.set_active_diagram_id(meta.active_diagram_id);
         session.set_active_walkthrough_id(meta.active_walkthrough_id);
-        session.set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
+        let selected_object_refs = meta.selected_object_refs;
         let walkthrough_ids = meta.walkthrough_ids.clone();
 
         for diagram_meta in meta.diagrams {
@@ -1760,9 +1891,17 @@ impl SessionFolder {
             session.diagrams_mut().insert(diagram_id, diagram);
         }
 
+        session.set_selected_object_refs(
+            selected_object_refs
+                .into_iter()
+                .map(|object_ref| migrate_legacy_gantt_lane_ref(&session, object_ref))
+                .collect(),
+        );
+
         for xref_meta in meta.xrefs {
-            let mut xref =
-                XRef::new(xref_meta.from, xref_meta.to, xref_meta.kind, xref_meta.status);
+            let from = migrate_legacy_gantt_lane_ref(&session, xref_meta.from);
+            let to = migrate_legacy_gantt_lane_ref(&session, xref_meta.to);
+            let mut xref = XRef::new(from, to, xref_meta.kind, xref_meta.status);
             xref.set_label(xref_meta.label);
             session.xrefs_mut().insert(xref_meta.xref_id, xref);
         }

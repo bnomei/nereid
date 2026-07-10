@@ -270,6 +270,14 @@ pub struct DiagramCounts {
     pub messages: u64,
     pub nodes: u64,
     pub edges: u64,
+    pub classes: u64,
+    pub relations: u64,
+    pub entities: u64,
+    pub relationships: u64,
+    pub sections: u64,
+    pub tasks: u64,
+    pub dependencies: u64,
+    pub lanes: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -379,6 +387,120 @@ pub enum McpDiagramAst {
         nodes: Vec<McpFlowNodeAst>,
         edges: Vec<McpFlowEdgeAst>,
     },
+    Class {
+        classes: Vec<McpClassNodeAst>,
+        relations: Vec<McpClassRelationAst>,
+    },
+    Er {
+        entities: Vec<McpErEntityAst>,
+        relationships: Vec<McpErRelationshipAst>,
+    },
+    Gantt {
+        title: Option<String>,
+        date_format: Option<String>,
+        sections: Vec<McpGanttSectionAst>,
+        tasks: Vec<McpGanttTaskAst>,
+        lanes: Vec<McpGanttLaneAst>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct McpClassNodeAst {
+    pub class_id: String,
+    pub name: String,
+    pub attributes: Vec<String>,
+    pub methods: Vec<String>,
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum McpClassRelationKind {
+    Inheritance,
+    Composition,
+    Aggregation,
+    Association,
+    Dependency,
+    Realization,
+    Link,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct McpClassRelationAst {
+    pub relation_id: String,
+    pub from_class_id: String,
+    pub to_class_id: String,
+    pub kind: McpClassRelationKind,
+    pub label: Option<String>,
+    pub raw_connector: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct McpErEntityAst {
+    pub entity_id: String,
+    pub name: String,
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum McpErCardinality {
+    ExactlyOne,
+    ZeroOrOne,
+    OneOrMore,
+    ZeroOrMore,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum McpErStroke {
+    Identifying,
+    NonIdentifying,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct McpErRelationshipAst {
+    pub relationship_id: String,
+    pub from_entity_id: String,
+    pub to_entity_id: String,
+    pub from_cardinality: McpErCardinality,
+    pub to_cardinality: McpErCardinality,
+    pub stroke: McpErStroke,
+    pub label: Option<String>,
+    pub raw_connector: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct McpGanttSectionAst {
+    pub section_id: String,
+    pub name: String,
+    pub task_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum McpGanttTaskStart {
+    Date { date: String },
+    After { task_id: String },
+    Unspecified,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct McpGanttTaskAst {
+    pub task_id: String,
+    pub mermaid_tag: Option<String>,
+    pub name: String,
+    pub start: McpGanttTaskStart,
+    pub duration_days: u32,
+    pub raw_duration: String,
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct McpGanttLaneAst {
+    pub lane_id: String,
+    pub label: String,
+    pub note: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -810,6 +932,48 @@ pub enum McpObject {
         label: Option<String>,
         connector: Option<String>,
         style: Option<String>,
+    },
+    ClassNode {
+        name: String,
+        attributes: Vec<String>,
+        methods: Vec<String>,
+        note: Option<String>,
+    },
+    ClassRelation {
+        from_class_id: String,
+        to_class_id: String,
+        kind: McpClassRelationKind,
+        label: Option<String>,
+        raw_connector: Option<String>,
+    },
+    ErEntity {
+        name: String,
+        note: Option<String>,
+    },
+    ErRelationship {
+        from_entity_id: String,
+        to_entity_id: String,
+        from_cardinality: McpErCardinality,
+        to_cardinality: McpErCardinality,
+        stroke: McpErStroke,
+        label: Option<String>,
+        raw_connector: Option<String>,
+    },
+    GanttSection {
+        name: String,
+        task_ids: Vec<String>,
+    },
+    GanttTask {
+        mermaid_tag: Option<String>,
+        name: String,
+        start: McpGanttTaskStart,
+        duration_days: u32,
+        raw_duration: String,
+        note: Option<String>,
+    },
+    GanttLane {
+        label: String,
+        note: Option<String>,
     },
 }
 

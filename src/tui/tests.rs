@@ -20,7 +20,7 @@ use super::{
     ExternalAction, Focus, FocusOwner, HintKind, HintMode, PendingDiagramSync, SearchKind,
     SearchMode, SelectableObject,
 };
-use crate::format::mermaid::{parse_flowchart, parse_sequence_diagram};
+use crate::format::mermaid::{parse_flowchart, parse_gantt_diagram, parse_sequence_diagram};
 use crate::model::FlowNode;
 use crate::model::{
     Diagram, DiagramAst, DiagramId, FlowchartAst, ObjectId, ObjectRef, SequenceAst, Session,
@@ -775,6 +775,42 @@ fn applying_comment_only_change_does_not_bump_rev() {
 }
 
 #[test]
+fn applying_gantt_edit_preserves_reconciled_task_id_and_note() {
+    let mut ast = parse_gantt_diagram(
+        "gantt\ndateFormat YYYY-MM-DD\nsection Build\nDesign :design, 2026-01-01, 2d\n",
+    )
+    .unwrap();
+    let design_id = ast
+        .tasks()
+        .iter()
+        .find_map(|(id, task)| (task.mermaid_tag() == Some("design")).then_some(id.clone()))
+        .unwrap();
+    ast.tasks_mut().get_mut(&design_id).unwrap().set_note(Some("keep design note"));
+    let diagram_id = DiagramId::new("gantt-edit").unwrap();
+    let mut session = Session::new(SessionId::new("s:gantt-edit").unwrap());
+    session.diagrams_mut().insert(
+        diagram_id.clone(),
+        Diagram::new(diagram_id.clone(), "Gantt", DiagramAst::Gantt(ast)),
+    );
+    session.set_active_diagram_id(Some(diagram_id.clone()));
+    let mut app = App::new(session);
+
+    app.apply_edited_mermaid_to_diagram(
+        &diagram_id,
+        crate::model::DiagramKind::Gantt,
+        0,
+        "gantt\ndateFormat YYYY-MM-DD\nsection Build\nPrep :prep, 2025-12-31, 1d\nDesign :design, 2026-01-01, 2d\n",
+    )
+    .unwrap();
+
+    let DiagramAst::Gantt(ast) = app.session.diagrams()[&diagram_id].ast() else {
+        panic!("expected Gantt")
+    };
+    assert_eq!(ast.tasks()[&design_id].mermaid_tag(), Some("design"));
+    assert_eq!(ast.tasks()[&design_id].note(), Some("keep design note"));
+}
+
+#[test]
 fn enabling_follow_ai_jumps_to_agent_highlight_diagram() {
     let mut app = App::new(demo_session());
     let target: ObjectRef = "d:demo-seq/seq/participant/p:alice".parse().expect("object ref");
@@ -995,7 +1031,7 @@ fn er_diagram_f_enters_hint_mode_with_entity_targets() {
 }
 
 #[test]
-fn gantt_diagram_f_enters_hint_mode_with_task_and_lane_targets() {
+fn gantt_diagram_f_enters_hint_mode_with_task_section_and_lane_targets() {
     let mut session = Session::new(SessionId::new("s:gantt-hint").expect("session id"));
     let gantt_id = DiagramId::new("d-gantt").expect("diagram id");
     let gantt_ast = crate::format::mermaid::parse_gantt_diagram(
@@ -1015,6 +1051,13 @@ fn gantt_diagram_f_enters_hint_mode_with_task_and_lane_targets() {
         other => panic!("expected AwaitingFirst Jump on gantt diagram, got {other:?}"),
     };
     assert!(!targets.is_empty(), "gantt diagram should expose hint targets");
+    assert!(
+        targets.iter().any(|t| {
+            matches!(t.object_ref.category().segments(), [a, b] if a == "gantt" && b == "section")
+        }),
+        "expected gantt/section targets: {:?}",
+        targets.iter().map(|t| t.object_ref.to_string()).collect::<Vec<_>>()
+    );
     assert!(
         targets.iter().any(|t| {
             matches!(t.object_ref.category().segments(), [a, b] if a == "gantt" && b == "task")
@@ -1714,6 +1757,25 @@ fn diagram_view_prefixes_support_incoming_and_outgoing_markers() {
     app.set_active_diagram_id(DiagramId::new("demo-00-index").expect("diagram id"));
     let rendered = text_to_string(&app.diagram_text());
     assert!(rendered.contains("▾▴ Flowchart: labels + shapes"));
+}
+
+#[test]
+fn diagram_view_prefixes_xrefs_on_class_er_and_gantt_objects() {
+    let mut app = App::new(demo_session_fallback());
+
+    app.set_active_diagram_id(DiagramId::new("demo-class").unwrap());
+    let class = text_to_string(&app.diagram_text());
+    assert!(class.contains("▾ Class01"), "{class}");
+    assert!(class.contains("▴ Cool"), "{class}");
+
+    app.set_active_diagram_id(DiagramId::new("demo-er").unwrap());
+    let er = text_to_string(&app.diagram_text());
+    assert!(er.contains("▾ places"), "{er}");
+    assert!(er.contains("▴ ORDER"), "{er}");
+
+    app.set_active_diagram_id(DiagramId::new("demo-gantt").unwrap());
+    let gantt = text_to_string(&app.diagram_text());
+    assert!(gantt.contains("▾ A task"), "{gantt}");
 }
 
 #[test]
@@ -2778,6 +2840,118 @@ fn diagram_select_hints_selects_flow_edge_directly() {
 }
 
 #[test]
+fn diagram_select_hints_selects_class_relation_between_consecutive_classes() {
+    let mut session = Session::new(SessionId::new("s:class-chain").expect("session id"));
+    let diagram_id = DiagramId::new("d-class").expect("diagram id");
+    let ast = crate::format::mermaid::parse_class_diagram("classDiagram\nA --> B : links\n")
+        .expect("class parse");
+    session.diagrams_mut().insert(
+        diagram_id.clone(),
+        Diagram::new(diagram_id.clone(), "Class", DiagramAst::Class(ast)),
+    );
+    session.set_active_diagram_id(Some(diagram_id.clone()));
+
+    let mut app = App::new(session);
+    app.handle_key_code(KeyCode::Char('c'));
+    let targets = match &app.hint_mode {
+        HintMode::AwaitingFirst { kind: HintKind::SelectChain, targets } => targets.clone(),
+        other => panic!("expected AwaitingFirst SelectChain, got {other:?}"),
+    };
+
+    let class_a = ObjectRef::new(
+        diagram_id.clone(),
+        category_path(&["class", "class"]),
+        ObjectId::new("c:A").expect("object id"),
+    );
+    let class_b = ObjectRef::new(
+        diagram_id.clone(),
+        category_path(&["class", "class"]),
+        ObjectId::new("c:B").expect("object id"),
+    );
+    let relation = ObjectRef::new(
+        diagram_id,
+        category_path(&["class", "relation"]),
+        ObjectId::new("r:0001").expect("object id"),
+    );
+
+    let target_a = targets
+        .iter()
+        .find(|target| target.object_ref == class_a)
+        .expect("hint target for class A")
+        .clone();
+    let target_b = targets
+        .iter()
+        .find(|target| target.object_ref == class_b)
+        .expect("hint target for class B")
+        .clone();
+
+    for target in [target_a, target_b] {
+        app.handle_key_code(KeyCode::Char(target.label[0].to_ascii_lowercase()));
+        app.handle_key_code(KeyCode::Char(target.label[1].to_ascii_lowercase()));
+    }
+
+    assert!(app.session.selected_object_refs().contains(&class_a));
+    assert!(app.session.selected_object_refs().contains(&class_b));
+    assert!(app.session.selected_object_refs().contains(&relation));
+}
+
+#[test]
+fn diagram_select_hints_selects_er_relationship_between_consecutive_entities() {
+    let mut session = Session::new(SessionId::new("s:er-chain").expect("session id"));
+    let diagram_id = DiagramId::new("d-er").expect("diagram id");
+    let ast =
+        crate::format::mermaid::parse_er_diagram("erDiagram\nCUSTOMER ||--o{ ORDER : places\n")
+            .expect("ER parse");
+    session
+        .diagrams_mut()
+        .insert(diagram_id.clone(), Diagram::new(diagram_id.clone(), "ER", DiagramAst::Er(ast)));
+    session.set_active_diagram_id(Some(diagram_id.clone()));
+
+    let mut app = App::new(session);
+    app.handle_key_code(KeyCode::Char('c'));
+    let targets = match &app.hint_mode {
+        HintMode::AwaitingFirst { kind: HintKind::SelectChain, targets } => targets.clone(),
+        other => panic!("expected AwaitingFirst SelectChain, got {other:?}"),
+    };
+
+    let customer = ObjectRef::new(
+        diagram_id.clone(),
+        category_path(&["er", "entity"]),
+        ObjectId::new("e:CUSTOMER").expect("object id"),
+    );
+    let order = ObjectRef::new(
+        diagram_id.clone(),
+        category_path(&["er", "entity"]),
+        ObjectId::new("e:ORDER").expect("object id"),
+    );
+    let relationship = ObjectRef::new(
+        diagram_id,
+        category_path(&["er", "relationship"]),
+        ObjectId::new("r:0001").expect("object id"),
+    );
+
+    let customer_target = targets
+        .iter()
+        .find(|target| target.object_ref == customer)
+        .expect("hint target for CUSTOMER")
+        .clone();
+    let order_target = targets
+        .iter()
+        .find(|target| target.object_ref == order)
+        .expect("hint target for ORDER")
+        .clone();
+
+    for target in [customer_target, order_target] {
+        app.handle_key_code(KeyCode::Char(target.label[0].to_ascii_lowercase()));
+        app.handle_key_code(KeyCode::Char(target.label[1].to_ascii_lowercase()));
+    }
+
+    assert!(app.session.selected_object_refs().contains(&customer));
+    assert!(app.session.selected_object_refs().contains(&order));
+    assert!(app.session.selected_object_refs().contains(&relationship));
+}
+
+#[test]
 fn diagram_select_hints_selects_message_between_consecutive_sequence_participants() {
     let mut app = App::new(demo_session_fallback());
     let seq_id = DiagramId::new("demo-seq").expect("diagram id");
@@ -2879,5 +3053,16 @@ fn demo_session_includes_class_er_gantt() {
             );
         }
         other => panic!("expected flowchart index, got {other:?}"),
+    }
+}
+
+#[test]
+fn fallback_demo_cross_references_all_new_diagram_kinds() {
+    let session = demo_session_fallback();
+    for xref_id in ["x:3", "x:4", "x:5"] {
+        let xref = session.xrefs().get(&XRefId::new(xref_id).unwrap()).expect("fallback xref");
+        assert_eq!(xref.status(), XRefStatus::Ok);
+        assert!(session.object_ref_exists(xref.from()), "missing from ref: {}", xref.from());
+        assert!(session.object_ref_exists(xref.to()), "missing to ref: {}", xref.to());
     }
 }

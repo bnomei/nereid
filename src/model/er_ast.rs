@@ -58,6 +58,10 @@ impl ErEntity {
         &self.name
     }
 
+    pub fn set_name(&mut self, name: impl Into<String>) {
+        self.name = name.into();
+    }
+
     pub fn note(&self) -> Option<&str> {
         self.note.as_deref()
     }
@@ -165,6 +169,10 @@ impl ErRelationship {
 
     pub fn label(&self) -> Option<&str> {
         self.label.as_deref()
+    }
+
+    pub fn set_label<T: Into<String>>(&mut self, label: Option<T>) {
+        self.label = label.map(Into::into);
     }
 
     pub fn raw_connector(&self) -> Option<&str> {

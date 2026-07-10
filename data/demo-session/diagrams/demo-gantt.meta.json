@@ -8,14 +8,14 @@
     "t:0004": "unspecified start → after previous"
   },
   "gantt_lane_notes": {
-    "lane:0000": "kickoff week",
-    "lane:0007": "week +1",
-    "lane:0011": "Task in Another starts",
-    "lane:0014": "mid-run checkpoint",
-    "lane:0021": "second half begins",
-    "lane:0028": "A task winds down",
-    "lane:0035": "Another task active",
-    "lane:0042": "closing weeks",
-    "lane:0049": "schedule tail"
+    "lane:2014-01-01": "kickoff week",
+    "lane:2014-01-08": "week +1",
+    "lane:2014-01-12": "Task in Another starts",
+    "lane:2014-01-15": "mid-run checkpoint",
+    "lane:2014-01-22": "second half begins",
+    "lane:2014-01-29": "A task winds down",
+    "lane:2014-02-05": "Another task active",
+    "lane:2014-02-12": "closing weeks",
+    "lane:2014-02-19": "schedule tail"
   }
 }

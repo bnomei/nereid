@@ -407,7 +407,6 @@ impl NereidMcp {
                         style: edge.style().map(|s| s.to_owned()),
                     }
                 }
-                // Class/ER/gantt project into FlowNode/FlowEdge shapes for v1 tooling parity.
                 ([left, right], DiagramAst::Class(ast)) if left == "class" && right == "class" => {
                     let class = ast.classes().get(object_id).ok_or_else(|| {
                         ErrorData::resource_not_found(
@@ -415,12 +414,11 @@ impl NereidMcp {
                             Some(serde_json::json!({ "object_ref": object_ref.as_str() })),
                         )
                     })?;
-                    McpObject::FlowNode {
-                        label: class.name().to_owned(),
-                        shape: "class".to_owned(),
-                        mermaid_id: Some(class.name().to_owned()),
+                    McpObject::ClassNode {
+                        name: class.name().to_owned(),
+                        attributes: class.attributes().to_vec(),
+                        methods: class.methods().to_vec(),
                         note: class.note().map(ToOwned::to_owned),
-                        symbol: None,
                     }
                 }
                 ([left, right], DiagramAst::Class(ast))
@@ -432,12 +430,12 @@ impl NereidMcp {
                             Some(serde_json::json!({ "object_ref": object_ref.as_str() })),
                         )
                     })?;
-                    McpObject::FlowEdge {
-                        from_node_id: rel.from_class_id().to_string(),
-                        to_node_id: rel.to_class_id().to_string(),
+                    McpObject::ClassRelation {
+                        from_class_id: rel.from_class_id().to_string(),
+                        to_class_id: rel.to_class_id().to_string(),
+                        kind: map_class_relation_kind_to_mcp(rel.kind()),
                         label: rel.label().map(ToOwned::to_owned),
-                        connector: rel.raw_connector().map(ToOwned::to_owned),
-                        style: None,
+                        raw_connector: rel.raw_connector().map(ToOwned::to_owned),
                     }
                 }
                 ([left, right], DiagramAst::Er(ast)) if left == "er" && right == "entity" => {
@@ -447,12 +445,9 @@ impl NereidMcp {
                             Some(serde_json::json!({ "object_ref": object_ref.as_str() })),
                         )
                     })?;
-                    McpObject::FlowNode {
-                        label: entity.name().to_owned(),
-                        shape: "entity".to_owned(),
-                        mermaid_id: Some(entity.name().to_owned()),
+                    McpObject::ErEntity {
+                        name: entity.name().to_owned(),
                         note: entity.note().map(ToOwned::to_owned),
-                        symbol: None,
                     }
                 }
                 ([left, right], DiagramAst::Er(ast)) if left == "er" && right == "relationship" => {
@@ -462,12 +457,32 @@ impl NereidMcp {
                             Some(serde_json::json!({ "object_ref": object_ref.as_str() })),
                         )
                     })?;
-                    McpObject::FlowEdge {
-                        from_node_id: rel.from_entity_id().to_string(),
-                        to_node_id: rel.to_entity_id().to_string(),
+                    McpObject::ErRelationship {
+                        from_entity_id: rel.from_entity_id().to_string(),
+                        to_entity_id: rel.to_entity_id().to_string(),
+                        from_cardinality: map_er_cardinality_to_mcp(rel.from_card()),
+                        to_cardinality: map_er_cardinality_to_mcp(rel.to_card()),
+                        stroke: map_er_stroke_to_mcp(rel.stroke()),
                         label: rel.label().map(ToOwned::to_owned),
-                        connector: rel.raw_connector().map(ToOwned::to_owned),
-                        style: None,
+                        raw_connector: rel.raw_connector().map(ToOwned::to_owned),
+                    }
+                }
+                ([left, right], DiagramAst::Gantt(ast))
+                    if left == "gantt" && right == "section" =>
+                {
+                    let section = ast
+                        .sections()
+                        .iter()
+                        .find(|section| section.section_id() == object_id)
+                        .ok_or_else(|| {
+                            ErrorData::resource_not_found(
+                                "gantt section not found",
+                                Some(serde_json::json!({ "object_ref": object_ref.as_str() })),
+                            )
+                        })?;
+                    McpObject::GanttSection {
+                        name: section.name().to_owned(),
+                        task_ids: section.task_ids().iter().map(ToString::to_string).collect(),
                     }
                 }
                 ([left, right], DiagramAst::Gantt(ast)) if left == "gantt" && right == "task" => {
@@ -477,33 +492,25 @@ impl NereidMcp {
                             Some(serde_json::json!({ "object_ref": object_ref.as_str() })),
                         )
                     })?;
-                    McpObject::FlowNode {
-                        label: task.name().to_owned(),
-                        shape: "task".to_owned(),
-                        mermaid_id: task.mermaid_tag().map(ToOwned::to_owned),
+                    McpObject::GanttTask {
+                        mermaid_tag: task.mermaid_tag().map(ToOwned::to_owned),
+                        name: task.name().to_owned(),
+                        start: map_gantt_task_start_to_mcp(task.start()),
+                        duration_days: task.duration_days(),
+                        raw_duration: task.raw_duration().to_owned(),
                         note: task.note().map(ToOwned::to_owned),
-                        symbol: None,
                     }
                 }
                 ([left, right], DiagramAst::Gantt(ast)) if left == "gantt" && right == "lane" => {
-                    let note = ast.lane_note(object_id).map(ToOwned::to_owned);
-                    if note.is_none()
-                        && object_id.as_str().strip_prefix("lane:").is_none_or(|rest| {
-                            rest.len() != 4 || !rest.chars().all(|c| c.is_ascii_digit())
-                        })
-                    {
-                        return Err(ErrorData::resource_not_found(
+                    let lanes = ast.lanes();
+                    let label = lanes.get(object_id).ok_or_else(|| {
+                        ErrorData::resource_not_found(
                             "gantt lane not found",
                             Some(serde_json::json!({ "object_ref": object_ref.as_str() })),
-                        ));
-                    }
-                    McpObject::FlowNode {
-                        label: object_id.as_str().to_owned(),
-                        shape: "lane".to_owned(),
-                        mermaid_id: Some(object_id.as_str().to_owned()),
-                        note,
-                        symbol: None,
-                    }
+                        )
+                    })?;
+                    let note = ast.lane_note(object_id).map(ToOwned::to_owned);
+                    McpObject::GanttLane { label: label.clone(), note }
                 }
                 _ => {
                     return Err(ErrorData::invalid_params(

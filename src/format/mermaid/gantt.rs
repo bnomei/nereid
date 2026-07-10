@@ -8,7 +8,7 @@
 
 //! Limited `gantt` parse/export for Nereid's gantt AST.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use crate::model::ids::ObjectId;
@@ -45,13 +45,61 @@ impl std::error::Error for MermaidGanttParseError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MermaidGanttExportError {
-    EmptyTaskName { task_id: ObjectId },
+    EmptyTaskName {
+        task_id: ObjectId,
+    },
+    MissingSectionTask {
+        section_id: ObjectId,
+        task_id: ObjectId,
+    },
+    DuplicateTaskMembership {
+        task_id: ObjectId,
+        first_section_id: ObjectId,
+        second_section_id: ObjectId,
+    },
+    UnsectionedTask {
+        task_id: ObjectId,
+    },
+    TaskIdMismatch {
+        map_id: ObjectId,
+        task_id: ObjectId,
+    },
+    MissingDependency {
+        task_id: ObjectId,
+        dependency_id: ObjectId,
+    },
+    DuplicateMermaidTag {
+        tag: String,
+    },
 }
 
 impl fmt::Display for MermaidGanttExportError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::EmptyTaskName { task_id } => write!(f, "task {task_id} has an empty name"),
+            Self::MissingSectionTask { section_id, task_id } => {
+                write!(f, "gantt section {section_id} references missing task {task_id}")
+            }
+            Self::DuplicateTaskMembership {
+                task_id,
+                first_section_id,
+                second_section_id,
+            } => write!(
+                f,
+                "gantt task {task_id} belongs to both sections {first_section_id} and {second_section_id}"
+            ),
+            Self::UnsectionedTask { task_id } => {
+                write!(f, "gantt task {task_id} does not belong to a section")
+            }
+            Self::TaskIdMismatch { map_id, task_id } => {
+                write!(f, "gantt task map id {map_id} does not match embedded id {task_id}")
+            }
+            Self::MissingDependency { task_id, dependency_id } => {
+                write!(f, "gantt task {task_id} depends on missing task {dependency_id}")
+            }
+            Self::DuplicateMermaidTag { tag } => {
+                write!(f, "gantt Mermaid task tag is not unique: {tag}")
+            }
         }
     }
 }
@@ -231,6 +279,80 @@ pub fn parse_gantt_diagram(input: &str) -> Result<GanttAst, MermaidGanttParseErr
 
 /// Export gantt diagram to Mermaid.
 pub fn export_gantt_diagram(ast: &GanttAst) -> Result<String, MermaidGanttExportError> {
+    let mut membership = BTreeMap::<ObjectId, ObjectId>::new();
+    for section in ast.sections() {
+        for task_id in section.task_ids() {
+            if !ast.tasks().contains_key(task_id) {
+                return Err(MermaidGanttExportError::MissingSectionTask {
+                    section_id: section.section_id().clone(),
+                    task_id: task_id.clone(),
+                });
+            }
+            if let Some(first_section_id) =
+                membership.insert(task_id.clone(), section.section_id().clone())
+            {
+                return Err(MermaidGanttExportError::DuplicateTaskMembership {
+                    task_id: task_id.clone(),
+                    first_section_id,
+                    second_section_id: section.section_id().clone(),
+                });
+            }
+        }
+    }
+
+    let mut used_tags = BTreeSet::<String>::new();
+    let mut effective_tags = BTreeMap::<ObjectId, String>::new();
+    let mut referenced_dependencies = BTreeSet::<ObjectId>::new();
+    for (task_id, task) in ast.tasks() {
+        if task.task_id() != task_id {
+            return Err(MermaidGanttExportError::TaskIdMismatch {
+                map_id: task_id.clone(),
+                task_id: task.task_id().clone(),
+            });
+        }
+        if task.name().is_empty() {
+            return Err(MermaidGanttExportError::EmptyTaskName { task_id: task_id.clone() });
+        }
+        if !membership.contains_key(task_id) {
+            return Err(MermaidGanttExportError::UnsectionedTask { task_id: task_id.clone() });
+        }
+        if let Some(tag) = task.mermaid_tag() {
+            if !used_tags.insert(tag.to_owned()) {
+                return Err(MermaidGanttExportError::DuplicateMermaidTag { tag: tag.to_owned() });
+            }
+            effective_tags.insert(task_id.clone(), tag.to_owned());
+        }
+        if let GanttTaskStart::After(dependency_id) = task.start() {
+            if !ast.tasks().contains_key(dependency_id) {
+                return Err(MermaidGanttExportError::MissingDependency {
+                    task_id: task_id.clone(),
+                    dependency_id: dependency_id.clone(),
+                });
+            }
+            referenced_dependencies.insert(dependency_id.clone());
+        }
+    }
+
+    for dependency_id in referenced_dependencies {
+        if effective_tags.contains_key(&dependency_id) {
+            continue;
+        }
+        let base = dependency_id
+            .as_str()
+            .chars()
+            .map(|ch| if ch.is_ascii_alphanumeric() || ch == '_' { ch } else { '_' })
+            .collect::<String>();
+        let base = format!("nereid_{base}");
+        let mut tag = base.clone();
+        let mut suffix = 2_u64;
+        while used_tags.contains(&tag) {
+            tag = format!("{base}_{suffix}");
+            suffix = suffix.saturating_add(1);
+        }
+        used_tags.insert(tag.clone());
+        effective_tags.insert(dependency_id, tag);
+    }
+
     let mut out = String::from("gantt\n");
     if let Some(title) = ast.title() {
         out.push_str(&format!("    title {title}\n"));
@@ -239,28 +361,22 @@ pub fn export_gantt_diagram(ast: &GanttAst) -> Result<String, MermaidGanttExport
         out.push_str(&format!("    dateFormat {fmt}\n"));
     }
 
-    let tag_of = |task: &GanttTask| -> String {
-        task.mermaid_tag().map(str::to_owned).unwrap_or_else(|| task.task_id().to_string())
-    };
-
     for section in ast.sections() {
         out.push_str(&format!("    section {}\n", section.name()));
         for tid in section.task_ids() {
             let Some(task) = ast.tasks().get(tid) else {
                 continue;
             };
-            if task.name().is_empty() {
-                return Err(MermaidGanttExportError::EmptyTaskName { task_id: tid.clone() });
-            }
             let mut meta = Vec::new();
-            if let Some(tag) = task.mermaid_tag() {
-                meta.push(tag.to_owned());
+            if let Some(tag) = effective_tags.get(tid) {
+                meta.push(tag.clone());
             }
             match task.start() {
                 GanttTaskStart::Date(d) => meta.push(d.clone()),
                 GanttTaskStart::After(dep) => {
-                    let dep_tag =
-                        ast.tasks().get(dep).map(tag_of).unwrap_or_else(|| dep.to_string());
+                    let dep_tag = effective_tags
+                        .get(dep)
+                        .expect("validated dependency receives an effective tag");
                     meta.push(format!("after {dep_tag}"));
                 }
                 GanttTaskStart::Unspecified => {}
@@ -297,5 +413,60 @@ another task     :24d
         assert_eq!(a1.duration_days(), 30);
         let after = ast.tasks().values().find(|t| t.name() == "Another task").unwrap();
         assert!(matches!(after.start(), GanttTaskStart::After(_)));
+    }
+
+    #[test]
+    fn export_synthesizes_tag_for_untagged_after_dependency() {
+        let first_id = ObjectId::new("task:first").unwrap();
+        let second_id = ObjectId::new("task:second").unwrap();
+        let mut ast = GanttAst::default();
+        let mut section = GanttSection::new(ObjectId::new("sec:stable").unwrap(), "Build");
+        section.task_ids_mut().extend([first_id.clone(), second_id.clone()]);
+        ast.sections_mut().push(section);
+        ast.tasks_mut().insert(
+            first_id.clone(),
+            GanttTask::new(
+                first_id.clone(),
+                "First",
+                GanttTaskStart::Date("2026-01-01".to_owned()),
+                2,
+                "2d",
+            ),
+        );
+        ast.tasks_mut().insert(
+            second_id.clone(),
+            GanttTask::new(second_id, "Second", GanttTaskStart::After(first_id), 1, "1d"),
+        );
+
+        let exported = export_gantt_diagram(&ast).expect("export");
+        assert!(exported.contains("nereid_task_first"), "{exported}");
+        let reparsed = parse_gantt_diagram(&exported).expect("exported gantt reparses");
+        assert!(reparsed.tasks().values().any(|task| {
+            matches!(task.start(), GanttTaskStart::After(_)) && task.name() == "Second"
+        }));
+    }
+
+    #[test]
+    fn export_rejects_unsectioned_and_duplicate_task_membership() {
+        let task_id = ObjectId::new("t:one").unwrap();
+        let mut ast = GanttAst::default();
+        ast.tasks_mut().insert(
+            task_id.clone(),
+            GanttTask::new(task_id.clone(), "One", GanttTaskStart::Unspecified, 1, "1d"),
+        );
+        assert_eq!(
+            export_gantt_diagram(&ast),
+            Err(MermaidGanttExportError::UnsectionedTask { task_id: task_id.clone() })
+        );
+
+        for (section_id, name) in [("sec:a", "A"), ("sec:b", "B")] {
+            let mut section = GanttSection::new(ObjectId::new(section_id).unwrap(), name);
+            section.task_ids_mut().push(task_id.clone());
+            ast.sections_mut().push(section);
+        }
+        assert!(matches!(
+            export_gantt_diagram(&ast),
+            Err(MermaidGanttExportError::DuplicateTaskMembership { .. })
+        ));
     }
 }

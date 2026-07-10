@@ -1,6 +1,6 @@
 ---
 name: nereid
-description: Collaborate in Nereid Mermaid sessions via MCP using AST-first, probe-refine workflows for sequence diagrams, flowcharts, xrefs, routes, and walkthroughs. Use when exploring or editing diagrams with a human watching live in TUI, and when coordinating attention through `attention.*`, `follow_ai.*`, and `selection.*`.
+description: Collaborate in Nereid Mermaid sessions via MCP using AST-first, probe-refine workflows for sequence, flowchart, class, entity-relationship, and Gantt diagrams, plus xrefs, routes, and walkthroughs. Use when exploring or editing diagrams with a human watching live in TUI, and when coordinating attention through `attention_*`, `follow_ai_*`, and `selection_*`.
 ---
 
 # Nereid MCP Collaboration
@@ -32,13 +32,32 @@ Treat these as separate concerns:
 
 - Treat AST as source of truth; rendered text and Mermaid text are projections.
 - Session files (`nereid-session.meta.json`, `diagrams/*.mmd`, `walkthroughs/*.wt.json`) are app-managed snapshots and can be rewritten frequently while Nereid runs.
-- Use canonical `ObjectRef` everywhere:
-  `d:<diagram_id>/<seq|flow>/<participant|message|block|section|node|edge>/<object_id>`.
+- Use canonical `ObjectRef` everywhere: `d:<diagram_id>/<category...>/<object_id>`.
+  Supported category pairs are `seq/participant`, `seq/message`, `seq/block`, `seq/section`,
+  `flow/node`, `flow/edge`, `class/class`, `class/relation`, `er/entity`, `er/relationship`,
+  `gantt/section`, `gantt/task`, and `gantt/lane`.
 - Prefer small reads first (`diagram_stat`, `diagram_get_slice`, `diagram_diff`, `walkthrough_diff`).
-- Use typed query tools (`seq.*`, `flow.*`, `xref.*`, `route_find`) before large snapshots.
+- Use typed query tools (`seq_*`, `flow_*`, `xref_*`, `route_find`) before large snapshots.
 - Gate edits with `base_rev` and keep ops minimal.
 - Record evidence as refs (xrefs and walkthrough nodes) so reasoning is resumable.
 - Keep dangling xrefs visible as TODO artifacts unless asked to clean them.
+
+## Diagram Kind Boundaries
+
+| Kind | Mermaid header | Canonical object categories | Mutation path |
+|---|---|---|---|
+| Sequence | `sequenceDiagram` | `seq/participant`, `seq/message`, `seq/block`, `seq/section` | structured `seq_*` ops or Mermaid replace |
+| Flowchart | `flowchart` / `graph` | `flow/node`, `flow/edge` | structured `flow_*` ops or Mermaid replace |
+| Class | `classDiagram` | `class/class`, `class/relation` | Mermaid replace |
+| ER | `erDiagram` | `er/entity`, `er/relationship` | Mermaid replace |
+| Gantt | `gantt` | `gantt/section`, `gantt/task`, `gantt/lane` | Mermaid replace |
+
+Creation, raw Mermaid reads, text rendering, xrefs, selection, and attention work for all five
+kinds. `diagram_get_ast` and `object_read` return kind-specific fields, including class members,
+typed ER cardinalities, and Gantt sections, starts, durations, and dependencies. Typed mutation ops
+and dedicated query helpers remain sequence/flow-specific, so edit class, ER, and Gantt diagrams
+with Mermaid replace. `gantt/lane` refs identify rendered time headers; prefer task or section refs
+for structural probing.
 
 ## Execution Discipline
 
@@ -91,7 +110,7 @@ Treat these as separate concerns:
 - Skip spotlight changes for quick query-only answers unless orientation is needed.
 - Use `selection_update` for temporary multi-object working sets, not as a focus proxy.
 - For create/switch-only requests, stop after `diagram_create_from_mermaid` (and optional
-  `attention_agent_set`); avoid extra `diagram_stat`, `diagram_render_text`, or `flow.*` probes
+  `attention_agent_set`); avoid extra `diagram_stat`, `diagram_render_text`, or `flow_*` probes
   unless the user asks for inspection/debugging.
 
 ## Tool Contracts (Input/Output)
@@ -331,7 +350,7 @@ Output:
 Use a shallow, typed exploration loop:
 1. Anchor on one object (`attention_human_read` or explicit `object_ref`).
 2. Pull local structure with `diagram_get_slice`.
-3. Ask one typed question (`seq.*`, `flow.*`, `xref.*`, `route_find`).
+3. Ask one typed question (`seq_*`, `flow_*`, `xref_*`, `route_find`).
 4. Shift agent spotlight to next object if needed.
 5. Repeat until ambiguity is resolved.
 

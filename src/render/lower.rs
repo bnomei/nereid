@@ -170,7 +170,8 @@ fn er_card_to_cap(card: ErCardinality) -> CapKind {
     match card {
         ErCardinality::ExactlyOne => CapKind::ExactlyOne,
         ErCardinality::ZeroOrOne => CapKind::ZeroOrOne,
-        ErCardinality::OneOrMore | ErCardinality::ZeroOrMore => CapKind::CrowFoot,
+        ErCardinality::OneOrMore => CapKind::CrowFoot,
+        ErCardinality::ZeroOrMore => CapKind::ZeroOrMore,
     }
 }
 
@@ -191,8 +192,8 @@ pub fn lower_er(ast: &ErAst) -> GraphModel {
         // Prefer raw Mermaid token; never invent arrow heads for pure cardinality ends.
         let bridge =
             rel.raw_connector().map(str::to_owned).or_else(|| match (start_cap, end_cap) {
-                (CapKind::ZeroOrOne, _) => Some("o--".to_owned()),
-                (_, CapKind::ZeroOrOne) => Some("--o".to_owned()),
+                (CapKind::ZeroOrOne | CapKind::ZeroOrMore, _) => Some("o--".to_owned()),
+                (_, CapKind::ZeroOrOne | CapKind::ZeroOrMore) => Some("--o".to_owned()),
                 _ => Some("---".to_owned()),
             });
         let edge = GraphEdge::new(rel.from_entity_id().clone(), rel.to_entity_id().clone())
@@ -265,5 +266,35 @@ mod tests {
         assert_eq!(scene.family_name(), "graph");
         let scene = lower_diagram_ast(&DiagramAst::Sequence(SequenceAst::default()));
         assert_eq!(scene.family_name(), "track");
+    }
+
+    #[test]
+    fn default_class_relation_caps_survive_export_roundtrip() {
+        let mut ast = ClassAst::default();
+        ast.classes_mut().insert(oid("c:a"), crate::model::ClassNode::new("A"));
+        ast.classes_mut().insert(oid("c:b"), crate::model::ClassNode::new("B"));
+        ast.relations_mut().insert(
+            oid("r:1"),
+            crate::model::ClassRelation::new(
+                oid("c:a"),
+                oid("c:b"),
+                ClassRelationKind::Composition,
+            ),
+        );
+
+        let before = lower_class(&ast);
+        let exported = crate::format::mermaid::export_class_diagram(&ast).expect("export");
+        let reparsed = crate::format::mermaid::parse_class_diagram(&exported).expect("parse");
+        let after = lower_class(&reparsed);
+        let before_edge = before.edges().values().next().unwrap();
+        let after_edge = after.edges().values().next().unwrap();
+        assert_eq!(before_edge.start_cap(), after_edge.start_cap());
+        assert_eq!(before_edge.end_cap(), after_edge.end_cap());
+    }
+
+    #[test]
+    fn er_one_or_more_and_zero_or_more_lower_to_distinct_caps() {
+        assert_eq!(er_card_to_cap(ErCardinality::OneOrMore), CapKind::CrowFoot);
+        assert_eq!(er_card_to_cap(ErCardinality::ZeroOrMore), CapKind::ZeroOrMore);
     }
 }

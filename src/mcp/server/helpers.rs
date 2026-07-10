@@ -13,7 +13,7 @@ fn diagram_kind_label(kind: DiagramKind) -> &'static str {
         DiagramKind::Sequence => "Sequence",
         DiagramKind::Flowchart => "Flowchart",
         DiagramKind::Class => "Class",
-        DiagramKind::Er => "Er",
+        DiagramKind::Er => "ER",
         DiagramKind::Gantt => "Gantt",
     }
 }
@@ -91,12 +91,16 @@ fn digest_for_diagram(diagram: &Diagram) -> DiagramDigest {
                 messages: ast.messages().len() as u64,
                 nodes: 0,
                 edges: 0,
+                classes: 0,
+                relations: 0,
+                entities: 0,
+                relationships: 0,
+                sections: 0,
+                tasks: 0,
+                dependencies: 0,
+                lanes: 0,
             },
-            key_names: ast
-                .participants()
-                .values()
-                .map(|p| p.mermaid_name().to_owned())
-                .collect(),
+            key_names: ast.participants().values().map(|p| p.mermaid_name().to_owned()).collect(),
             context: ReadContext::default(),
         },
         DiagramAst::Flowchart(ast) => DiagramDigest {
@@ -106,6 +110,14 @@ fn digest_for_diagram(diagram: &Diagram) -> DiagramDigest {
                 messages: 0,
                 nodes: ast.nodes().len() as u64,
                 edges: ast.edges().len() as u64,
+                classes: 0,
+                relations: 0,
+                entities: 0,
+                relationships: 0,
+                sections: 0,
+                tasks: 0,
+                dependencies: 0,
+                lanes: 0,
             },
             key_names: ast.nodes().values().map(|n| n.label().to_owned()).collect(),
             context: ReadContext::default(),
@@ -117,6 +129,14 @@ fn digest_for_diagram(diagram: &Diagram) -> DiagramDigest {
                 messages: 0,
                 nodes: ast.classes().len() as u64,
                 edges: ast.relations().len() as u64,
+                classes: ast.classes().len() as u64,
+                relations: ast.relations().len() as u64,
+                entities: 0,
+                relationships: 0,
+                sections: 0,
+                tasks: 0,
+                dependencies: 0,
+                lanes: 0,
             },
             key_names: ast.classes().values().map(|c| c.name().to_owned()).collect(),
             context: ReadContext::default(),
@@ -128,6 +148,14 @@ fn digest_for_diagram(diagram: &Diagram) -> DiagramDigest {
                 messages: 0,
                 nodes: ast.entities().len() as u64,
                 edges: ast.relationships().len() as u64,
+                classes: 0,
+                relations: 0,
+                entities: ast.entities().len() as u64,
+                relationships: ast.relationships().len() as u64,
+                sections: 0,
+                tasks: 0,
+                dependencies: 0,
+                lanes: 0,
             },
             key_names: ast.entities().values().map(|e| e.name().to_owned()).collect(),
             context: ReadContext::default(),
@@ -138,7 +166,23 @@ fn digest_for_diagram(diagram: &Diagram) -> DiagramDigest {
                 participants: 0,
                 messages: 0,
                 nodes: ast.tasks().len() as u64,
-                edges: 0,
+                edges: ast
+                    .tasks()
+                    .values()
+                    .filter(|task| matches!(task.start(), crate::model::GanttTaskStart::After(_)))
+                    .count() as u64,
+                classes: 0,
+                relations: 0,
+                entities: 0,
+                relationships: 0,
+                sections: ast.sections().len() as u64,
+                tasks: ast.tasks().len() as u64,
+                dependencies: ast
+                    .tasks()
+                    .values()
+                    .filter(|task| matches!(task.start(), crate::model::GanttTaskStart::After(_)))
+                    .count() as u64,
+                lanes: ast.lanes().len() as u64,
             },
             key_names: ast.tasks().values().map(|t| t.name().to_owned()).collect(),
             context: ReadContext::default(),
@@ -175,7 +219,8 @@ fn mermaid_for_gantt(ast: &crate::model::GanttAst) -> String {
 }
 
 fn mermaid_for_class(ast: &crate::model::ClassAst) -> String {
-    crate::format::mermaid::export_class_diagram(ast).unwrap_or_else(|_| "classDiagram\n".to_owned())
+    crate::format::mermaid::export_class_diagram(ast)
+        .unwrap_or_else(|_| "classDiagram\n".to_owned())
 }
 
 fn mcp_ast_for_diagram(diagram: &Diagram) -> McpDiagramAst {
@@ -208,23 +253,13 @@ fn mcp_ast_for_diagram(diagram: &Diagram) -> McpDiagramAst {
                 })
                 .collect::<Vec<_>>();
             messages.sort_by(|a, b| {
-                a.order_key
-                    .cmp(&b.order_key)
-                    .then_with(|| a.message_id.cmp(&b.message_id))
+                a.order_key.cmp(&b.order_key).then_with(|| a.message_id.cmp(&b.message_id))
             });
 
-            let mut blocks = ast
-                .blocks()
-                .iter()
-                .map(map_seq_block_to_mcp)
-                .collect::<Vec<_>>();
+            let mut blocks = ast.blocks().iter().map(map_seq_block_to_mcp).collect::<Vec<_>>();
             blocks.sort_by(|a, b| a.block_id.cmp(&b.block_id));
 
-            McpDiagramAst::Sequence {
-                participants,
-                messages,
-                blocks,
-            }
+            McpDiagramAst::Sequence { participants, messages, blocks }
         }
         DiagramAst::Flowchart(ast) => {
             let mut nodes = ast
@@ -258,82 +293,142 @@ fn mcp_ast_for_diagram(diagram: &Diagram) -> McpDiagramAst {
             McpDiagramAst::Flowchart { nodes, edges }
         }
         DiagramAst::Class(ast) => {
-            // Project class diagrams into the flowchart MCP shape (nodes/edges) for v1 tooling.
-            let mut nodes = ast
+            let mut classes = ast
                 .classes()
                 .iter()
-                .map(|(class_id, class)| McpFlowNodeAst {
-                    node_id: class_id.to_string(),
-                    label: class.name().to_owned(),
-                    shape: "class".to_owned(),
-                    mermaid_id: Some(class.name().to_owned()),
+                .map(|(class_id, class)| McpClassNodeAst {
+                    class_id: class_id.to_string(),
+                    name: class.name().to_owned(),
+                    attributes: class.attributes().to_vec(),
+                    methods: class.methods().to_vec(),
                     note: class.note().map(str::to_owned),
-                    symbol: None,
                 })
                 .collect::<Vec<_>>();
-            nodes.sort_by(|a, b| a.node_id.cmp(&b.node_id));
+            classes.sort_by(|a, b| a.class_id.cmp(&b.class_id));
 
-            let mut edges = ast
+            let mut relations = ast
                 .relations()
                 .iter()
-                .map(|(rel_id, rel)| McpFlowEdgeAst {
-                    edge_id: rel_id.to_string(),
-                    from_node_id: rel.from_class_id().to_string(),
-                    to_node_id: rel.to_class_id().to_string(),
+                .map(|(rel_id, rel)| McpClassRelationAst {
+                    relation_id: rel_id.to_string(),
+                    from_class_id: rel.from_class_id().to_string(),
+                    to_class_id: rel.to_class_id().to_string(),
+                    kind: map_class_relation_kind_to_mcp(rel.kind()),
                     label: rel.label().map(ToOwned::to_owned),
-                    connector: rel.raw_connector().map(ToOwned::to_owned),
-                    style: None,
+                    raw_connector: rel.raw_connector().map(ToOwned::to_owned),
                 })
                 .collect::<Vec<_>>();
-            edges.sort_by(|a, b| a.edge_id.cmp(&b.edge_id));
+            relations.sort_by(|a, b| a.relation_id.cmp(&b.relation_id));
 
-            McpDiagramAst::Flowchart { nodes, edges }
+            McpDiagramAst::Class { classes, relations }
         }
         DiagramAst::Er(ast) => {
-            let mut nodes = ast
+            let mut entities = ast
                 .entities()
                 .iter()
-                .map(|(id, e)| McpFlowNodeAst {
-                    node_id: id.to_string(),
-                    label: e.name().to_owned(),
-                    shape: "entity".to_owned(),
-                    mermaid_id: Some(e.name().to_owned()),
-                    note: e.note().map(str::to_owned),
-                    symbol: None,
+                .map(|(id, entity)| McpErEntityAst {
+                    entity_id: id.to_string(),
+                    name: entity.name().to_owned(),
+                    note: entity.note().map(str::to_owned),
                 })
                 .collect::<Vec<_>>();
-            nodes.sort_by(|a, b| a.node_id.cmp(&b.node_id));
-            let mut edges = ast
+            entities.sort_by(|a, b| a.entity_id.cmp(&b.entity_id));
+            let mut relationships = ast
                 .relationships()
                 .iter()
-                .map(|(id, r)| McpFlowEdgeAst {
-                    edge_id: id.to_string(),
-                    from_node_id: r.from_entity_id().to_string(),
-                    to_node_id: r.to_entity_id().to_string(),
-                    label: r.label().map(ToOwned::to_owned),
-                    connector: r.raw_connector().map(ToOwned::to_owned),
-                    style: None,
+                .map(|(id, relationship)| McpErRelationshipAst {
+                    relationship_id: id.to_string(),
+                    from_entity_id: relationship.from_entity_id().to_string(),
+                    to_entity_id: relationship.to_entity_id().to_string(),
+                    from_cardinality: map_er_cardinality_to_mcp(relationship.from_card()),
+                    to_cardinality: map_er_cardinality_to_mcp(relationship.to_card()),
+                    stroke: map_er_stroke_to_mcp(relationship.stroke()),
+                    label: relationship.label().map(ToOwned::to_owned),
+                    raw_connector: relationship.raw_connector().map(ToOwned::to_owned),
                 })
                 .collect::<Vec<_>>();
-            edges.sort_by(|a, b| a.edge_id.cmp(&b.edge_id));
-            McpDiagramAst::Flowchart { nodes, edges }
+            relationships.sort_by(|a, b| a.relationship_id.cmp(&b.relationship_id));
+            McpDiagramAst::Er { entities, relationships }
         }
         DiagramAst::Gantt(ast) => {
-            let mut nodes = ast
+            let sections = ast
+                .sections()
+                .iter()
+                .map(|section| McpGanttSectionAst {
+                    section_id: section.section_id().to_string(),
+                    name: section.name().to_owned(),
+                    task_ids: section.task_ids().iter().map(ToString::to_string).collect(),
+                })
+                .collect();
+            let mut tasks = ast
                 .tasks()
                 .iter()
-                .map(|(id, task)| McpFlowNodeAst {
-                    node_id: id.to_string(),
-                    label: task.name().to_owned(),
-                    shape: "task".to_owned(),
-                    mermaid_id: task.mermaid_tag().map(ToOwned::to_owned),
+                .map(|(id, task)| McpGanttTaskAst {
+                    task_id: id.to_string(),
+                    mermaid_tag: task.mermaid_tag().map(ToOwned::to_owned),
+                    name: task.name().to_owned(),
+                    start: map_gantt_task_start_to_mcp(task.start()),
+                    duration_days: task.duration_days(),
+                    raw_duration: task.raw_duration().to_owned(),
                     note: task.note().map(str::to_owned),
-                    symbol: None,
                 })
                 .collect::<Vec<_>>();
-            nodes.sort_by(|a, b| a.node_id.cmp(&b.node_id));
-            McpDiagramAst::Flowchart { nodes, edges: Vec::new() }
+            tasks.sort_by(|a, b| a.task_id.cmp(&b.task_id));
+            let lanes = ast
+                .lanes()
+                .into_iter()
+                .map(|(lane_id, label)| McpGanttLaneAst {
+                    note: ast.lane_note(&lane_id).map(ToOwned::to_owned),
+                    lane_id: lane_id.to_string(),
+                    label,
+                })
+                .collect();
+            McpDiagramAst::Gantt {
+                title: ast.title().map(ToOwned::to_owned),
+                date_format: ast.date_format().map(ToOwned::to_owned),
+                sections,
+                tasks,
+                lanes,
+            }
         }
+    }
+}
+
+fn map_class_relation_kind_to_mcp(kind: crate::model::ClassRelationKind) -> McpClassRelationKind {
+    match kind {
+        crate::model::ClassRelationKind::Inheritance => McpClassRelationKind::Inheritance,
+        crate::model::ClassRelationKind::Composition => McpClassRelationKind::Composition,
+        crate::model::ClassRelationKind::Aggregation => McpClassRelationKind::Aggregation,
+        crate::model::ClassRelationKind::Association => McpClassRelationKind::Association,
+        crate::model::ClassRelationKind::Dependency => McpClassRelationKind::Dependency,
+        crate::model::ClassRelationKind::Realization => McpClassRelationKind::Realization,
+        crate::model::ClassRelationKind::Link => McpClassRelationKind::Link,
+    }
+}
+
+fn map_er_cardinality_to_mcp(cardinality: crate::model::ErCardinality) -> McpErCardinality {
+    match cardinality {
+        crate::model::ErCardinality::ExactlyOne => McpErCardinality::ExactlyOne,
+        crate::model::ErCardinality::ZeroOrOne => McpErCardinality::ZeroOrOne,
+        crate::model::ErCardinality::OneOrMore => McpErCardinality::OneOrMore,
+        crate::model::ErCardinality::ZeroOrMore => McpErCardinality::ZeroOrMore,
+    }
+}
+
+fn map_er_stroke_to_mcp(stroke: crate::model::ErStroke) -> McpErStroke {
+    match stroke {
+        crate::model::ErStroke::Identifying => McpErStroke::Identifying,
+        crate::model::ErStroke::NonIdentifying => McpErStroke::NonIdentifying,
+    }
+}
+
+fn map_gantt_task_start_to_mcp(start: &crate::model::GanttTaskStart) -> McpGanttTaskStart {
+    match start {
+        crate::model::GanttTaskStart::Date(date) => McpGanttTaskStart::Date { date: date.clone() },
+        crate::model::GanttTaskStart::After(task_id) => {
+            McpGanttTaskStart::After { task_id: task_id.to_string() }
+        }
+        crate::model::GanttTaskStart::Unspecified => McpGanttTaskStart::Unspecified,
     }
 }
 
@@ -403,20 +498,12 @@ fn map_seq_block_to_mcp(block: &crate::model::seq_ast::SequenceBlock) -> McpSeqB
             section_id: section.section_id().to_string(),
             kind: map_seq_section_kind_to_mcp(section.kind()),
             header: section.header().map(ToOwned::to_owned),
-            message_ids: section
-                .message_ids()
-                .iter()
-                .map(ToString::to_string)
-                .collect(),
+            message_ids: section.message_ids().iter().map(ToString::to_string).collect(),
         })
         .collect::<Vec<_>>();
     sections.sort_by(|a, b| a.section_id.cmp(&b.section_id));
 
-    let mut blocks = block
-        .blocks()
-        .iter()
-        .map(map_seq_block_to_mcp)
-        .collect::<Vec<_>>();
+    let mut blocks = block.blocks().iter().map(map_seq_block_to_mcp).collect::<Vec<_>>();
     blocks.sort_by(|a, b| a.block_id.cmp(&b.block_id));
 
     McpSeqBlockAst {
@@ -462,10 +549,7 @@ fn mermaid_for_sequence(ast: &crate::model::SequenceAst) -> String {
             crate::model::SequenceMessageKind::Async => "-)",
             crate::model::SequenceMessageKind::Return => "-->>",
         };
-        let arrow = msg
-            .raw_arrow()
-            .filter(|raw| !raw.is_empty())
-            .unwrap_or(arrow);
+        let arrow = msg.raw_arrow().filter(|raw| !raw.is_empty()).unwrap_or(arrow);
 
         out.push_str("    ");
         out.push_str(from_name);
@@ -498,10 +582,7 @@ fn mermaid_for_flowchart(ast: &crate::model::FlowchartAst) -> String {
         out.push_str("    ");
         out.push_str(&from_id);
         out.push(' ');
-        let op = edge
-            .connector()
-            .filter(|connector| !connector.is_empty())
-            .unwrap_or("-->");
+        let op = edge.connector().filter(|connector| !connector.is_empty()).unwrap_or("-->");
         out.push_str(op);
         if let Some(label) = edge.label().filter(|label| !label.is_empty()) {
             out.push('|');
@@ -552,9 +633,7 @@ fn mermaid_safe_id(raw: &str) -> String {
 }
 
 fn mermaid_escape_text(raw: &str) -> String {
-    raw.replace('\\', "\\\\")
-        .replace('"', "\\\"")
-        .replace('\n', "\\n")
+    raw.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n")
 }
 
 fn mermaid_node_shape(label: &str, shape: Option<&str>) -> String {
@@ -613,10 +692,8 @@ fn delta_response_from_history(
 
     let mut changes = Vec::new();
     if !added.is_empty() {
-        changes.push(DeltaChange {
-            kind: DeltaChangeKind::Added,
-            refs: added.into_iter().collect(),
-        });
+        changes
+            .push(DeltaChange { kind: DeltaChangeKind::Added, refs: added.into_iter().collect() });
     }
     if !removed.is_empty() {
         changes.push(DeltaChange {
@@ -631,11 +708,7 @@ fn delta_response_from_history(
         });
     }
 
-    Some(DiagramDeltaResponse {
-        from_rev: since_rev,
-        to_rev: current_rev,
-        changes,
-    })
+    Some(DiagramDeltaResponse { from_rev: since_rev, to_rev: current_rev, changes })
 }
 
 fn diagram_meta_ref(diagram_id: &DiagramId) -> String {
@@ -675,10 +748,8 @@ fn walkthrough_delta_response_from_history(
 
     let mut changes = Vec::new();
     if !added.is_empty() {
-        changes.push(DeltaChange {
-            kind: DeltaChangeKind::Added,
-            refs: added.into_iter().collect(),
-        });
+        changes
+            .push(DeltaChange { kind: DeltaChangeKind::Added, refs: added.into_iter().collect() });
     }
     if !removed.is_empty() {
         changes.push(DeltaChange {
@@ -693,11 +764,7 @@ fn walkthrough_delta_response_from_history(
         });
     }
 
-    Some(WalkthroughDeltaResponse {
-        from_rev: since_rev,
-        to_rev: current_rev,
-        changes,
-    })
+    Some(WalkthroughDeltaResponse { from_rev: since_rev, to_rev: current_rev, changes })
 }
 
 fn delta_unavailable(since_rev: u64, current_rev: u64, supported_since_rev: u64) -> ErrorData {
@@ -775,21 +842,10 @@ fn apply_walkthrough_ops(
                 walkthrough.set_title(title.clone());
                 delta.updated.insert(walkthrough_meta_ref(walkthrough_id));
             }
-            McpWalkthroughOp::AddNode {
-                node_id,
-                title,
-                body_md,
-                refs,
-                tags,
-                status,
-            } => {
+            McpWalkthroughOp::AddNode { node_id, title, body_md, refs, tags, status } => {
                 let parsed_node_id = parse_walkthrough_node_id(node_id)?;
 
-                if walkthrough
-                    .nodes()
-                    .iter()
-                    .any(|node| node.node_id() == &parsed_node_id)
-                {
+                if walkthrough.nodes().iter().any(|node| node.node_id() == &parsed_node_id) {
                     return Err(ErrorData::invalid_params(
                         "node_id already exists",
                         Some(serde_json::json!({
@@ -816,18 +872,9 @@ fn apply_walkthrough_ops(
                 }
 
                 walkthrough.nodes_mut().push(node);
-                delta
-                    .added
-                    .insert(walkthrough_node_ref(walkthrough_id, &parsed_node_id));
+                delta.added.insert(walkthrough_node_ref(walkthrough_id, &parsed_node_id));
             }
-            McpWalkthroughOp::UpdateNode {
-                node_id,
-                title,
-                body_md,
-                refs,
-                tags,
-                status,
-            } => {
+            McpWalkthroughOp::UpdateNode { node_id, title, body_md, refs, tags, status } => {
                 let parsed_node_id = parse_walkthrough_node_id(node_id)?;
                 let (
                     node_index,
@@ -886,9 +933,7 @@ fn apply_walkthrough_ops(
                 }
 
                 walkthrough.nodes_mut()[node_index] = replacement;
-                delta
-                    .updated
-                    .insert(walkthrough_node_ref(walkthrough_id, &parsed_node_id));
+                delta.updated.insert(walkthrough_node_ref(walkthrough_id, &parsed_node_id));
             }
             McpWalkthroughOp::RemoveNode { node_id } => {
                 let parsed_node_id = parse_walkthrough_node_id(node_id)?;
@@ -906,9 +951,7 @@ fn apply_walkthrough_ops(
                         )
                     })?;
                 walkthrough.nodes_mut().remove(node_index);
-                delta
-                    .removed
-                    .insert(walkthrough_node_ref(walkthrough_id, &parsed_node_id));
+                delta.removed.insert(walkthrough_node_ref(walkthrough_id, &parsed_node_id));
 
                 let mut removed_edges = Vec::new();
                 walkthrough.edges_mut().retain(|edge| {
@@ -925,26 +968,15 @@ fn apply_walkthrough_ops(
                 });
 
                 for (from, to, kind) in removed_edges {
-                    delta
-                        .removed
-                        .insert(walkthrough_edge_ref(walkthrough_id, &from, &to, &kind));
+                    delta.removed.insert(walkthrough_edge_ref(walkthrough_id, &from, &to, &kind));
                 }
             }
-            McpWalkthroughOp::AddEdge {
-                from_node_id,
-                to_node_id,
-                kind,
-                label,
-            } => {
+            McpWalkthroughOp::AddEdge { from_node_id, to_node_id, kind, label } => {
                 validate_walkthrough_edge_kind(kind)?;
                 let parsed_from = parse_walkthrough_node_id(from_node_id)?;
                 let parsed_to = parse_walkthrough_node_id(to_node_id)?;
 
-                if !walkthrough
-                    .nodes()
-                    .iter()
-                    .any(|node| node.node_id() == &parsed_from)
-                {
+                if !walkthrough.nodes().iter().any(|node| node.node_id() == &parsed_from) {
                     return Err(ErrorData::resource_not_found(
                         "walkthrough node not found",
                         Some(serde_json::json!({
@@ -954,11 +986,7 @@ fn apply_walkthrough_ops(
                     ));
                 }
 
-                if !walkthrough
-                    .nodes()
-                    .iter()
-                    .any(|node| node.node_id() == &parsed_to)
-                {
+                if !walkthrough.nodes().iter().any(|node| node.node_id() == &parsed_to) {
                     return Err(ErrorData::resource_not_found(
                         "walkthrough node not found",
                         Some(serde_json::json!({
@@ -996,12 +1024,7 @@ fn apply_walkthrough_ops(
                     kind,
                 ));
             }
-            McpWalkthroughOp::UpdateEdge {
-                from_node_id,
-                to_node_id,
-                kind,
-                label,
-            } => {
+            McpWalkthroughOp::UpdateEdge { from_node_id, to_node_id, kind, label } => {
                 validate_walkthrough_edge_kind(kind)?;
                 let parsed_from = parse_walkthrough_node_id(from_node_id)?;
                 let parsed_to = parse_walkthrough_node_id(to_node_id)?;
@@ -1037,11 +1060,7 @@ fn apply_walkthrough_ops(
                     kind,
                 ));
             }
-            McpWalkthroughOp::RemoveEdge {
-                from_node_id,
-                to_node_id,
-                kind,
-            } => {
+            McpWalkthroughOp::RemoveEdge { from_node_id, to_node_id, kind } => {
                 validate_walkthrough_edge_kind(kind)?;
                 let parsed_from = parse_walkthrough_node_id(from_node_id)?;
                 let parsed_to = parse_walkthrough_node_id(to_node_id)?;
@@ -1146,17 +1165,11 @@ fn map_replace_error(err: crate::store::DiagramMermaidReplaceError) -> ErrorData
 
 fn map_apply_error(err: ApplyError) -> ErrorData {
     match err {
-        ApplyError::Conflict {
-            base_rev,
-            current_rev,
-        } => ErrorData::invalid_request(
+        ApplyError::Conflict { base_rev, current_rev } => ErrorData::invalid_request(
             "conflict: stale base_rev",
             Some(serde_json::json!({ "base_rev": base_rev, "current_rev": current_rev })),
         ),
-        ApplyError::KindMismatch {
-            diagram_kind,
-            op_kind,
-        } => ErrorData::invalid_params(
+        ApplyError::KindMismatch { diagram_kind, op_kind } => ErrorData::invalid_params(
             "op kind mismatch for diagram kind",
             Some(
                 serde_json::json!({ "diagram_kind": format!("{diagram_kind:?}"), "op_kind": format!("{op_kind:?}") }),
@@ -1185,53 +1198,47 @@ fn map_apply_error(err: ApplyError) -> ErrorData {
         ApplyError::InvalidSeqParticipantMermaidName { mermaid_name, reason } => {
             ErrorData::invalid_params(
                 "invalid sequence participant Mermaid name",
-                Some(
-                    serde_json::json!({
-                        "mermaid_name": mermaid_name,
-                        "reason": reason.to_string(),
-                    }),
-                ),
+                Some(serde_json::json!({
+                    "mermaid_name": mermaid_name,
+                    "reason": reason.to_string(),
+                })),
             )
         }
-        ApplyError::DuplicateSeqParticipantMermaidName {
-            mermaid_name,
-            participant_id,
-        } => ErrorData::invalid_params(
-            "sequence participant Mermaid name already in use",
-            Some(
-                serde_json::json!({
+        ApplyError::DuplicateSeqParticipantMermaidName { mermaid_name, participant_id } => {
+            ErrorData::invalid_params(
+                "sequence participant Mermaid name already in use",
+                Some(serde_json::json!({
                     "mermaid_name": mermaid_name,
                     "participant_id": participant_id.to_string(),
-                }),
-            ),
-        ),
+                })),
+            )
+        }
         ApplyError::InvalidFlowNodeMermaidId { mermaid_id, reason } => ErrorData::invalid_params(
             "invalid flow node Mermaid id",
             Some(serde_json::json!({ "mermaid_id": mermaid_id, "reason": reason.to_string() })),
         ),
-        ApplyError::DuplicateFlowNodeMermaidId {
-            mermaid_id,
-            node_id,
-        } => ErrorData::invalid_params(
-            "flow node Mermaid id already in use",
-            Some(serde_json::json!({ "mermaid_id": mermaid_id, "node_id": node_id.to_string() })),
-        ),
+        ApplyError::DuplicateFlowNodeMermaidId { mermaid_id, node_id } => {
+            ErrorData::invalid_params(
+                "flow node Mermaid id already in use",
+                Some(
+                    serde_json::json!({ "mermaid_id": mermaid_id, "node_id": node_id.to_string() }),
+                ),
+            )
+        }
         ApplyError::InvalidSymbolAnchor { source } => ErrorData::invalid_params(
             "invalid symbol anchor",
             Some(serde_json::json!({ "reason": source.to_string() })),
         ),
-        ApplyError::InvalidSeqSectionKind {
-            block_id,
-            block_kind,
-            section_kind,
-        } => ErrorData::invalid_params(
-            "invalid section kind for block",
-            Some(serde_json::json!({
-                "block_id": block_id.to_string(),
-                "block_kind": format!("{block_kind:?}"),
-                "section_kind": format!("{section_kind:?}"),
-            })),
-        ),
+        ApplyError::InvalidSeqSectionKind { block_id, block_kind, section_kind } => {
+            ErrorData::invalid_params(
+                "invalid section kind for block",
+                Some(serde_json::json!({
+                    "block_id": block_id.to_string(),
+                    "block_kind": format!("{block_kind:?}"),
+                    "section_kind": format!("{section_kind:?}"),
+                })),
+            )
+        }
         ApplyError::InvalidSeqSectionNotEmpty { section_id } => ErrorData::invalid_params(
             "section still has messages",
             Some(serde_json::json!({ "section_id": section_id.to_string() })),
@@ -1372,39 +1379,33 @@ fn refresh_xref_statuses(session: &mut Session) {
 
 fn mcp_op_to_internal(op: &McpOp) -> Result<Op, ErrorData> {
     Ok(match op {
-        McpOp::SeqAddParticipant {
-            participant_id,
-            mermaid_name,
-        } => Op::Seq(SeqOp::AddParticipant {
-            participant_id: parse_object_id(participant_id)?,
-            mermaid_name: mermaid_name.clone(),
-        }),
-        McpOp::SeqUpdateParticipant {
-            participant_id,
-            mermaid_name,
-        } => Op::Seq(SeqOp::UpdateParticipant {
-            participant_id: parse_object_id(participant_id)?,
-            patch: SeqParticipantPatch {
+        McpOp::SeqAddParticipant { participant_id, mermaid_name } => {
+            Op::Seq(SeqOp::AddParticipant {
+                participant_id: parse_object_id(participant_id)?,
                 mermaid_name: mermaid_name.clone(),
-            },
-        }),
-        McpOp::SeqSetParticipantNote {
-            participant_id,
-            note,
-        } => Op::Seq(SeqOp::SetParticipantNote {
-            participant_id: parse_object_id(participant_id)?,
-            note: note.clone(),
-        }),
-        McpOp::SeqSetParticipantSymbol {
-            participant_id,
-            symbol,
-        } => Op::Seq(SeqOp::SetParticipantSymbol {
-            participant_id: parse_object_id(participant_id)?,
-            symbol: symbol.as_ref().map(internal_symbol_anchor).transpose()?,
-        }),
-        McpOp::SeqRemoveParticipant { participant_id } => Op::Seq(SeqOp::RemoveParticipant {
-            participant_id: parse_object_id(participant_id)?,
-        }),
+            })
+        }
+        McpOp::SeqUpdateParticipant { participant_id, mermaid_name } => {
+            Op::Seq(SeqOp::UpdateParticipant {
+                participant_id: parse_object_id(participant_id)?,
+                patch: SeqParticipantPatch { mermaid_name: mermaid_name.clone() },
+            })
+        }
+        McpOp::SeqSetParticipantNote { participant_id, note } => {
+            Op::Seq(SeqOp::SetParticipantNote {
+                participant_id: parse_object_id(participant_id)?,
+                note: note.clone(),
+            })
+        }
+        McpOp::SeqSetParticipantSymbol { participant_id, symbol } => {
+            Op::Seq(SeqOp::SetParticipantSymbol {
+                participant_id: parse_object_id(participant_id)?,
+                symbol: symbol.as_ref().map(internal_symbol_anchor).transpose()?,
+            })
+        }
+        McpOp::SeqRemoveParticipant { participant_id } => {
+            Op::Seq(SeqOp::RemoveParticipant { participant_id: parse_object_id(participant_id)? })
+        }
         McpOp::SeqAddMessage {
             message_id,
             from_participant_id,
@@ -1439,52 +1440,39 @@ fn mcp_op_to_internal(op: &McpOp) -> Result<Op, ErrorData> {
                     .as_deref()
                     .map(parse_object_id)
                     .transpose()?,
-                to_participant_id: to_participant_id
-                    .as_deref()
-                    .map(parse_object_id)
-                    .transpose()?,
+                to_participant_id: to_participant_id.as_deref().map(parse_object_id).transpose()?,
                 kind: kind.map(map_message_kind),
                 arrow: arrow.clone(),
                 text: text.clone(),
                 order_key: *order_key,
             },
         }),
-        McpOp::SeqRemoveMessage { message_id } => Op::Seq(SeqOp::RemoveMessage {
-            message_id: parse_object_id(message_id)?,
-        }),
-        McpOp::SeqSetMessageSection {
-            message_id,
-            section_id,
-        } => Op::Seq(SeqOp::SetMessageSection {
-            message_id: parse_object_id(message_id)?,
-            section_id: section_id.as_deref().map(parse_object_id).transpose()?,
-        }),
-        McpOp::SeqAddBlock {
-            block_id,
-            kind,
-            header,
-            parent_block_id,
-            main_section_id,
-        } => Op::Seq(SeqOp::AddBlock {
-            block_id: parse_object_id(block_id)?,
-            kind: map_mcp_seq_block_kind(*kind),
-            header: header.clone(),
-            parent_block_id: parent_block_id.as_deref().map(parse_object_id).transpose()?,
-            main_section_id: parse_object_id(main_section_id)?,
-        }),
+        McpOp::SeqRemoveMessage { message_id } => {
+            Op::Seq(SeqOp::RemoveMessage { message_id: parse_object_id(message_id)? })
+        }
+        McpOp::SeqSetMessageSection { message_id, section_id } => {
+            Op::Seq(SeqOp::SetMessageSection {
+                message_id: parse_object_id(message_id)?,
+                section_id: section_id.as_deref().map(parse_object_id).transpose()?,
+            })
+        }
+        McpOp::SeqAddBlock { block_id, kind, header, parent_block_id, main_section_id } => {
+            Op::Seq(SeqOp::AddBlock {
+                block_id: parse_object_id(block_id)?,
+                kind: map_mcp_seq_block_kind(*kind),
+                header: header.clone(),
+                parent_block_id: parent_block_id.as_deref().map(parse_object_id).transpose()?,
+                main_section_id: parse_object_id(main_section_id)?,
+            })
+        }
         McpOp::SeqUpdateBlock { block_id, header } => Op::Seq(SeqOp::UpdateBlock {
             block_id: parse_object_id(block_id)?,
             patch: SeqBlockPatch { header: header.clone() },
         }),
-        McpOp::SeqRemoveBlock { block_id } => Op::Seq(SeqOp::RemoveBlock {
-            block_id: parse_object_id(block_id)?,
-        }),
-        McpOp::SeqAddSection {
-            section_id,
-            block_id,
-            kind,
-            header,
-        } => Op::Seq(SeqOp::AddSection {
+        McpOp::SeqRemoveBlock { block_id } => {
+            Op::Seq(SeqOp::RemoveBlock { block_id: parse_object_id(block_id)? })
+        }
+        McpOp::SeqAddSection { section_id, block_id, kind, header } => Op::Seq(SeqOp::AddSection {
             section_id: parse_object_id(section_id)?,
             block_id: parse_object_id(block_id)?,
             kind: map_mcp_seq_section_add_kind(*kind),
@@ -1494,82 +1482,57 @@ fn mcp_op_to_internal(op: &McpOp) -> Result<Op, ErrorData> {
             section_id: parse_object_id(section_id)?,
             patch: SeqSectionPatch { header: header.clone() },
         }),
-        McpOp::SeqRemoveSection { section_id } => Op::Seq(SeqOp::RemoveSection {
-            section_id: parse_object_id(section_id)?,
-        }),
-        McpOp::FlowAddNode {
-            node_id,
-            label,
-            shape,
-        } => Op::Flow(FlowOp::AddNode {
+        McpOp::SeqRemoveSection { section_id } => {
+            Op::Seq(SeqOp::RemoveSection { section_id: parse_object_id(section_id)? })
+        }
+        McpOp::FlowAddNode { node_id, label, shape } => Op::Flow(FlowOp::AddNode {
             node_id: parse_object_id(node_id)?,
             label: label.clone(),
             shape: shape.clone(),
         }),
-        McpOp::FlowUpdateNode {
-            node_id,
-            label,
-            shape,
-        } => Op::Flow(FlowOp::UpdateNode {
+        McpOp::FlowUpdateNode { node_id, label, shape } => Op::Flow(FlowOp::UpdateNode {
             node_id: parse_object_id(node_id)?,
-            patch: FlowNodePatch {
-                label: label.clone(),
-                shape: shape.clone(),
-            },
+            patch: FlowNodePatch { label: label.clone(), shape: shape.clone() },
         }),
-        McpOp::FlowSetNodeMermaidId {
-            node_id,
-            mermaid_id,
-        } => Op::Flow(FlowOp::SetNodeMermaidId {
+        McpOp::FlowSetNodeMermaidId { node_id, mermaid_id } => Op::Flow(FlowOp::SetNodeMermaidId {
             node_id: parse_object_id(node_id)?,
             mermaid_id: mermaid_id.clone(),
         }),
-        McpOp::FlowSetNodeNote { node_id, note } => Op::Flow(FlowOp::SetNodeNote {
-            node_id: parse_object_id(node_id)?,
-            note: note.clone(),
-        }),
+        McpOp::FlowSetNodeNote { node_id, note } => {
+            Op::Flow(FlowOp::SetNodeNote { node_id: parse_object_id(node_id)?, note: note.clone() })
+        }
         McpOp::FlowSetNodeSymbol { node_id, symbol } => Op::Flow(FlowOp::SetNodeSymbol {
             node_id: parse_object_id(node_id)?,
             symbol: symbol.as_ref().map(internal_symbol_anchor).transpose()?,
         }),
-        McpOp::FlowRemoveNode { node_id } => Op::Flow(FlowOp::RemoveNode {
-            node_id: parse_object_id(node_id)?,
-        }),
-        McpOp::FlowAddEdge {
-            edge_id,
-            from_node_id,
-            to_node_id,
-            label,
-            connector,
-            style,
-        } => Op::Flow(FlowOp::AddEdge {
-            edge_id: parse_object_id(edge_id)?,
-            from_node_id: parse_object_id(from_node_id)?,
-            to_node_id: parse_object_id(to_node_id)?,
-            label: label.clone(),
-            connector: connector.clone(),
-            style: style.clone(),
-        }),
-        McpOp::FlowUpdateEdge {
-            edge_id,
-            from_node_id,
-            to_node_id,
-            label,
-            connector,
-            style,
-        } => Op::Flow(FlowOp::UpdateEdge {
-            edge_id: parse_object_id(edge_id)?,
-            patch: FlowEdgePatch {
-                from_node_id: from_node_id.as_deref().map(parse_object_id).transpose()?,
-                to_node_id: to_node_id.as_deref().map(parse_object_id).transpose()?,
+        McpOp::FlowRemoveNode { node_id } => {
+            Op::Flow(FlowOp::RemoveNode { node_id: parse_object_id(node_id)? })
+        }
+        McpOp::FlowAddEdge { edge_id, from_node_id, to_node_id, label, connector, style } => {
+            Op::Flow(FlowOp::AddEdge {
+                edge_id: parse_object_id(edge_id)?,
+                from_node_id: parse_object_id(from_node_id)?,
+                to_node_id: parse_object_id(to_node_id)?,
                 label: label.clone(),
                 connector: connector.clone(),
                 style: style.clone(),
-            },
-        }),
-        McpOp::FlowRemoveEdge { edge_id } => Op::Flow(FlowOp::RemoveEdge {
-            edge_id: parse_object_id(edge_id)?,
-        }),
+            })
+        }
+        McpOp::FlowUpdateEdge { edge_id, from_node_id, to_node_id, label, connector, style } => {
+            Op::Flow(FlowOp::UpdateEdge {
+                edge_id: parse_object_id(edge_id)?,
+                patch: FlowEdgePatch {
+                    from_node_id: from_node_id.as_deref().map(parse_object_id).transpose()?,
+                    to_node_id: to_node_id.as_deref().map(parse_object_id).transpose()?,
+                    label: label.clone(),
+                    connector: connector.clone(),
+                    style: style.clone(),
+                },
+            })
+        }
+        McpOp::FlowRemoveEdge { edge_id } => {
+            Op::Flow(FlowOp::RemoveEdge { edge_id: parse_object_id(edge_id)? })
+        }
     })
 }
 

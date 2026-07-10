@@ -12,8 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added class diagrams end-to-end: `ClassAst`, limited Mermaid `classDiagram` parse/export, graph-family lowerer, compartment render path, and session/MCP/TUI kind wiring (`classDiagram` create/replace/export/render).
 - Added entity-relationship diagrams: `ErAst`, limited `erDiagram` parse/export with 2→1 char cardinality folding, graph lowerer, and session/MCP/TUI kind wiring.
 - Added gantt charts: `GanttAst`, limited `gantt` parse/export (sections, dates, durations, `after`), track paint, and session/MCP/TUI kind wiring.
-- Gantt paint mirrors sequence track chrome: time-lane header boxes with optional notes and lifelines, multi-column task boxes spanning duration, no title/section side chrome; F/C hints for `gantt/task` and `gantt/lane`.
+- Gantt paint mirrors sequence track chrome: title and section labels, time-lane header boxes with optional notes and lifelines, and multi-column task boxes spanning duration; F/C hints cover `gantt/section`, `gantt/task`, and `gantt/lane`.
 - Added top-level notes for class nodes, ER entities, gantt tasks, and gantt lanes (AST + diagram sidecar + render/TUI dimming via `*/note` spans), matching flowchart/sequence notes.
+- Added typed MCP AST/object reads and complete counts/deltas for class, ER, and Gantt diagrams; their classes, relations, entities, relationships, sections, tasks, dependencies, and rendered lanes participate in object refs, slices, routes, xrefs, selection, and attention.
+- Preserved class/ER relationship and Gantt task/section IDs across Mermaid reorder/insertion so persisted selections and xrefs do not silently retarget; dated Gantt lanes now use calendar-stable ids, and leap years use Gregorian spacing.
+- Made class/ER layout cycle-tolerant (including visible self-relations), retained all four ER cardinalities in text paint, and hardened class/ER/Gantt export against missing endpoints, invalid task membership, and unloadable `after` dependencies.
 - Expanded the built-in `--demo` session with class, ER, and gantt fixtures (index links, nav xrefs, and demo notes).
 - Various Bugfixes.
 

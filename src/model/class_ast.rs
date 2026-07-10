@@ -70,6 +70,10 @@ impl ClassNode {
         &self.name
     }
 
+    pub fn set_name(&mut self, name: impl Into<String>) {
+        self.name = name.into();
+    }
+
     pub fn attributes(&self) -> &[String] {
         &self.attributes
     }
@@ -162,6 +166,10 @@ impl ClassRelation {
 
     pub fn label(&self) -> Option<&str> {
         self.label.as_deref()
+    }
+
+    pub fn set_label<T: Into<String>>(&mut self, label: Option<T>) {
+        self.label = label.map(Into::into);
     }
 
     pub fn raw_connector(&self) -> Option<&str> {

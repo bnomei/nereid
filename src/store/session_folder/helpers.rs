@@ -466,6 +466,12 @@ struct DiagramMetaJson {
     xrefs: Vec<DiagramXRefJson>,
     #[serde(default)]
     flow_edges: Vec<DiagramFlowEdgeMetaJson>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    class_relations: Vec<DiagramClassRelationMetaJson>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    er_relationships: Vec<DiagramErRelationshipMetaJson>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    gantt_sections: Vec<DiagramGanttSectionMetaJson>,
     #[serde(default)]
     sequence_messages: Vec<DiagramSequenceMessageMetaJson>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -501,6 +507,8 @@ struct DiagramStableIdMapJson {
     by_mermaid_id: BTreeMap<String, String>,
     #[serde(default)]
     by_name: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    by_fingerprint: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -523,6 +531,134 @@ struct DiagramFlowEdgeMetaJson {
     label: Option<String>,
     #[serde(default)]
     style: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct DiagramClassRelationMetaJson {
+    relation_id: String,
+    from_class_id: String,
+    to_class_id: String,
+    kind: ClassRelationKindJson,
+    #[serde(default)]
+    label: Option<String>,
+    #[serde(default)]
+    raw_connector: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct DiagramErRelationshipMetaJson {
+    relationship_id: String,
+    from_entity_id: String,
+    to_entity_id: String,
+    from_card: ErCardinalityJson,
+    to_card: ErCardinalityJson,
+    stroke: ErStrokeJson,
+    #[serde(default)]
+    label: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct DiagramGanttSectionMetaJson {
+    section_id: String,
+    name: String,
+    #[serde(default)]
+    task_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum ClassRelationKindJson {
+    Inheritance,
+    Composition,
+    Aggregation,
+    Association,
+    Dependency,
+    Realization,
+    Link,
+}
+
+impl From<ClassRelationKind> for ClassRelationKindJson {
+    fn from(kind: ClassRelationKind) -> Self {
+        match kind {
+            ClassRelationKind::Inheritance => Self::Inheritance,
+            ClassRelationKind::Composition => Self::Composition,
+            ClassRelationKind::Aggregation => Self::Aggregation,
+            ClassRelationKind::Association => Self::Association,
+            ClassRelationKind::Dependency => Self::Dependency,
+            ClassRelationKind::Realization => Self::Realization,
+            ClassRelationKind::Link => Self::Link,
+        }
+    }
+}
+
+impl From<ClassRelationKindJson> for ClassRelationKind {
+    fn from(kind: ClassRelationKindJson) -> Self {
+        match kind {
+            ClassRelationKindJson::Inheritance => Self::Inheritance,
+            ClassRelationKindJson::Composition => Self::Composition,
+            ClassRelationKindJson::Aggregation => Self::Aggregation,
+            ClassRelationKindJson::Association => Self::Association,
+            ClassRelationKindJson::Dependency => Self::Dependency,
+            ClassRelationKindJson::Realization => Self::Realization,
+            ClassRelationKindJson::Link => Self::Link,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum ErCardinalityJson {
+    ExactlyOne,
+    ZeroOrOne,
+    OneOrMore,
+    ZeroOrMore,
+}
+
+impl From<ErCardinality> for ErCardinalityJson {
+    fn from(cardinality: ErCardinality) -> Self {
+        match cardinality {
+            ErCardinality::ExactlyOne => Self::ExactlyOne,
+            ErCardinality::ZeroOrOne => Self::ZeroOrOne,
+            ErCardinality::OneOrMore => Self::OneOrMore,
+            ErCardinality::ZeroOrMore => Self::ZeroOrMore,
+        }
+    }
+}
+
+impl From<ErCardinalityJson> for ErCardinality {
+    fn from(cardinality: ErCardinalityJson) -> Self {
+        match cardinality {
+            ErCardinalityJson::ExactlyOne => Self::ExactlyOne,
+            ErCardinalityJson::ZeroOrOne => Self::ZeroOrOne,
+            ErCardinalityJson::OneOrMore => Self::OneOrMore,
+            ErCardinalityJson::ZeroOrMore => Self::ZeroOrMore,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum ErStrokeJson {
+    Identifying,
+    NonIdentifying,
+}
+
+impl From<ErStroke> for ErStrokeJson {
+    fn from(stroke: ErStroke) -> Self {
+        match stroke {
+            ErStroke::Identifying => Self::Identifying,
+            ErStroke::NonIdentifying => Self::NonIdentifying,
+        }
+    }
+}
+
+impl From<ErStrokeJson> for ErStroke {
+    fn from(stroke: ErStrokeJson) -> Self {
+        match stroke {
+            ErStrokeJson::Identifying => Self::Identifying,
+            ErStrokeJson::NonIdentifying => Self::NonIdentifying,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -705,6 +841,7 @@ fn diagram_meta_to_json(
     let stable_id_map = DiagramStableIdMapJson {
         by_mermaid_id: meta.stable_id_map.by_mermaid_id.clone(),
         by_name: meta.stable_id_map.by_name.clone(),
+        by_fingerprint: meta.stable_id_map.by_fingerprint.clone(),
     };
 
     let xrefs = meta
@@ -729,6 +866,43 @@ fn diagram_meta_to_json(
             to_node_id: edge.to_node_id.to_string(),
             label: edge.label.clone(),
             style: edge.style.clone(),
+        })
+        .collect();
+
+    let class_relations = meta
+        .class_relations
+        .iter()
+        .map(|relation| DiagramClassRelationMetaJson {
+            relation_id: relation.relation_id.to_string(),
+            from_class_id: relation.from_class_id.to_string(),
+            to_class_id: relation.to_class_id.to_string(),
+            kind: relation.kind.into(),
+            label: relation.label.clone(),
+            raw_connector: relation.raw_connector.clone(),
+        })
+        .collect();
+
+    let er_relationships = meta
+        .er_relationships
+        .iter()
+        .map(|relationship| DiagramErRelationshipMetaJson {
+            relationship_id: relationship.relationship_id.to_string(),
+            from_entity_id: relationship.from_entity_id.to_string(),
+            to_entity_id: relationship.to_entity_id.to_string(),
+            from_card: relationship.from_card.into(),
+            to_card: relationship.to_card.into(),
+            stroke: relationship.stroke.into(),
+            label: relationship.label.clone(),
+        })
+        .collect();
+
+    let gantt_sections = meta
+        .gantt_sections
+        .iter()
+        .map(|section| DiagramGanttSectionMetaJson {
+            section_id: section.section_id.to_string(),
+            name: section.name.clone(),
+            task_ids: section.task_ids.iter().map(ToString::to_string).collect(),
         })
         .collect();
 
@@ -840,6 +1014,9 @@ fn diagram_meta_to_json(
         stable_id_map,
         xrefs,
         flow_edges,
+        class_relations,
+        er_relationships,
+        gantt_sections,
         sequence_messages,
         sequence_blocks,
         flow_node_notes,
@@ -871,6 +1048,7 @@ fn diagram_meta_from_json(
     let stable_id_map = DiagramStableIdMap {
         by_mermaid_id: meta_json.stable_id_map.by_mermaid_id,
         by_name: meta_json.stable_id_map.by_name,
+        by_fingerprint: meta_json.stable_id_map.by_fingerprint,
     };
 
     let xrefs = meta_json
@@ -919,6 +1097,109 @@ fn diagram_meta_from_json(
                 label: edge_json.label,
                 style: edge_json.style,
             })
+        })
+        .collect::<Result<Vec<_>, StoreError>>()?;
+
+    let class_relations = meta_json
+        .class_relations
+        .into_iter()
+        .map(|relation| {
+            let relation_id = ObjectId::new(relation.relation_id.clone()).map_err(|source| {
+                StoreError::InvalidId {
+                    field: "class_relations[].relation_id",
+                    value: relation.relation_id,
+                    source: Box::new(source),
+                }
+            })?;
+            let from_class_id =
+                ObjectId::new(relation.from_class_id.clone()).map_err(|source| {
+                    StoreError::InvalidId {
+                        field: "class_relations[].from_class_id",
+                        value: relation.from_class_id,
+                        source: Box::new(source),
+                    }
+                })?;
+            let to_class_id = ObjectId::new(relation.to_class_id.clone()).map_err(|source| {
+                StoreError::InvalidId {
+                    field: "class_relations[].to_class_id",
+                    value: relation.to_class_id,
+                    source: Box::new(source),
+                }
+            })?;
+            Ok(DiagramClassRelationMeta {
+                relation_id,
+                from_class_id,
+                to_class_id,
+                kind: relation.kind.into(),
+                label: relation.label,
+                raw_connector: relation.raw_connector,
+            })
+        })
+        .collect::<Result<Vec<_>, StoreError>>()?;
+
+    let er_relationships = meta_json
+        .er_relationships
+        .into_iter()
+        .map(|relationship| {
+            let relationship_id =
+                ObjectId::new(relationship.relationship_id.clone()).map_err(|source| {
+                    StoreError::InvalidId {
+                        field: "er_relationships[].relationship_id",
+                        value: relationship.relationship_id,
+                        source: Box::new(source),
+                    }
+                })?;
+            let from_entity_id =
+                ObjectId::new(relationship.from_entity_id.clone()).map_err(|source| {
+                    StoreError::InvalidId {
+                        field: "er_relationships[].from_entity_id",
+                        value: relationship.from_entity_id,
+                        source: Box::new(source),
+                    }
+                })?;
+            let to_entity_id =
+                ObjectId::new(relationship.to_entity_id.clone()).map_err(|source| {
+                    StoreError::InvalidId {
+                        field: "er_relationships[].to_entity_id",
+                        value: relationship.to_entity_id,
+                        source: Box::new(source),
+                    }
+                })?;
+            Ok(DiagramErRelationshipMeta {
+                relationship_id,
+                from_entity_id,
+                to_entity_id,
+                from_card: relationship.from_card.into(),
+                to_card: relationship.to_card.into(),
+                stroke: relationship.stroke.into(),
+                label: relationship.label,
+            })
+        })
+        .collect::<Result<Vec<_>, StoreError>>()?;
+
+    let gantt_sections = meta_json
+        .gantt_sections
+        .into_iter()
+        .map(|section| {
+            let section_id = ObjectId::new(section.section_id.clone()).map_err(|source| {
+                StoreError::InvalidId {
+                    field: "gantt_sections[].section_id",
+                    value: section.section_id,
+                    source: Box::new(source),
+                }
+            })?;
+            let task_ids = section
+                .task_ids
+                .into_iter()
+                .map(|raw| {
+                    ObjectId::new(raw.clone()).map_err(|source| StoreError::InvalidId {
+                        field: "gantt_sections[].task_ids[]",
+                        value: raw,
+                        source: Box::new(source),
+                    })
+                })
+                .collect::<Result<Vec<_>, StoreError>>()?;
+            Ok(DiagramGanttSectionMeta { section_id, name: section.name, task_ids })
         })
         .collect::<Result<Vec<_>, StoreError>>()?;
 
@@ -1153,6 +1434,9 @@ fn diagram_meta_from_json(
         stable_id_map,
         xrefs,
         flow_edges,
+        class_relations,
+        er_relationships,
+        gantt_sections,
         sequence_messages,
         sequence_blocks,
         default_symbol_repository_id: meta_json.default_symbol_repository_id,

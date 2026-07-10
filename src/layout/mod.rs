@@ -20,6 +20,6 @@ pub use flowchart::{
     layout_flowchart, route_flowchart_edges_orthogonal, FlowNodePlacement, FlowchartLayout,
     FlowchartLayoutError, GridPoint,
 };
-pub use graph::layout_graph;
+pub use graph::{layout_general_graph, layout_graph};
 pub use sequence::{layout_sequence, SequenceLayout, SequenceLayoutError};
 pub use track::layout_track;

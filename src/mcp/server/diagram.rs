@@ -45,18 +45,25 @@ fn stable_object_snapshots(
             for (class_id, node) in class_ast.classes() {
                 snapshots.insert(
                     object_ref(diagram_id, class_category.clone(), class_id),
-                    format!("name={:?};note={:?}", node.name(), node.note()),
+                    format!(
+                        "name={:?};attributes={:?};methods={:?};note={:?}",
+                        node.name(),
+                        node.attributes(),
+                        node.methods(),
+                        node.note()
+                    ),
                 );
             }
             for (rel_id, rel) in class_ast.relations() {
                 snapshots.insert(
                     object_ref(diagram_id, relation_category.clone(), rel_id),
                     format!(
-                        "from={:?};to={:?};kind={:?};label={:?}",
+                        "from={:?};to={:?};kind={:?};label={:?};connector={:?}",
                         rel.from_class_id(),
                         rel.to_class_id(),
                         rel.kind(),
-                        rel.label()
+                        rel.label(),
+                        rel.raw_connector()
                     ),
                 );
             }
@@ -73,16 +80,47 @@ fn stable_object_snapshots(
             for (id, r) in er_ast.relationships() {
                 snapshots.insert(
                     object_ref(diagram_id, rel_cat.clone(), id),
-                    format!("label={:?}", r.label()),
+                    format!(
+                        "from={:?};to={:?};from_card={:?};to_card={:?};stroke={:?};label={:?};connector={:?}",
+                        r.from_entity_id(),
+                        r.to_entity_id(),
+                        r.from_card(),
+                        r.to_card(),
+                        r.stroke(),
+                        r.label(),
+                        r.raw_connector()
+                    ),
                 );
             }
         }
         DiagramAst::Gantt(gantt_ast) => {
             let task_cat = category(&["gantt", "task"]);
+            let section_cat = category(&["gantt", "section"]);
+            let lane_cat = category(&["gantt", "lane"]);
             for (id, task) in gantt_ast.tasks() {
                 snapshots.insert(
                     object_ref(diagram_id, task_cat.clone(), id),
-                    format!("name={:?}", task.name()),
+                    format!(
+                        "tag={:?};name={:?};start={:?};duration_days={};raw_duration={:?};note={:?}",
+                        task.mermaid_tag(),
+                        task.name(),
+                        task.start(),
+                        task.duration_days(),
+                        task.raw_duration(),
+                        task.note()
+                    ),
+                );
+            }
+            for section in gantt_ast.sections() {
+                snapshots.insert(
+                    object_ref(diagram_id, section_cat.clone(), section.section_id()),
+                    format!("name={:?};task_ids={:?}", section.name(), section.task_ids()),
+                );
+            }
+            for (lane_id, label) in gantt_ast.lanes() {
+                snapshots.insert(
+                    object_ref(diagram_id, lane_cat.clone(), &lane_id),
+                    format!("label={label:?};note={:?}", gantt_ast.lane_note(&lane_id)),
                 );
             }
         }
@@ -247,11 +285,26 @@ fn replace_delta_from_asts(
         }
     }
 
-    let diagram_metadata_updated = matches!(
-        (previous_ast, next_ast),
-        (DiagramAst::Flowchart(previous), DiagramAst::Flowchart(next))
-            if previous.default_edge_style() != next.default_edge_style()
-    );
+    let diagram_metadata_updated = match (previous_ast, next_ast) {
+        (DiagramAst::Flowchart(previous), DiagramAst::Flowchart(next)) => {
+            previous.default_edge_style() != next.default_edge_style()
+        }
+        (DiagramAst::Gantt(previous), DiagramAst::Gantt(next)) => {
+            previous.title() != next.title()
+                || previous.date_format() != next.date_format()
+                || previous
+                    .sections()
+                    .iter()
+                    .map(|section| section.section_id())
+                    .collect::<Vec<_>>()
+                    != next
+                        .sections()
+                        .iter()
+                        .map(|section| section.section_id())
+                        .collect::<Vec<_>>()
+        }
+        _ => false,
+    };
 
     (delta, diagram_metadata_updated)
 }
@@ -1100,9 +1153,72 @@ impl NereidMcp {
                 (objects, edges)
             }
             DiagramAst::Gantt(ast) => {
-                // Gantt has no structural edges; return the center task (if valid) only.
+                let task_category = category(&["gantt", "task"]);
+                let section_category = category(&["gantt", "section"]);
+                let lane_category = category(&["gantt", "lane"]);
+                let task_ref = |id: &ObjectId| {
+                    ObjectRef::new(diagram_id.clone(), task_category.clone(), id.clone())
+                };
+                let section_ref = |id: &ObjectId| {
+                    ObjectRef::new(diagram_id.clone(), section_category.clone(), id.clone())
+                };
+                let lane_ref = |id: &ObjectId| {
+                    ObjectRef::new(diagram_id.clone(), lane_category.clone(), id.clone())
+                };
+                let mut adjacency = BTreeMap::<ObjectRef, BTreeSet<ObjectRef>>::new();
+                fn connect(
+                    adjacency: &mut BTreeMap<ObjectRef, BTreeSet<ObjectRef>>,
+                    left: ObjectRef,
+                    right: ObjectRef,
+                ) {
+                    adjacency.entry(left.clone()).or_default().insert(right.clone());
+                    adjacency.entry(right).or_default().insert(left);
+                }
+
+                for task_id in ast.tasks().keys() {
+                    adjacency.entry(task_ref(task_id)).or_default();
+                }
+                for section in ast.sections() {
+                    let section_ref = section_ref(section.section_id());
+                    adjacency.entry(section_ref.clone()).or_default();
+                    for task_id in section.task_ids() {
+                        if ast.tasks().contains_key(task_id) {
+                            connect(&mut adjacency, section_ref.clone(), task_ref(task_id));
+                        }
+                    }
+                }
+                for (task_id, task) in ast.tasks() {
+                    if let crate::model::GanttTaskStart::After(dependency_id) = task.start() {
+                        if ast.tasks().contains_key(dependency_id) {
+                            connect(&mut adjacency, task_ref(task_id), task_ref(dependency_id));
+                        }
+                    }
+                }
+
+                let (windows, _) = ast.resolved_task_windows();
+                let max_end = windows.values().map(|window| window.end).max().unwrap_or(1).max(1);
+                let lane_days = ast
+                    .lanes_with_days()
+                    .into_iter()
+                    .map(|(lane_id, day, _)| (lane_id, day))
+                    .collect::<Vec<_>>();
+                for (index, (lane_id, day)) in lane_days.iter().enumerate() {
+                    let lane_ref = lane_ref(lane_id);
+                    adjacency.entry(lane_ref.clone()).or_default();
+                    let next_day = lane_days
+                        .get(index + 1)
+                        .map(|(_, next)| *next)
+                        .unwrap_or(max_end)
+                        .max(day.saturating_add(1));
+                    for (task_id, window) in &windows {
+                        if window.start < next_day && window.end > *day {
+                            connect(&mut adjacency, lane_ref.clone(), task_ref(task_id));
+                        }
+                    }
+                }
+
                 let segments = center_ref_parsed.category().segments();
-                match segments {
+                let start = match segments {
                     [a, b] if a.as_str() == "gantt" && b.as_str() == "task" => {
                         let id = center_ref_parsed.object_id().clone();
                         if !ast.tasks().contains_key(&id) {
@@ -1111,15 +1227,50 @@ impl NereidMcp {
                                 Some(serde_json::json!({ "task_id": id.as_str() })),
                             ));
                         }
-                        (vec![format!("d:{}/gantt/task/{}", diagram_id.as_str(), id)], Vec::new())
+                        task_ref(&id)
+                    }
+                    [a, b] if a.as_str() == "gantt" && b.as_str() == "section" => {
+                        let id = center_ref_parsed.object_id().clone();
+                        if !ast.sections().iter().any(|section| section.section_id() == &id) {
+                            return Err(ErrorData::resource_not_found(
+                                "gantt section not found",
+                                Some(serde_json::json!({ "section_id": id.as_str() })),
+                            ));
+                        }
+                        section_ref(&id)
+                    }
+                    [a, b] if a.as_str() == "gantt" && b.as_str() == "lane" => {
+                        let id = center_ref_parsed.object_id().clone();
+                        if !ast.lanes().contains_key(&id) {
+                            return Err(ErrorData::resource_not_found(
+                                "gantt lane not found",
+                                Some(serde_json::json!({ "lane_id": id.as_str() })),
+                            ));
+                        }
+                        lane_ref(&id)
                     }
                     _ => {
                         return Err(ErrorData::invalid_params(
-                            "center_ref is not a gantt task object",
+                            "center_ref is not a gantt task, section, or lane object",
                             Some(serde_json::json!({ "center_ref": center_ref })),
                         ));
                     }
+                };
+
+                let mut visited = BTreeSet::new();
+                let mut queue = VecDeque::from([(start.clone(), 0_usize)]);
+                visited.insert(start);
+                while let Some((current, hops)) = queue.pop_front() {
+                    if hops >= max_hops {
+                        continue;
+                    }
+                    for next in adjacency.get(&current).into_iter().flatten() {
+                        if visited.insert(next.clone()) {
+                            queue.push_back((next.clone(), hops.saturating_add(1)));
+                        }
+                    }
                 }
+                (visited.into_iter().map(|item| item.to_string()).collect(), Vec::new())
             }
             DiagramAst::Flowchart(ast) => {
                 let segments = center_ref_parsed.category().segments();
@@ -1614,6 +1765,14 @@ impl NereidMcp {
                                     "messages": digest.counts.messages,
                                     "nodes": digest.counts.nodes,
                                     "edges": digest.counts.edges,
+                                    "classes": digest.counts.classes,
+                                    "relations": digest.counts.relations,
+                                    "entities": digest.counts.entities,
+                                    "relationships": digest.counts.relationships,
+                                    "sections": digest.counts.sections,
+                                    "tasks": digest.counts.tasks,
+                                    "dependencies": digest.counts.dependencies,
+                                    "lanes": digest.counts.lanes,
                                 },
                                 "key_names": digest.key_names,
                             },
@@ -1700,6 +1859,14 @@ impl NereidMcp {
                             "messages": digest.counts.messages,
                             "nodes": digest.counts.nodes,
                             "edges": digest.counts.edges,
+                            "classes": digest.counts.classes,
+                            "relations": digest.counts.relations,
+                            "entities": digest.counts.entities,
+                            "relationships": digest.counts.relationships,
+                            "sections": digest.counts.sections,
+                            "tasks": digest.counts.tasks,
+                            "dependencies": digest.counts.dependencies,
+                            "lanes": digest.counts.lanes,
                         },
                         "key_names": digest.key_names,
                     },

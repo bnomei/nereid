@@ -39,8 +39,38 @@ Creation runs parse + render preflight. If the call returns `INVALID_PARAMS` wit
 `cannot render Mermaid diagram: ...` (for example cycle/layout issues), fix Mermaid and retry
 before proceeding.
 For create/switch-only tasks, use the create response as the success signal; skip
-`diagram_stat`/`diagram_render_text`/`flow.*` unless inspection is explicitly requested.
+`diagram_stat`/`diagram_render_text`/`flow_*` unless inspection is explicitly requested.
 Failed preflight is non-mutating: no new diagram is persisted and active diagram remains unchanged.
+
+The same creation tool accepts all five supported Mermaid headers:
+
+```text
+sequenceDiagram
+flowchart TD
+classDiagram
+erDiagram
+gantt
+```
+
+For example:
+
+```mermaid
+classDiagram
+  Order *-- LineItem : contains
+```
+
+```mermaid
+erDiagram
+  CUSTOMER ||--o{ ORDER : places
+```
+
+```mermaid
+gantt
+  dateFormat YYYY-MM-DD
+  section Delivery
+  Build :build, 2026-07-10, 5d
+  Ship :after build, 2d
+```
 
 Delete a diagram when cleaning up:
 
@@ -135,7 +165,39 @@ Tool: `diagram_get_slice`
 ```
 
 Canonical object ref format:
-`d:<diagram_id>/<seq|flow>/<participant|message|block|section|node|edge>/<object_id>`
+`d:<diagram_id>/<category...>/<object_id>`
+
+Supported category pairs:
+
+- Sequence: `seq/participant`, `seq/message`, `seq/block`, `seq/section`
+- Flowchart: `flow/node`, `flow/edge`
+- Class: `class/class`, `class/relation`
+- ER: `er/entity`, `er/relationship`
+- Gantt: `gantt/section`, `gantt/task`, `gantt/lane`
+
+Examples:
+
+```text
+d:d-model/class/class/c:Order
+d:d-model/class/relation/r:0001
+d:d-data/er/entity/e:CUSTOMER
+d:d-data/er/relationship/r:0001
+d:d-plan/gantt/section/sec:0001
+d:d-plan/gantt/task/t:0001
+d:d-plan/gantt/lane/lane:2026-01-01
+```
+
+## Read and mutation boundaries by kind
+
+- All five kinds support create, list/open, raw Mermaid read, text render, replace, xrefs,
+  selection, attention, and route participation.
+- `diagram_get_ast` and `object_read` expose kind-specific class, ER, and Gantt fields, including
+  class members, typed ER cardinalities, and Gantt sections, starts, durations, and dependencies.
+- Sequence and flowchart have structured mutation ops and dedicated typed query helpers.
+- Class, ER, and Gantt are edited through `diagram_replace_from_mermaid` (or the TUI editor).
+- Gantt lane refs are rendered time-header anchors. Valid `YYYY-MM-DD` schedules use stable
+  calendar ids such as `lane:2026-01-01`; schedules without parseable absolute dates use relative
+  ids such as `lane:0000`. Prefer `gantt/task` or `gantt/section` as a `diagram_get_slice` center.
 
 ## Safe mutation pattern
 

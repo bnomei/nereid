@@ -13,7 +13,9 @@
 
 use std::fmt;
 
-use crate::layout::{layout_graph, layout_track, FlowchartLayoutError, SequenceLayoutError};
+use crate::layout::{
+    layout_general_graph, layout_graph, layout_track, FlowchartLayoutError, SequenceLayoutError,
+};
 use crate::model::diagram::DiagramAst;
 use crate::model::ids::DiagramId;
 
@@ -135,7 +137,11 @@ pub fn render_graph_unicode_annotated_with_categories(
     options: RenderOptions,
     highlight_categories: Option<crate::render::graph_paint::GraphHighlightCategories<'_>>,
 ) -> Result<AnnotatedRender, PipelineRenderError> {
-    let layout = layout_graph(model)?;
+    let layout = if highlight_categories.is_some() {
+        layout_general_graph(model)?
+    } else {
+        layout_graph(model)?
+    };
     if let Some(categories) = highlight_categories {
         return Ok(crate::render::graph_paint::render_graph_model_with_compartments_annotated(
             diagram_id, model, &layout, options, categories,
@@ -159,7 +165,7 @@ pub fn render_class_unicode_with_options(
     model: &GraphModel,
     options: RenderOptions,
 ) -> Result<String, PipelineRenderError> {
-    let layout = layout_graph(model)?;
+    let layout = layout_general_graph(model)?;
     Ok(crate::render::graph_paint::render_graph_model_with_compartments(model, &layout, options)?)
 }
 
@@ -168,7 +174,7 @@ pub fn render_er_unicode_with_options(
     model: &GraphModel,
     options: RenderOptions,
 ) -> Result<String, PipelineRenderError> {
-    let layout = layout_graph(model)?;
+    let layout = layout_general_graph(model)?;
     Ok(crate::render::graph_paint::render_graph_model_with_compartments(model, &layout, options)?)
 }
 
@@ -367,6 +373,29 @@ mod tests {
         )
         .expect("pipeline");
         assert_eq!(via_diagram, via_pipeline);
+    }
+
+    #[test]
+    fn class_and_er_render_accept_cycles_and_self_relations() {
+        let class = crate::format::mermaid::parse_class_diagram(
+            "classDiagram\nA --> B\nB --> C\nC --> A\nA --> A : recursive\n",
+        )
+        .expect("class parse");
+        let class_text =
+            render_ast_unicode_with_options(&DiagramAst::Class(class), RenderOptions::default())
+                .expect("cyclic class render");
+        assert!(class_text.contains('A'));
+        assert!(class_text.contains("recursive"), "{class_text}");
+
+        let er = crate::format::mermaid::parse_er_diagram(
+            "erDiagram\nA ||--o{ B\nB ||--o{ C\nC ||--o{ A\nA ||--|| A : self\n",
+        )
+        .expect("er parse");
+        let er_text =
+            render_ast_unicode_with_options(&DiagramAst::Er(er), RenderOptions::default())
+                .expect("cyclic er render");
+        assert!(er_text.contains('A'));
+        assert!(er_text.contains("self"), "{er_text}");
     }
 
     #[test]

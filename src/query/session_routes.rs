@@ -81,6 +81,14 @@ fn gantt_task_ref(diagram_id: &DiagramId, task_id: &ObjectId) -> ObjectRef {
     ObjectRef::new(diagram_id.clone(), cat(&["gantt", "task"]), task_id.clone())
 }
 
+fn gantt_section_ref(diagram_id: &DiagramId, section_id: &ObjectId) -> ObjectRef {
+    ObjectRef::new(diagram_id.clone(), cat(&["gantt", "section"]), section_id.clone())
+}
+
+fn gantt_lane_ref(diagram_id: &DiagramId, lane_id: &ObjectId) -> ObjectRef {
+    ObjectRef::new(diagram_id.clone(), cat(&["gantt", "lane"]), lane_id.clone())
+}
+
 /// Bidirectional node↔edge connectivity matching flowchart routes.
 fn wire_node_edge_pair(
     adjacency: &mut BTreeMap<ObjectRef, BTreeSet<ObjectRef>>,
@@ -184,6 +192,17 @@ fn derive_adjacency(session: &Session) -> BTreeMap<ObjectRef, BTreeSet<ObjectRef
                 for id in ast.tasks().keys() {
                     insert_node(&mut adjacency, gantt_task_ref(diagram_id, id));
                 }
+                for section in ast.sections() {
+                    let section_ref = gantt_section_ref(diagram_id, section.section_id());
+                    insert_node(&mut adjacency, section_ref.clone());
+                    for task_id in section.task_ids() {
+                        if ast.tasks().contains_key(task_id) {
+                            let task_ref = gantt_task_ref(diagram_id, task_id);
+                            insert_edge(&mut adjacency, section_ref.clone(), task_ref.clone());
+                            insert_edge(&mut adjacency, task_ref, section_ref.clone());
+                        }
+                    }
+                }
                 // Wire `after` dependency chains as undirected route hops.
                 for (id, task) in ast.tasks() {
                     if let crate::model::GanttTaskStart::After(dep) = task.start() {
@@ -192,6 +211,32 @@ fn derive_adjacency(session: &Session) -> BTreeMap<ObjectRef, BTreeSet<ObjectRef
                             let to = gantt_task_ref(diagram_id, dep);
                             insert_edge(&mut adjacency, from.clone(), to.clone());
                             insert_edge(&mut adjacency, to, from);
+                        }
+                    }
+                }
+
+                // Render-visible time lanes are first-class refs. Connect each lane to tasks whose
+                // resolved windows overlap that lane's tick interval.
+                let (windows, _) = ast.resolved_task_windows();
+                let max_end = windows.values().map(|window| window.end).max().unwrap_or(1).max(1);
+                let lane_days = ast
+                    .lanes_with_days()
+                    .into_iter()
+                    .map(|(lane_id, day, _)| (lane_id, day))
+                    .collect::<Vec<_>>();
+                for (index, (lane_id, day)) in lane_days.iter().enumerate() {
+                    let lane_ref = gantt_lane_ref(diagram_id, lane_id);
+                    insert_node(&mut adjacency, lane_ref.clone());
+                    let next_day = lane_days
+                        .get(index + 1)
+                        .map(|(_, next)| *next)
+                        .unwrap_or(max_end)
+                        .max(day.saturating_add(1));
+                    for (task_id, window) in &windows {
+                        if window.start < next_day && window.end > *day {
+                            let task_ref = gantt_task_ref(diagram_id, task_id);
+                            insert_edge(&mut adjacency, lane_ref.clone(), task_ref.clone());
+                            insert_edge(&mut adjacency, task_ref, lane_ref.clone());
                         }
                     }
                 }
@@ -937,6 +982,44 @@ mod tests {
                 "d:flow/flow/node/n:d",
             ]
         );
+    }
+
+    #[test]
+    fn gantt_sections_lanes_and_after_dependencies_share_the_route_graph() {
+        let mut session = Session::new(SessionId::new("s:gantt-routes").unwrap());
+        let diagram_id = DiagramId::new("gantt").unwrap();
+        let ast = crate::format::mermaid::parse_gantt_diagram(
+            "gantt\ndateFormat YYYY-MM-DD\nsection Build\nFirst :a, 2026-01-01, 7d\nSecond :b, after a, 7d\n",
+        )
+        .unwrap();
+        let section_id = ast.sections()[0].section_id().clone();
+        let first_id = ast
+            .tasks()
+            .iter()
+            .find(|(_, task)| task.name() == "First")
+            .map(|(id, _)| id.clone())
+            .unwrap();
+        let second_id = ast
+            .tasks()
+            .iter()
+            .find(|(_, task)| task.name() == "Second")
+            .map(|(id, _)| id.clone())
+            .unwrap();
+        session.diagrams_mut().insert(
+            diagram_id,
+            Diagram::new(DiagramId::new("gantt").unwrap(), "Gantt", DiagramAst::Gantt(ast)),
+        );
+
+        let section: ObjectRef = format!("d:gantt/gantt/section/{section_id}").parse().unwrap();
+        let lane: ObjectRef = "d:gantt/gantt/lane/lane:2026-01-01".parse().unwrap();
+        let second: ObjectRef = format!("d:gantt/gantt/task/{second_id}").parse().unwrap();
+
+        let to_lane = find_route(&session, &section, &lane).expect("section to lane route");
+        assert_eq!(to_lane.len(), 3);
+        assert_eq!(to_lane[1].object_id(), &first_id);
+
+        let dependency = find_route(&session, &lane, &second).expect("lane to after task route");
+        assert!(dependency.iter().any(|item| item.object_id() == &first_id));
     }
 
     fn oid(raw: &str) -> ObjectId {

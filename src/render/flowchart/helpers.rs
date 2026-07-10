@@ -846,7 +846,8 @@ fn edge_endpoint_cap_kinds(connector: Option<&str>) -> (Option<EndpointCapKind>,
             | CapKind::DiamondHollow
             | CapKind::TriangleHollow
             | CapKind::ExactlyOne
-            | CapKind::CrowFoot => None,
+            | CapKind::CrowFoot
+            | CapKind::ZeroOrMore => None,
         }
     };
     (map(start), map(end))

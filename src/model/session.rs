@@ -73,7 +73,7 @@ impl Session {
         &mut self.xrefs
     }
 
-    /// Whether `object_ref` resolves to a live participant, message, block, section, node, or edge.
+    /// Whether `object_ref` resolves to a live object in its diagram-specific category.
     pub fn object_ref_exists(&self, object_ref: &ObjectRef) -> bool {
         let Some(diagram) = self.diagrams.get(object_ref.diagram_id()) else {
             return false;
@@ -118,12 +118,11 @@ impl Session {
             (DiagramAst::Gantt(ast), [left, right]) if left == "gantt" && right == "task" => {
                 ast.tasks().contains_key(object_id)
             }
+            (DiagramAst::Gantt(ast), [left, right]) if left == "gantt" && right == "section" => {
+                ast.sections().iter().any(|section| section.section_id() == object_id)
+            }
             (DiagramAst::Gantt(ast), [left, right]) if left == "gantt" && right == "lane" => {
-                // Lanes are paint-derived; accept known note keys or the stable lane:NNNN form.
-                ast.lane_notes().contains_key(object_id)
-                    || object_id.as_str().strip_prefix("lane:").is_some_and(|rest| {
-                        rest.len() == 4 && rest.chars().all(|c| c.is_ascii_digit())
-                    })
+                ast.lanes().contains_key(object_id)
             }
             _ => false,
         }
@@ -162,5 +161,45 @@ impl Session {
 
     pub fn set_selected_object_refs(&mut self, selected_object_refs: BTreeSet<ObjectRef>) {
         self.selected_object_refs = selected_object_refs;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::format::mermaid::parse_gantt_diagram;
+    use crate::model::{CategoryPath, Diagram, DiagramId, ObjectId, SessionId};
+
+    fn object_ref(diagram_id: &DiagramId, category: &str, object_id: &str) -> ObjectRef {
+        ObjectRef::new(
+            diagram_id.clone(),
+            CategoryPath::new(vec!["gantt".to_owned(), category.to_owned()]).unwrap(),
+            ObjectId::new(object_id).unwrap(),
+        )
+    }
+
+    #[test]
+    fn gantt_section_and_only_rendered_lanes_are_live_refs() {
+        let ast = parse_gantt_diagram(
+            "gantt\ndateFormat YYYY-MM-DD\nsection Build\nA :a, 2026-01-01, 14d\n",
+        )
+        .unwrap();
+        let section_id = ast.sections()[0].section_id().clone();
+        let diagram_id = DiagramId::new("d-gantt").unwrap();
+        let mut session = Session::new(SessionId::new("s:gantt").unwrap());
+        session.diagrams_mut().insert(
+            diagram_id.clone(),
+            Diagram::new(diagram_id.clone(), "Gantt", DiagramAst::Gantt(ast)),
+        );
+
+        assert!(session.object_ref_exists(&object_ref(
+            &diagram_id,
+            "section",
+            section_id.as_str()
+        )));
+        assert!(session.object_ref_exists(&object_ref(&diagram_id, "lane", "lane:2026-01-01")));
+        assert!(session.object_ref_exists(&object_ref(&diagram_id, "lane", "lane:2026-01-08")));
+        assert!(!session.object_ref_exists(&object_ref(&diagram_id, "lane", "lane:2026-01-02")));
+        assert!(!session.object_ref_exists(&object_ref(&diagram_id, "lane", "lane:9999")));
     }
 }

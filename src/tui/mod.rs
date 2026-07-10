@@ -36,8 +36,7 @@ use tokio::sync::Mutex;
 
 use crate::format::mermaid::{
     export_class_diagram, export_er_diagram, export_flowchart, export_gantt_diagram,
-    export_sequence_diagram, parse_class_diagram, parse_er_diagram, parse_flowchart,
-    parse_gantt_diagram, parse_sequence_diagram,
+    export_sequence_diagram,
 };
 use crate::model::{
     CategoryPath, Diagram, DiagramAst, DiagramId, DiagramKind, FlowchartAst, ObjectId, ObjectRef,
@@ -1536,23 +1535,41 @@ impl App {
         baseline_rev: u64,
         mermaid: &str,
     ) -> Result<(), String> {
-        let parsed_ast = parse_mermaid_for_kind(diagram_kind, mermaid)?;
         let Some(current_diagram) = self.session.diagrams().get(diagram_id) else {
             return Err(format!("diagram not found: {diagram_id}"));
         };
-        if current_diagram.ast() == &parsed_ast {
+        if current_diagram.kind() != diagram_kind {
+            return Err(format!(
+                "diagram kind changed while editing: expected {diagram_kind:?}, found {:?}",
+                current_diagram.kind()
+            ));
+        }
+
+        // Use the store replacement path even for in-memory edits: it reconciles parse-order ids
+        // against the current diagram and restores sidecar-only notes before replacing the AST.
+        let mut replacement = current_diagram.clone();
+        crate::store::replace_diagram_from_mermaid(&mut replacement, mermaid)
+            .map_err(|err| format!("failed applying edited Mermaid: {err}"))?;
+        if current_diagram.ast() == replacement.ast() {
             self.set_toast(format!("No structural changes: {diagram_id}"));
             return Ok(());
         }
+
+        crate::render::diagram::render_diagram_unicode_annotated_with_options(
+            &replacement,
+            RenderOptions {
+                show_notes: self.show_notes,
+                prefix_object_labels: false,
+                flowchart_extra_col_gap: TUI_FLOWCHART_EXTRA_COL_GAP,
+            },
+        )
+        .map_err(|err| format!("edited diagram cannot be rendered: {err}"))?;
 
         {
             let Some(diagram) = self.session.diagrams_mut().get_mut(diagram_id) else {
                 return Err(format!("diagram not found: {diagram_id}"));
             };
-            diagram
-                .set_ast(parsed_ast)
-                .map_err(|err| format!("failed applying edited Mermaid: {err}"))?;
-            diagram.bump_rev();
+            *diagram = replacement;
         }
 
         self.retain_existing_selected_refs();
@@ -2142,10 +2159,18 @@ impl App {
             DiagramAst::Gantt(ast) => {
                 let mut refs = Vec::new();
                 let task_cat = category_path(&["gantt", "task"]);
+                let section_cat = category_path(&["gantt", "section"]);
                 for id in ast.tasks().keys() {
                     refs.push(ObjectRef::new(diagram_id.clone(), task_cat.clone(), id.clone()));
                 }
-                // Time-lane headers live only in the render highlight index (not the AST).
+                for section in ast.sections() {
+                    refs.push(ObjectRef::new(
+                        diagram_id.clone(),
+                        section_cat.clone(),
+                        section.section_id().clone(),
+                    ));
+                }
+                // Time-lane headers are schedule-derived and indexed by annotated render.
                 for object_ref in self.base_highlight_index.keys() {
                     if object_ref.diagram_id() == &diagram_id
                         && matches!(
@@ -2251,6 +2276,12 @@ impl App {
                     let inner_x0 = x0.saturating_add(1);
                     let inner_x1 = x1.saturating_sub(1);
                     (y0.saturating_add(1), inner_x0, inner_x1, ' ')
+                }
+                [a, b] if a == "gantt" && b == "section" => {
+                    let Some((y0, x0, x1)) = hint_bounds_from_spans(spans) else {
+                        continue;
+                    };
+                    (y0, x0, x1, ' ')
                 }
                 _ => continue,
             };
@@ -2395,7 +2426,55 @@ impl App {
                     )
                 })
             }
-            DiagramAst::Class(_) | DiagramAst::Er(_) | DiagramAst::Gantt(_) => None,
+            DiagramAst::Class(ast) => {
+                let is_class = |r: &ObjectRef| matches!(r.category().segments(), [a, b] if a == "class" && b == "class");
+                if !is_class(current) || !is_class(previous) {
+                    return None;
+                }
+
+                let current_id = current.object_id();
+                let previous_id = previous.object_id();
+                ast.relations()
+                    .iter()
+                    .find(|(_, relation)| {
+                        (relation.from_class_id() == current_id
+                            && relation.to_class_id() == previous_id)
+                            || (relation.from_class_id() == previous_id
+                                && relation.to_class_id() == current_id)
+                    })
+                    .map(|(relation_id, _)| {
+                        ObjectRef::new(
+                            current.diagram_id().clone(),
+                            category_path(&["class", "relation"]),
+                            relation_id.clone(),
+                        )
+                    })
+            }
+            DiagramAst::Er(ast) => {
+                let is_entity = |r: &ObjectRef| matches!(r.category().segments(), [a, b] if a == "er" && b == "entity");
+                if !is_entity(current) || !is_entity(previous) {
+                    return None;
+                }
+
+                let current_id = current.object_id();
+                let previous_id = previous.object_id();
+                ast.relationships()
+                    .iter()
+                    .find(|(_, relationship)| {
+                        (relationship.from_entity_id() == current_id
+                            && relationship.to_entity_id() == previous_id)
+                            || (relationship.from_entity_id() == previous_id
+                                && relationship.to_entity_id() == current_id)
+                    })
+                    .map(|(relationship_id, _)| {
+                        ObjectRef::new(
+                            current.diagram_id().clone(),
+                            category_path(&["er", "relationship"]),
+                            relationship_id.clone(),
+                        )
+                    })
+            }
+            DiagramAst::Gantt(_) => None,
             DiagramAst::Sequence(ast) => {
                 let is_seq_participant = |r: &ObjectRef| matches!(r.category().segments(), [a, b] if a == "seq" && b == "participant");
                 if !is_seq_participant(current) || !is_seq_participant(previous) {
@@ -2967,30 +3046,10 @@ fn export_diagram_mermaid(diagram: &Diagram) -> Result<String, String> {
         DiagramAst::Class(ast) => export_class_diagram(ast)
             .map_err(|err| format!("failed to export class Mermaid: {err}")),
         DiagramAst::Er(ast) => {
-            export_er_diagram(ast).map_err(|err| format!("failed to export er Mermaid: {err}"))
+            export_er_diagram(ast).map_err(|err| format!("failed to export ER Mermaid: {err}"))
         }
         DiagramAst::Gantt(ast) => export_gantt_diagram(ast)
             .map_err(|err| format!("failed to export gantt Mermaid: {err}")),
-    }
-}
-
-fn parse_mermaid_for_kind(kind: DiagramKind, source: &str) -> Result<DiagramAst, String> {
-    match kind {
-        DiagramKind::Sequence => parse_sequence_diagram(source)
-            .map(DiagramAst::Sequence)
-            .map_err(|err| format!("sequence parse failed: {err}")),
-        DiagramKind::Flowchart => parse_flowchart(source)
-            .map(DiagramAst::Flowchart)
-            .map_err(|err| format!("flowchart parse failed: {err}")),
-        DiagramKind::Class => parse_class_diagram(source)
-            .map(DiagramAst::Class)
-            .map_err(|err| format!("class parse failed: {err}")),
-        DiagramKind::Er => parse_er_diagram(source)
-            .map(DiagramAst::Er)
-            .map_err(|err| format!("er parse failed: {err}")),
-        DiagramKind::Gantt => parse_gantt_diagram(source)
-            .map(DiagramAst::Gantt)
-            .map_err(|err| format!("gantt parse failed: {err}")),
     }
 }
 
@@ -3052,7 +3111,98 @@ fn prefix_xref_direction_labels_for_tui(diagram: &mut Diagram, session: &Session
 
     let mut ast = diagram.ast().clone();
     match &mut ast {
-        DiagramAst::Class(_) | DiagramAst::Er(_) | DiagramAst::Gantt(_) => {}
+        DiagramAst::Class(class_ast) => {
+            let class_category = category_path(&["class", "class"]);
+            for (class_id, class) in class_ast.classes_mut() {
+                let object_ref = ObjectRef::new(
+                    diagram.diagram_id().clone(),
+                    class_category.clone(),
+                    class_id.clone(),
+                );
+                class.set_name(prefixed_direction_label(
+                    class.name(),
+                    incoming_refs.contains(&object_ref),
+                    outgoing_refs.contains(&object_ref),
+                ));
+            }
+            let relation_category = category_path(&["class", "relation"]);
+            for (relation_id, relation) in class_ast.relations_mut() {
+                let object_ref = ObjectRef::new(
+                    diagram.diagram_id().clone(),
+                    relation_category.clone(),
+                    relation_id.clone(),
+                );
+                let has_incoming = incoming_refs.contains(&object_ref);
+                let has_outgoing = outgoing_refs.contains(&object_ref);
+                if has_incoming || has_outgoing {
+                    relation.set_label(Some(prefixed_direction_label(
+                        relation.label().unwrap_or(""),
+                        has_incoming,
+                        has_outgoing,
+                    )));
+                }
+            }
+        }
+        DiagramAst::Er(er_ast) => {
+            let entity_category = category_path(&["er", "entity"]);
+            for (entity_id, entity) in er_ast.entities_mut() {
+                let object_ref = ObjectRef::new(
+                    diagram.diagram_id().clone(),
+                    entity_category.clone(),
+                    entity_id.clone(),
+                );
+                entity.set_name(prefixed_direction_label(
+                    entity.name(),
+                    incoming_refs.contains(&object_ref),
+                    outgoing_refs.contains(&object_ref),
+                ));
+            }
+            let relationship_category = category_path(&["er", "relationship"]);
+            for (relationship_id, relationship) in er_ast.relationships_mut() {
+                let object_ref = ObjectRef::new(
+                    diagram.diagram_id().clone(),
+                    relationship_category.clone(),
+                    relationship_id.clone(),
+                );
+                let has_incoming = incoming_refs.contains(&object_ref);
+                let has_outgoing = outgoing_refs.contains(&object_ref);
+                if has_incoming || has_outgoing {
+                    relationship.set_label(Some(prefixed_direction_label(
+                        relationship.label().unwrap_or(""),
+                        has_incoming,
+                        has_outgoing,
+                    )));
+                }
+            }
+        }
+        DiagramAst::Gantt(gantt_ast) => {
+            let section_category = category_path(&["gantt", "section"]);
+            for section in gantt_ast.sections_mut() {
+                let object_ref = ObjectRef::new(
+                    diagram.diagram_id().clone(),
+                    section_category.clone(),
+                    section.section_id().clone(),
+                );
+                section.set_name(prefixed_direction_label(
+                    section.name(),
+                    incoming_refs.contains(&object_ref),
+                    outgoing_refs.contains(&object_ref),
+                ));
+            }
+            let task_category = category_path(&["gantt", "task"]);
+            for (task_id, task) in gantt_ast.tasks_mut() {
+                let object_ref = ObjectRef::new(
+                    diagram.diagram_id().clone(),
+                    task_category.clone(),
+                    task_id.clone(),
+                );
+                task.set_name(prefixed_direction_label(
+                    task.name(),
+                    incoming_refs.contains(&object_ref),
+                    outgoing_refs.contains(&object_ref),
+                ));
+            }
+        }
         DiagramAst::Flowchart(flow_ast) => {
             let node_category = category_path(&["flow", "node"]);
             for (node_id, node) in flow_ast.nodes_mut() {
@@ -3964,8 +4114,20 @@ fn objects_from_gantt_ast(
     ast: &crate::model::GanttAst,
 ) -> Vec<SelectableObject> {
     let task_cat = category_path(&["gantt", "task"]);
+    let section_cat = category_path(&["gantt", "section"]);
     let lane_cat = category_path(&["gantt", "lane"]);
     let mut out = Vec::new();
+    for section in ast.sections() {
+        out.push(SelectableObject {
+            label: format!("section {} ({})", section.section_id(), section.name()),
+            note: None,
+            object_ref: ObjectRef::new(
+                diagram_id.clone(),
+                section_cat.clone(),
+                section.section_id().clone(),
+            ),
+        });
+    }
     for (id, task) in ast.tasks() {
         out.push(SelectableObject {
             label: format!("task {} ({})", id, task.name()),
@@ -3973,11 +4135,11 @@ fn objects_from_gantt_ast(
             object_ref: ObjectRef::new(diagram_id.clone(), task_cat.clone(), id.clone()),
         });
     }
-    for (id, note) in ast.lane_notes() {
+    for (id, label) in ast.lanes() {
         out.push(SelectableObject {
-            label: format!("lane {id}"),
-            note: Some(note.clone()),
-            object_ref: ObjectRef::new(diagram_id.clone(), lane_cat.clone(), id.clone()),
+            label: format!("lane {id} ({label})"),
+            note: ast.lane_note(&id).map(str::to_owned),
+            object_ref: ObjectRef::new(diagram_id.clone(), lane_cat.clone(), id),
         });
     }
     out
@@ -4421,11 +4583,11 @@ fn demo_session_fallback() -> Session {
 
     session.diagrams_mut().insert(seq_id.clone(), seq_diagram);
     session.diagrams_mut().insert(flow_id.clone(), flow_diagram);
-    session.diagrams_mut().insert(class_id, class_diagram);
-    session.diagrams_mut().insert(er_id, er_diagram);
-    session.diagrams_mut().insert(gantt_id, gantt_diagram);
+    session.diagrams_mut().insert(class_id.clone(), class_diagram);
+    session.diagrams_mut().insert(er_id.clone(), er_diagram);
+    session.diagrams_mut().insert(gantt_id.clone(), gantt_diagram);
     // Prefer a sequence diagram with highlight spans for default TUI hint modes.
-    session.set_active_diagram_id(Some(seq_id));
+    session.set_active_diagram_id(Some(seq_id.clone()));
 
     let x1 = XRef::new(
         ObjectRef::new(flow_id.clone(), category_path(&["flow", "node"]), n_a.clone()),
@@ -4441,8 +4603,30 @@ fn demo_session_fallback() -> Session {
         XRefStatus::DanglingTo,
     );
 
+    let x3 = XRef::new(
+        ObjectRef::new(seq_id, category_path(&["seq", "message"]), oid("m:0001")),
+        ObjectRef::new(class_id.clone(), category_path(&["class", "class"]), oid("c:Class01")),
+        "documents",
+        XRefStatus::Ok,
+    );
+    let x4 = XRef::new(
+        ObjectRef::new(class_id, category_path(&["class", "relation"]), oid("r:0001")),
+        ObjectRef::new(er_id.clone(), category_path(&["er", "relationship"]), oid("r:0001")),
+        "models",
+        XRefStatus::Ok,
+    );
+    let x5 = XRef::new(
+        ObjectRef::new(er_id, category_path(&["er", "entity"]), oid("e:ORDER")),
+        ObjectRef::new(gantt_id, category_path(&["gantt", "task"]), oid("t:0001")),
+        "scheduled_by",
+        XRefStatus::Ok,
+    );
+
     session.xrefs_mut().insert(XRefId::new("x:1").expect("xref id"), x1);
     session.xrefs_mut().insert(XRefId::new("x:2").expect("xref id"), x2);
+    session.xrefs_mut().insert(XRefId::new("x:3").expect("xref id"), x3);
+    session.xrefs_mut().insert(XRefId::new("x:4").expect("xref id"), x4);
+    session.xrefs_mut().insert(XRefId::new("x:5").expect("xref id"), x5);
 
     session
 }

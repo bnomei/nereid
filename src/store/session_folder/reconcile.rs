@@ -14,12 +14,17 @@
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use super::{DiagramMeta, DiagramSequenceBlockMeta, DiagramStableIdMap};
+use super::{
+    DiagramClassRelationMeta, DiagramErRelationshipMeta, DiagramGanttSectionMeta, DiagramMeta,
+    DiagramSequenceBlockMeta, DiagramStableIdMap,
+};
 use crate::model::seq_ast::{
     SequenceBlock, SequenceBlockKind, SequenceSection, SequenceSectionKind,
 };
 use crate::model::{
-    DiagramAst, FlowEdge, FlowchartAst, ObjectId, SequenceAst, SequenceMessage, SequenceMessageKind,
+    ClassAst, ClassRelation, DiagramAst, ErAst, ErRelationship, FlowEdge, FlowchartAst, GanttAst,
+    GanttSection, GanttTask, GanttTaskStart, ObjectId, SequenceAst, SequenceMessage,
+    SequenceMessageKind,
 };
 
 pub(crate) fn stable_id_map_from_ast(ast: &DiagramAst) -> DiagramStableIdMap {
@@ -36,7 +41,11 @@ pub(crate) fn stable_id_map_from_ast(ast: &DiagramAst) -> DiagramStableIdMap {
                     .or_insert_with(|| participant_id.to_string());
             }
 
-            DiagramStableIdMap { by_mermaid_id: BTreeMap::new(), by_name }
+            DiagramStableIdMap {
+                by_mermaid_id: BTreeMap::new(),
+                by_name,
+                by_fingerprint: BTreeMap::new(),
+            }
         }
         DiagramAst::Flowchart(flow_ast) => {
             let mut by_mermaid_id = BTreeMap::new();
@@ -47,7 +56,11 @@ pub(crate) fn stable_id_map_from_ast(ast: &DiagramAst) -> DiagramStableIdMap {
                 by_mermaid_id.entry(mermaid_id).or_insert_with(|| node_id.to_string());
             }
 
-            DiagramStableIdMap { by_mermaid_id, by_name: BTreeMap::new() }
+            DiagramStableIdMap {
+                by_mermaid_id,
+                by_name: BTreeMap::new(),
+                by_fingerprint: BTreeMap::new(),
+            }
         }
         DiagramAst::Class(class_ast) => {
             let mut by_name = BTreeMap::new();
@@ -57,7 +70,11 @@ pub(crate) fn stable_id_map_from_ast(ast: &DiagramAst) -> DiagramStableIdMap {
                 }
                 by_name.entry(class.name().to_owned()).or_insert_with(|| class_id.to_string());
             }
-            DiagramStableIdMap { by_mermaid_id: BTreeMap::new(), by_name }
+            DiagramStableIdMap {
+                by_mermaid_id: BTreeMap::new(),
+                by_name,
+                by_fingerprint: BTreeMap::new(),
+            }
         }
         DiagramAst::Er(er_ast) => {
             let mut by_name = BTreeMap::new();
@@ -66,22 +83,79 @@ pub(crate) fn stable_id_map_from_ast(ast: &DiagramAst) -> DiagramStableIdMap {
                     by_name.entry(e.name().to_owned()).or_insert_with(|| id.to_string());
                 }
             }
-            DiagramStableIdMap { by_mermaid_id: BTreeMap::new(), by_name }
+            DiagramStableIdMap {
+                by_mermaid_id: BTreeMap::new(),
+                by_name,
+                by_fingerprint: BTreeMap::new(),
+            }
         }
         DiagramAst::Gantt(gantt_ast) => {
             let mut by_mermaid_id = BTreeMap::new();
             let mut by_name = BTreeMap::new();
+            let mut by_fingerprint = BTreeMap::new();
+            let mut name_counts = BTreeMap::<&str, usize>::new();
+            for task in gantt_ast.tasks().values() {
+                *name_counts.entry(task.name()).or_default() += 1;
+            }
             for (task_id, task) in gantt_ast.tasks() {
                 if let Some(tag) = task.mermaid_tag().filter(|t| !t.is_empty()) {
                     by_mermaid_id.entry(tag.to_owned()).or_insert_with(|| task_id.to_string());
                 }
-                if !task.name().is_empty() {
+                if !task.name().is_empty() && name_counts.get(task.name()) == Some(&1) {
                     by_name.entry(task.name().to_owned()).or_insert_with(|| task_id.to_string());
                 }
+                by_fingerprint
+                    .entry(gantt_task_fingerprint(gantt_ast, task_id, task))
+                    .or_insert_with(|| task_id.to_string());
             }
-            DiagramStableIdMap { by_mermaid_id, by_name }
+            DiagramStableIdMap { by_mermaid_id, by_name, by_fingerprint }
         }
     }
+}
+
+fn gantt_task_base_fingerprint(ast: &GanttAst, task: &GanttTask) -> String {
+    let start = match task.start() {
+        GanttTaskStart::Date(date) => format!("date:{date}"),
+        GanttTaskStart::After(dependency_id) => {
+            let dependency = ast.tasks().get(dependency_id);
+            let semantic_dependency = dependency
+                .and_then(|task| task.mermaid_tag())
+                .map(|tag| format!("tag:{tag}"))
+                .or_else(|| dependency.map(|task| format!("name:{:?}", task.name())))
+                .unwrap_or_else(|| format!("id:{dependency_id}"));
+            format!("after:{semantic_dependency}")
+        }
+        GanttTaskStart::Unspecified => "unspecified".to_owned(),
+    };
+    format!(
+        "name={:?};start={start};duration_days={};raw_duration={:?}",
+        task.name(),
+        task.duration_days(),
+        task.raw_duration()
+    )
+}
+
+fn gantt_task_fingerprint(ast: &GanttAst, task_id: &ObjectId, task: &GanttTask) -> String {
+    let base = gantt_task_base_fingerprint(ast, task);
+    let section_context = ast
+        .sections()
+        .iter()
+        .find(|section| section.task_ids().contains(task_id))
+        .map(|section| {
+            let occurrence = section
+                .task_ids()
+                .iter()
+                .take_while(|candidate| *candidate != task_id)
+                .filter(|candidate| {
+                    ast.tasks().get(*candidate).is_some_and(|candidate| {
+                        gantt_task_base_fingerprint(ast, candidate) == base
+                    })
+                })
+                .count();
+            format!("section={:?};occurrence={occurrence}", section.name())
+        })
+        .unwrap_or_else(|| "section=<unsectioned>;occurrence=0".to_owned());
+    format!("{base};{section_context}")
 }
 
 fn flow_node_mermaid_id(node_id: &ObjectId, mermaid_id: Option<&str>) -> Option<String> {
@@ -236,6 +310,214 @@ pub(crate) fn reconcile_flowchart_nodes(ast: &mut FlowchartAst, sidecar: &Diagra
     *ast.node_groups_mut() = next_node_groups;
 }
 
+pub(crate) fn reconcile_class_nodes(ast: &mut ClassAst, sidecar: &DiagramMeta) {
+    if sidecar.stable_id_map.by_name.is_empty() {
+        return;
+    }
+
+    let mut remap = BTreeMap::<ObjectId, ObjectId>::new();
+    let mut next_classes = BTreeMap::new();
+    let mut assigned_ids = BTreeSet::new();
+    let reserved_ids = sidecar
+        .stable_id_map
+        .by_name
+        .values()
+        .filter_map(|raw| parse_stable_object_id(raw))
+        .collect::<BTreeSet<_>>();
+
+    for (parsed_id, class) in ast.classes() {
+        let stable_id = sidecar
+            .stable_id_map
+            .by_name
+            .get(class.name())
+            .and_then(|raw| parse_stable_object_id(raw));
+        let mapped_id = if let Some(stable_id) = stable_id.filter(|id| !assigned_ids.contains(id)) {
+            stable_id
+        } else if !reserved_ids.contains(parsed_id) && !assigned_ids.contains(parsed_id) {
+            parsed_id.clone()
+        } else {
+            let unavailable =
+                reserved_ids.iter().chain(&assigned_ids).cloned().collect::<BTreeSet<_>>();
+            allocate_reconciled_object_id(parsed_id, &unavailable)
+        };
+        assigned_ids.insert(mapped_id.clone());
+        if &mapped_id != parsed_id {
+            remap.insert(parsed_id.clone(), mapped_id.clone());
+        }
+        next_classes.insert(mapped_id, class.clone());
+    }
+
+    if remap.is_empty() {
+        return;
+    }
+
+    *ast.classes_mut() = next_classes;
+    *ast.relations_mut() = ast
+        .relations()
+        .iter()
+        .map(|(relation_id, relation)| {
+            let updated = ClassRelation::new(
+                remap_id(&remap, relation.from_class_id()),
+                remap_id(&remap, relation.to_class_id()),
+                relation.kind(),
+            )
+            .with_label(relation.label().map(ToOwned::to_owned))
+            .with_raw_connector(relation.raw_connector().map(ToOwned::to_owned));
+            (relation_id.clone(), updated)
+        })
+        .collect();
+}
+
+pub(crate) fn reconcile_er_entities(ast: &mut ErAst, sidecar: &DiagramMeta) {
+    if sidecar.stable_id_map.by_name.is_empty() {
+        return;
+    }
+
+    let mut remap = BTreeMap::<ObjectId, ObjectId>::new();
+    let mut next_entities = BTreeMap::new();
+    let mut assigned_ids = BTreeSet::new();
+    let reserved_ids = sidecar
+        .stable_id_map
+        .by_name
+        .values()
+        .filter_map(|raw| parse_stable_object_id(raw))
+        .collect::<BTreeSet<_>>();
+
+    for (parsed_id, entity) in ast.entities() {
+        let stable_id = sidecar
+            .stable_id_map
+            .by_name
+            .get(entity.name())
+            .and_then(|raw| parse_stable_object_id(raw));
+        let mapped_id = if let Some(stable_id) = stable_id.filter(|id| !assigned_ids.contains(id)) {
+            stable_id
+        } else if !reserved_ids.contains(parsed_id) && !assigned_ids.contains(parsed_id) {
+            parsed_id.clone()
+        } else {
+            let unavailable =
+                reserved_ids.iter().chain(&assigned_ids).cloned().collect::<BTreeSet<_>>();
+            allocate_reconciled_object_id(parsed_id, &unavailable)
+        };
+        assigned_ids.insert(mapped_id.clone());
+        if &mapped_id != parsed_id {
+            remap.insert(parsed_id.clone(), mapped_id.clone());
+        }
+        next_entities.insert(mapped_id, entity.clone());
+    }
+
+    if remap.is_empty() {
+        return;
+    }
+
+    *ast.entities_mut() = next_entities;
+    *ast.relationships_mut() = ast
+        .relationships()
+        .iter()
+        .map(|(relationship_id, relationship)| {
+            let updated = ErRelationship::new(
+                remap_id(&remap, relationship.from_entity_id()),
+                remap_id(&remap, relationship.to_entity_id()),
+                relationship.from_card(),
+                relationship.to_card(),
+            )
+            .with_stroke(relationship.stroke())
+            .with_label(relationship.label().map(ToOwned::to_owned))
+            .with_raw_connector(relationship.raw_connector().map(ToOwned::to_owned));
+            (relationship_id.clone(), updated)
+        })
+        .collect();
+}
+
+pub(crate) fn reconcile_gantt_tasks(ast: &mut GanttAst, sidecar: &DiagramMeta) {
+    if sidecar.stable_id_map.by_mermaid_id.is_empty()
+        && sidecar.stable_id_map.by_name.is_empty()
+        && sidecar.stable_id_map.by_fingerprint.is_empty()
+    {
+        return;
+    }
+
+    let mut remap = BTreeMap::<ObjectId, ObjectId>::new();
+    let mut assigned_ids = BTreeSet::new();
+    let reserved_ids = sidecar
+        .stable_id_map
+        .by_mermaid_id
+        .values()
+        .chain(sidecar.stable_id_map.by_name.values())
+        .chain(sidecar.stable_id_map.by_fingerprint.values())
+        .filter_map(|raw| parse_stable_object_id(raw))
+        .collect::<BTreeSet<_>>();
+
+    let mut name_counts = BTreeMap::<&str, usize>::new();
+    for task in ast.tasks().values() {
+        *name_counts.entry(task.name()).or_default() += 1;
+    }
+
+    for (parsed_id, task) in ast.tasks() {
+        let stable_id = task
+            .mermaid_tag()
+            .and_then(|tag| sidecar.stable_id_map.by_mermaid_id.get(tag))
+            .or_else(|| {
+                sidecar
+                    .stable_id_map
+                    .by_fingerprint
+                    .get(&gantt_task_fingerprint(ast, parsed_id, task))
+            })
+            .or_else(|| {
+                (name_counts.get(task.name()) == Some(&1))
+                    .then(|| sidecar.stable_id_map.by_name.get(task.name()))
+                    .flatten()
+            })
+            .and_then(|raw| parse_stable_object_id(raw));
+        let mapped_id = if let Some(stable_id) = stable_id.filter(|id| !assigned_ids.contains(id)) {
+            stable_id
+        } else if !reserved_ids.contains(parsed_id) && !assigned_ids.contains(parsed_id) {
+            parsed_id.clone()
+        } else {
+            let unavailable =
+                reserved_ids.iter().chain(&assigned_ids).cloned().collect::<BTreeSet<_>>();
+            allocate_reconciled_object_id(parsed_id, &unavailable)
+        };
+        assigned_ids.insert(mapped_id.clone());
+        remap.insert(parsed_id.clone(), mapped_id);
+    }
+
+    if remap.iter().all(|(from, to)| from == to) {
+        return;
+    }
+
+    let next_tasks = ast
+        .tasks()
+        .iter()
+        .map(|(parsed_id, task)| {
+            let task_id = remap_id(&remap, parsed_id);
+            let start = match task.start() {
+                GanttTaskStart::Date(date) => GanttTaskStart::Date(date.clone()),
+                GanttTaskStart::After(dependency_id) => {
+                    GanttTaskStart::After(remap_id(&remap, dependency_id))
+                }
+                GanttTaskStart::Unspecified => GanttTaskStart::Unspecified,
+            };
+            let mut updated = GanttTask::new(
+                task_id.clone(),
+                task.name(),
+                start,
+                task.duration_days(),
+                task.raw_duration(),
+            )
+            .with_mermaid_tag(task.mermaid_tag().map(ToOwned::to_owned));
+            updated.set_note(task.note().map(ToOwned::to_owned));
+            (task_id, updated)
+        })
+        .collect();
+    *ast.tasks_mut() = next_tasks;
+
+    for section in ast.sections_mut() {
+        for task_id in section.task_ids_mut() {
+            *task_id = remap_id(&remap, task_id);
+        }
+    }
+}
+
 pub(crate) fn reconcile_flowchart_edges(ast: &mut FlowchartAst, sidecar: &DiagramMeta) {
     if sidecar.flow_edges.is_empty() {
         return;
@@ -329,6 +611,248 @@ pub(crate) fn reconcile_flowchart_edges(ast: &mut FlowchartAst, sidecar: &Diagra
     }
 
     *ast.edges_mut() = next_edges;
+}
+
+pub(crate) fn reconcile_class_relations(ast: &mut ClassAst, sidecar: &DiagramMeta) {
+    if sidecar.class_relations.is_empty() {
+        return;
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    struct Fingerprint {
+        from_id: ObjectId,
+        to_id: ObjectId,
+        kind: u8,
+        connector: u8,
+        label: Option<String>,
+    }
+
+    fn kind_key(kind: crate::model::ClassRelationKind) -> u8 {
+        match kind {
+            crate::model::ClassRelationKind::Inheritance => 0,
+            crate::model::ClassRelationKind::Composition => 1,
+            crate::model::ClassRelationKind::Aggregation => 2,
+            crate::model::ClassRelationKind::Association => 3,
+            crate::model::ClassRelationKind::Dependency => 4,
+            crate::model::ClassRelationKind::Realization => 5,
+            crate::model::ClassRelationKind::Link => 6,
+        }
+    }
+
+    fn from_meta(meta: &DiagramClassRelationMeta) -> Fingerprint {
+        Fingerprint {
+            from_id: meta.from_class_id.clone(),
+            to_id: meta.to_class_id.clone(),
+            kind: kind_key(meta.kind),
+            connector: connector_key(meta.kind, meta.raw_connector.as_deref()),
+            label: meta.label.clone(),
+        }
+    }
+
+    fn connector_key(kind: crate::model::ClassRelationKind, raw: Option<&str>) -> u8 {
+        let raw = raw.unwrap_or("");
+        match kind {
+            crate::model::ClassRelationKind::Inheritance
+            | crate::model::ClassRelationKind::Realization => u8::from(!raw.starts_with("<|")),
+            crate::model::ClassRelationKind::Composition => {
+                u8::from(raw.is_empty() || raw.starts_with('*'))
+            }
+            crate::model::ClassRelationKind::Aggregation => {
+                u8::from(raw.is_empty() || raw.starts_with('o'))
+            }
+            crate::model::ClassRelationKind::Association => u8::from(!raw.starts_with('<')),
+            crate::model::ClassRelationKind::Dependency => {
+                if raw.is_empty() || raw.contains('>') {
+                    2
+                } else if raw.starts_with('<') {
+                    1
+                } else {
+                    0
+                }
+            }
+            crate::model::ClassRelationKind::Link => u8::from(raw == "<-->"),
+        }
+    }
+
+    let mut by_fingerprint = BTreeMap::<Fingerprint, VecDeque<ObjectId>>::new();
+    let mut taken_ids = BTreeSet::new();
+    for meta in &sidecar.class_relations {
+        taken_ids.insert(meta.relation_id.clone());
+        by_fingerprint.entry(from_meta(meta)).or_default().push_back(meta.relation_id.clone());
+    }
+
+    let mut next_relations = BTreeMap::new();
+    for (parsed_id, relation) in ast.relations() {
+        let fingerprint = Fingerprint {
+            from_id: relation.from_class_id().clone(),
+            to_id: relation.to_class_id().clone(),
+            kind: kind_key(relation.kind()),
+            connector: connector_key(relation.kind(), relation.raw_connector()),
+            label: relation.label().map(ToOwned::to_owned),
+        };
+        let matched_id = by_fingerprint.get_mut(&fingerprint).and_then(VecDeque::pop_front);
+        let target_id = match matched_id {
+            Some(stable_id) if !next_relations.contains_key(&stable_id) => stable_id,
+            _ if !taken_ids.contains(parsed_id) && !next_relations.contains_key(parsed_id) => {
+                parsed_id.clone()
+            }
+            _ => {
+                let unavailable =
+                    taken_ids.iter().chain(next_relations.keys()).cloned().collect::<BTreeSet<_>>();
+                allocate_reconciled_object_id(parsed_id, &unavailable)
+            }
+        };
+        taken_ids.insert(target_id.clone());
+        next_relations.insert(target_id, relation.clone());
+    }
+    *ast.relations_mut() = next_relations;
+}
+
+pub(crate) fn reconcile_er_relationships(ast: &mut ErAst, sidecar: &DiagramMeta) {
+    if sidecar.er_relationships.is_empty() {
+        return;
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    struct Fingerprint {
+        from_id: ObjectId,
+        to_id: ObjectId,
+        from_card: u8,
+        to_card: u8,
+        stroke: u8,
+        label: Option<String>,
+    }
+
+    fn card_key(card: crate::model::ErCardinality) -> u8 {
+        match card {
+            crate::model::ErCardinality::ExactlyOne => 0,
+            crate::model::ErCardinality::ZeroOrOne => 1,
+            crate::model::ErCardinality::OneOrMore => 2,
+            crate::model::ErCardinality::ZeroOrMore => 3,
+        }
+    }
+
+    fn stroke_key(stroke: crate::model::ErStroke) -> u8 {
+        match stroke {
+            crate::model::ErStroke::Identifying => 0,
+            crate::model::ErStroke::NonIdentifying => 1,
+        }
+    }
+
+    fn from_meta(meta: &DiagramErRelationshipMeta) -> Fingerprint {
+        Fingerprint {
+            from_id: meta.from_entity_id.clone(),
+            to_id: meta.to_entity_id.clone(),
+            from_card: card_key(meta.from_card),
+            to_card: card_key(meta.to_card),
+            stroke: stroke_key(meta.stroke),
+            label: meta.label.clone(),
+        }
+    }
+
+    let mut by_fingerprint = BTreeMap::<Fingerprint, VecDeque<ObjectId>>::new();
+    let mut taken_ids = BTreeSet::new();
+    for meta in &sidecar.er_relationships {
+        taken_ids.insert(meta.relationship_id.clone());
+        by_fingerprint.entry(from_meta(meta)).or_default().push_back(meta.relationship_id.clone());
+    }
+
+    let mut next_relationships = BTreeMap::new();
+    for (parsed_id, relationship) in ast.relationships() {
+        let fingerprint = Fingerprint {
+            from_id: relationship.from_entity_id().clone(),
+            to_id: relationship.to_entity_id().clone(),
+            from_card: card_key(relationship.from_card()),
+            to_card: card_key(relationship.to_card()),
+            stroke: stroke_key(relationship.stroke()),
+            label: relationship.label().map(ToOwned::to_owned),
+        };
+        let matched_id = by_fingerprint.get_mut(&fingerprint).and_then(VecDeque::pop_front);
+        let target_id = match matched_id {
+            Some(stable_id) if !next_relationships.contains_key(&stable_id) => stable_id,
+            _ if !taken_ids.contains(parsed_id) && !next_relationships.contains_key(parsed_id) => {
+                parsed_id.clone()
+            }
+            _ => {
+                let unavailable = taken_ids
+                    .iter()
+                    .chain(next_relationships.keys())
+                    .cloned()
+                    .collect::<BTreeSet<_>>();
+                allocate_reconciled_object_id(parsed_id, &unavailable)
+            }
+        };
+        taken_ids.insert(target_id.clone());
+        next_relationships.insert(target_id, relationship.clone());
+    }
+    *ast.relationships_mut() = next_relationships;
+}
+
+pub(crate) fn reconcile_gantt_sections(ast: &mut GanttAst, sidecar: &DiagramMeta) {
+    if sidecar.gantt_sections.is_empty() {
+        return;
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    struct Fingerprint {
+        name: String,
+        task_ids: Vec<ObjectId>,
+    }
+
+    fn from_meta(meta: &DiagramGanttSectionMeta) -> Fingerprint {
+        Fingerprint { name: meta.name.clone(), task_ids: meta.task_ids.clone() }
+    }
+
+    let mut by_fingerprint = BTreeMap::<Fingerprint, VecDeque<ObjectId>>::new();
+    let mut old_name_counts = BTreeMap::<&str, usize>::new();
+    let mut current_name_counts = BTreeMap::<&str, usize>::new();
+    for meta in &sidecar.gantt_sections {
+        *old_name_counts.entry(meta.name.as_str()).or_default() += 1;
+    }
+    for section in ast.sections() {
+        *current_name_counts.entry(section.name()).or_default() += 1;
+    }
+    let mut by_unique_name = BTreeMap::<&str, ObjectId>::new();
+    let mut taken_ids = BTreeSet::new();
+    for meta in &sidecar.gantt_sections {
+        taken_ids.insert(meta.section_id.clone());
+        by_fingerprint.entry(from_meta(meta)).or_default().push_back(meta.section_id.clone());
+        if old_name_counts.get(meta.name.as_str()) == Some(&1) {
+            by_unique_name.insert(meta.name.as_str(), meta.section_id.clone());
+        }
+    }
+
+    let mut assigned_ids = BTreeSet::new();
+    let mut next_sections = Vec::with_capacity(ast.sections().len());
+    for section in ast.sections() {
+        let fingerprint =
+            Fingerprint { name: section.name().to_owned(), task_ids: section.task_ids().to_vec() };
+        let matched_id =
+            by_fingerprint.get_mut(&fingerprint).and_then(VecDeque::pop_front).or_else(|| {
+                (current_name_counts.get(section.name()) == Some(&1))
+                    .then(|| by_unique_name.get(section.name()).cloned())
+                    .flatten()
+            });
+        let target_id = match matched_id {
+            Some(stable_id) if !assigned_ids.contains(&stable_id) => stable_id,
+            _ if !taken_ids.contains(section.section_id())
+                && !assigned_ids.contains(section.section_id()) =>
+            {
+                section.section_id().clone()
+            }
+            _ => {
+                let unavailable =
+                    taken_ids.iter().chain(&assigned_ids).cloned().collect::<BTreeSet<_>>();
+                allocate_reconciled_object_id(section.section_id(), &unavailable)
+            }
+        };
+        taken_ids.insert(target_id.clone());
+        assigned_ids.insert(target_id.clone());
+        let mut updated = GanttSection::new(target_id, section.name());
+        *updated.task_ids_mut() = section.task_ids().to_vec();
+        next_sections.push(updated);
+    }
+    *ast.sections_mut() = next_sections;
 }
 
 pub(crate) fn reconcile_sequence_messages(ast: &mut SequenceAst, sidecar: &DiagramMeta) {
@@ -568,7 +1092,14 @@ pub(crate) fn reconcile_gantt_notes(ast: &mut crate::model::GanttAst, sidecar: &
         }
     }
     for (lane_id, note) in &sidecar.gantt_lane_notes {
-        ast.set_lane_note(lane_id.clone(), Some(note.clone()));
+        let migrated_id = lane_id
+            .as_str()
+            .strip_prefix("lane:")
+            .filter(|suffix| suffix.len() == 4 && suffix.chars().all(|ch| ch.is_ascii_digit()))
+            .and_then(|suffix| suffix.parse::<u32>().ok())
+            .and_then(|day| ast.lane_id_for_relative_day(day))
+            .unwrap_or_else(|| lane_id.clone());
+        ast.set_lane_note(migrated_id, Some(note.clone()));
     }
 }
 
@@ -831,13 +1362,18 @@ pub(crate) fn reconcile_diagram_ast(ast: &mut DiagramAst, sidecar: &DiagramMeta)
             reconcile_sequence_participant_symbols(seq_ast, sidecar);
         }
         DiagramAst::Class(class_ast) => {
-            // Name-based identity via stable_id_map; notes keyed by object id.
+            reconcile_class_nodes(class_ast, sidecar);
+            reconcile_class_relations(class_ast, sidecar);
             reconcile_class_notes(class_ast, sidecar);
         }
         DiagramAst::Er(er_ast) => {
+            reconcile_er_entities(er_ast, sidecar);
+            reconcile_er_relationships(er_ast, sidecar);
             reconcile_er_notes(er_ast, sidecar);
         }
         DiagramAst::Gantt(gantt_ast) => {
+            reconcile_gantt_tasks(gantt_ast, sidecar);
+            reconcile_gantt_sections(gantt_ast, sidecar);
             reconcile_gantt_notes(gantt_ast, sidecar);
         }
     }
@@ -850,6 +1386,9 @@ pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> 
 
     let (
         flow_edges,
+        class_relations,
+        er_relationships,
+        gantt_sections,
         sequence_messages,
         sequence_blocks,
         flow_node_notes,
@@ -874,6 +1413,9 @@ pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> 
                 .collect(),
             Vec::new(),
             Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
             ast.nodes()
                 .iter()
                 .filter_map(|(node_id, node)| {
@@ -894,6 +1436,9 @@ pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> 
             BTreeMap::new(),
         ),
         DiagramAst::Sequence(ast) => (
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
             Vec::new(),
             ast.messages_in_order()
                 .into_iter()
@@ -927,6 +1472,9 @@ pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> 
         ),
         DiagramAst::Class(ast) => (
             Vec::new(),
+            super::class_relations_meta_from_ast(ast),
+            Vec::new(),
+            Vec::new(),
             Vec::new(),
             Vec::new(),
             BTreeMap::new(),
@@ -946,6 +1494,9 @@ pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> 
         DiagramAst::Er(ast) => (
             Vec::new(),
             Vec::new(),
+            super::er_relationships_meta_from_ast(ast),
+            Vec::new(),
+            Vec::new(),
             Vec::new(),
             BTreeMap::new(),
             BTreeMap::new(),
@@ -963,6 +1514,9 @@ pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> 
         ),
         DiagramAst::Gantt(ast) => (
             Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            super::gantt_sections_meta_from_ast(ast),
             Vec::new(),
             Vec::new(),
             BTreeMap::new(),
@@ -987,6 +1541,9 @@ pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> 
         stable_id_map: stable_id_map_from_ast(diagram.ast()),
         xrefs: Vec::new(),
         flow_edges,
+        class_relations,
+        er_relationships,
+        gantt_sections,
         sequence_messages,
         sequence_blocks,
         default_symbol_repository_id: diagram.default_symbol_repository_id().map(ToOwned::to_owned),

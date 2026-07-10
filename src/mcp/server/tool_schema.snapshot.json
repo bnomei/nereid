@@ -1294,6 +1294,88 @@
     },
     "outputSchema": {
       "$defs": {
+        "McpClassNodeAst": {
+          "properties": {
+            "attributes": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "class_id": {
+              "type": "string"
+            },
+            "methods": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "name": {
+              "type": "string"
+            },
+            "note": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "class_id",
+            "name",
+            "attributes",
+            "methods"
+          ],
+          "type": "object"
+        },
+        "McpClassRelationAst": {
+          "properties": {
+            "from_class_id": {
+              "type": "string"
+            },
+            "kind": {
+              "$ref": "#/$defs/McpClassRelationKind"
+            },
+            "label": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "raw_connector": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "relation_id": {
+              "type": "string"
+            },
+            "to_class_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "relation_id",
+            "from_class_id",
+            "to_class_id",
+            "kind"
+          ],
+          "type": "object"
+        },
+        "McpClassRelationKind": {
+          "enum": [
+            "inheritance",
+            "composition",
+            "aggregation",
+            "association",
+            "dependency",
+            "realization",
+            "link"
+          ],
+          "type": "string"
+        },
         "McpDiagramAst": {
           "oneOf": [
             {
@@ -1354,8 +1436,185 @@
                 "edges"
               ],
               "type": "object"
+            },
+            {
+              "properties": {
+                "classes": {
+                  "items": {
+                    "$ref": "#/$defs/McpClassNodeAst"
+                  },
+                  "type": "array"
+                },
+                "relations": {
+                  "items": {
+                    "$ref": "#/$defs/McpClassRelationAst"
+                  },
+                  "type": "array"
+                },
+                "type": {
+                  "const": "class",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "classes",
+                "relations"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "entities": {
+                  "items": {
+                    "$ref": "#/$defs/McpErEntityAst"
+                  },
+                  "type": "array"
+                },
+                "relationships": {
+                  "items": {
+                    "$ref": "#/$defs/McpErRelationshipAst"
+                  },
+                  "type": "array"
+                },
+                "type": {
+                  "const": "er",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "entities",
+                "relationships"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "date_format": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "lanes": {
+                  "items": {
+                    "$ref": "#/$defs/McpGanttLaneAst"
+                  },
+                  "type": "array"
+                },
+                "sections": {
+                  "items": {
+                    "$ref": "#/$defs/McpGanttSectionAst"
+                  },
+                  "type": "array"
+                },
+                "tasks": {
+                  "items": {
+                    "$ref": "#/$defs/McpGanttTaskAst"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "gantt",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "sections",
+                "tasks",
+                "lanes"
+              ],
+              "type": "object"
             }
           ]
+        },
+        "McpErCardinality": {
+          "enum": [
+            "exactly_one",
+            "zero_or_one",
+            "one_or_more",
+            "zero_or_more"
+          ],
+          "type": "string"
+        },
+        "McpErEntityAst": {
+          "properties": {
+            "entity_id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "note": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "entity_id",
+            "name"
+          ],
+          "type": "object"
+        },
+        "McpErRelationshipAst": {
+          "properties": {
+            "from_cardinality": {
+              "$ref": "#/$defs/McpErCardinality"
+            },
+            "from_entity_id": {
+              "type": "string"
+            },
+            "label": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "raw_connector": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "relationship_id": {
+              "type": "string"
+            },
+            "stroke": {
+              "$ref": "#/$defs/McpErStroke"
+            },
+            "to_cardinality": {
+              "$ref": "#/$defs/McpErCardinality"
+            },
+            "to_entity_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "relationship_id",
+            "from_entity_id",
+            "to_entity_id",
+            "from_cardinality",
+            "to_cardinality",
+            "stroke"
+          ],
+          "type": "object"
+        },
+        "McpErStroke": {
+          "enum": [
+            "identifying",
+            "non_identifying"
+          ],
+          "type": "string"
         },
         "McpFlowEdgeAst": {
           "properties": {
@@ -1434,6 +1693,138 @@
             "shape"
           ],
           "type": "object"
+        },
+        "McpGanttLaneAst": {
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "lane_id": {
+              "type": "string"
+            },
+            "note": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "lane_id",
+            "label"
+          ],
+          "type": "object"
+        },
+        "McpGanttSectionAst": {
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "section_id": {
+              "type": "string"
+            },
+            "task_ids": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "section_id",
+            "name",
+            "task_ids"
+          ],
+          "type": "object"
+        },
+        "McpGanttTaskAst": {
+          "properties": {
+            "duration_days": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "mermaid_tag": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "note": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "raw_duration": {
+              "type": "string"
+            },
+            "start": {
+              "$ref": "#/$defs/McpGanttTaskStart"
+            },
+            "task_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "task_id",
+            "name",
+            "start",
+            "duration_days",
+            "raw_duration"
+          ],
+          "type": "object"
+        },
+        "McpGanttTaskStart": {
+          "oneOf": [
+            {
+              "properties": {
+                "date": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "date",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "date"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "task_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "after",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "task_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "unspecified",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            }
+          ]
         },
         "McpSeqBlockAst": {
           "properties": {
@@ -2950,7 +3341,27 @@
       "$defs": {
         "DiagramCounts": {
           "properties": {
+            "classes": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "dependencies": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
             "edges": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "entities": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "lanes": {
               "format": "uint64",
               "minimum": 0,
               "type": "integer"
@@ -2969,13 +3380,41 @@
               "format": "uint64",
               "minimum": 0,
               "type": "integer"
+            },
+            "relations": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "relationships": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "sections": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "tasks": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
             }
           },
           "required": [
             "participants",
             "messages",
             "nodes",
-            "edges"
+            "edges",
+            "classes",
+            "relations",
+            "entities",
+            "relationships",
+            "sections",
+            "tasks",
+            "dependencies",
+            "lanes"
           ],
           "type": "object"
         },
@@ -3475,6 +3914,82 @@
     },
     "outputSchema": {
       "$defs": {
+        "McpClassRelationKind": {
+          "enum": [
+            "inheritance",
+            "composition",
+            "aggregation",
+            "association",
+            "dependency",
+            "realization",
+            "link"
+          ],
+          "type": "string"
+        },
+        "McpErCardinality": {
+          "enum": [
+            "exactly_one",
+            "zero_or_one",
+            "one_or_more",
+            "zero_or_more"
+          ],
+          "type": "string"
+        },
+        "McpErStroke": {
+          "enum": [
+            "identifying",
+            "non_identifying"
+          ],
+          "type": "string"
+        },
+        "McpGanttTaskStart": {
+          "oneOf": [
+            {
+              "properties": {
+                "date": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "date",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "date"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "task_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "after",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "task_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "unspecified",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            }
+          ]
+        },
         "McpObject": {
           "oneOf": [
             {
@@ -3696,6 +4211,231 @@
                 "type",
                 "from_node_id",
                 "to_node_id"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "attributes": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "methods": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "class_node",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "name",
+                "attributes",
+                "methods"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "from_class_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "$ref": "#/$defs/McpClassRelationKind"
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "raw_connector": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "to_class_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "class_relation",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "from_class_id",
+                "to_class_id",
+                "kind"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "er_entity",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "name"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "from_cardinality": {
+                  "$ref": "#/$defs/McpErCardinality"
+                },
+                "from_entity_id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "raw_connector": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "stroke": {
+                  "$ref": "#/$defs/McpErStroke"
+                },
+                "to_cardinality": {
+                  "$ref": "#/$defs/McpErCardinality"
+                },
+                "to_entity_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "er_relationship",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "from_entity_id",
+                "to_entity_id",
+                "from_cardinality",
+                "to_cardinality",
+                "stroke"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "task_ids": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": {
+                  "const": "gantt_section",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "name",
+                "task_ids"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "duration_days": {
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "mermaid_tag": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "raw_duration": {
+                  "type": "string"
+                },
+                "start": {
+                  "$ref": "#/$defs/McpGanttTaskStart"
+                },
+                "type": {
+                  "const": "gantt_task",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "name",
+                "start",
+                "duration_days",
+                "raw_duration"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "const": "gantt_lane",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "label"
               ],
               "type": "object"
             }

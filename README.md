@@ -12,7 +12,7 @@ Nereid is a terminal-first workspace for Mermaid-backed diagrams. It combines a 
 
 Use Nereid when you want to:
 
-- browse and edit sequence diagrams and flowcharts from a terminal,
+- browse and edit sequence, flowchart, class, entity-relationship (ER), and Gantt diagrams from a terminal,
 - keep diagrams, walkthroughs, cross-references, selections, and active state in a local session folder,
 - expose typed MCP tools for diagram navigation, structured mutation (including sequence blocks), xrefs, walkthroughs, and graph queries,
 - replace Mermaid sources with identity-preserving reconcile when fingerprints still match,
@@ -164,9 +164,38 @@ Flowcharts support:
 - chained edges such as `A --> B --> C`,
 - `linkStyle` statements, which are preserved on export but ignored by the text renderer.
 
-Identifiers in parsed Mermaid node and participant names must be non-empty ASCII alphanumeric strings or underscores. They cannot contain whitespace or `/`.
+Class diagrams support:
 
-Sources: [src/format/mermaid/sequence.rs](src/format/mermaid/sequence.rs), [src/format/mermaid/flowchart.rs](src/format/mermaid/flowchart.rs), [src/format/mermaid/ident.rs](src/format/mermaid/ident.rs).
+- `classDiagram` as the first non-empty line,
+- comments beginning with `%%`,
+- bare class names containing ASCII letters, digits, underscores, or hyphens,
+- members in `ClassName : member` form; members containing `(` are methods and the rest are attributes,
+- inheritance, composition, aggregation, association, dependency, realization, and plain-link relations,
+- optional relation labels after `:`,
+- class notes stored in the diagram sidecar.
+
+Entity-relationship diagrams support:
+
+- `erDiagram` as the first non-empty line,
+- comments beginning with `%%`,
+- bare entity names containing ASCII letters, digits, underscores, or hyphens,
+- identifying (`--`) and non-identifying (`..`) relationships,
+- Mermaid cardinality tokens `||`, `|o`, `o|`, `|{`, `}|`, `}o`, and `o{`,
+- optional relationship labels after `:`,
+- entity notes stored in the diagram sidecar.
+
+Gantt diagrams support:
+
+- `gantt` as the first non-empty line,
+- comments beginning with `%%`,
+- optional `title` and `dateFormat` lines,
+- named `section` groups,
+- tasks with an optional tag, an absolute `YYYY-MM-DD` start or `after <tag>` dependency, and a day duration such as `14d`,
+- task and rendered time-lane notes stored in the diagram sidecar.
+
+Parsed sequence participant and flowchart node names must be non-empty ASCII alphanumeric strings or underscores. They cannot contain whitespace or `/`. Class and ER names additionally allow hyphens. Gantt task labels are free-form text before the task metadata colon.
+
+Sources: [src/format/mermaid/sequence.rs](src/format/mermaid/sequence.rs), [src/format/mermaid/flowchart.rs](src/format/mermaid/flowchart.rs), [src/format/mermaid/class.rs](src/format/mermaid/class.rs), [src/format/mermaid/er.rs](src/format/mermaid/er.rs), [src/format/mermaid/gantt.rs](src/format/mermaid/gantt.rs), [src/format/mermaid/ident.rs](src/format/mermaid/ident.rs).
 
 ## TUI
 
@@ -240,7 +269,21 @@ d:demo-flow/flow/node/n:a
 d:demo-seq/seq/message/m:0001
 d:demo-seq/seq/block/b:0000
 d:demo-seq/seq/section/sec:0000:00
+d:demo-class/class/class/c:Class01
+d:demo-class/class/relation/r:0001
+d:demo-er/er/entity/e:CUSTOMER
+d:demo-er/er/relationship/r:0001
+d:demo-gantt/gantt/section/sec:0001
+d:demo-gantt/gantt/task/t:0001
+d:demo-gantt/gantt/lane/lane:2014-01-01
 ```
+
+Canonical category pairs are `seq/participant`, `seq/message`, `seq/block`, `seq/section`, `flow/node`, `flow/edge`, `class/class`, `class/relation`, `er/entity`, `er/relationship`, `gantt/section`, `gantt/task`, and `gantt/lane`.
+
+Gantt lanes with valid `YYYY-MM-DD` task starts use calendar-stable ids such as
+`lane:2026-01-08`; charts without parseable absolute dates use relative ids such as `lane:0007`.
+
+Sequence and flowchart diagrams support structured MCP mutation ops. Edit class, ER, and Gantt diagrams with `diagram_replace_from_mermaid` or the TUI editor; their kind-specific AST and object reads remain available for inspection and verification.
 
 Prefer structure ops for local alt/opt/loop/par edits. Use `diagram_replace_from_mermaid` for bulk Mermaid rewrites; matching fingerprints keep stable ids, and the response reports preserved/dropped/new ids plus dangling xrefs on the target diagram.
 
@@ -255,13 +298,15 @@ Sources: [src/mcp/server.rs](src/mcp/server.rs), [src/mcp/server/tool_schema.sna
 
 ## Demo data and playbooks
 
-The repository includes a persisted demo session in [data/demo-session](data/demo-session). It contains sequence diagrams, flowcharts, xrefs, and a walkthrough that exercise the TUI and MCP tools.
+The repository includes a persisted demo session in [data/demo-session](data/demo-session). It contains sequence, flowchart, class, ER, and Gantt diagrams, plus xrefs and a walkthrough that exercise the TUI and MCP tools. The demo index links to every diagram family.
 
 Playbook prompts for MCP clients live in [tests/playbooks](tests/playbooks). Example tasks include:
 
 - "From the demo index, list every nav xref that lands in a sequence diagram."
 - "Create a temporary flowchart diagram, delete it, and confirm it is gone from `diagram_list`."
 - "Build an alt/else block with structure ops, or replace Mermaid while preserving message ids."
+- "Inspect the `places` relationship in the ER demo and return its canonical relationship ref."
+- "Follow the Gantt `after` dependency from `Another task` back to `A task`."
 
 ## Development
 

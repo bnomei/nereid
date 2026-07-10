@@ -40,7 +40,14 @@ impl std::error::Error for MermaidErParseError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MermaidErExportError {
-    EmptyEntityName { entity_id: ObjectId },
+    EmptyEntityName {
+        entity_id: ObjectId,
+    },
+    MissingRelationshipEndpoint {
+        relationship_id: ObjectId,
+        endpoint: &'static str,
+        entity_id: ObjectId,
+    },
 }
 
 impl fmt::Display for MermaidErExportError {
@@ -48,6 +55,12 @@ impl fmt::Display for MermaidErExportError {
         match self {
             Self::EmptyEntityName { entity_id } => {
                 write!(f, "entity {entity_id} has an empty name")
+            }
+            Self::MissingRelationshipEndpoint { relationship_id, endpoint, entity_id } => {
+                write!(
+                    f,
+                    "er relationship {relationship_id} references missing {endpoint} entity {entity_id}"
+                )
             }
         }
     }
@@ -235,9 +248,22 @@ pub fn export_er_diagram(ast: &ErAst) -> Result<String, MermaidErExportError> {
         out.push_str(&format!("    {}\n", entity.name()));
     }
 
-    for rel in ast.relationships().values() {
-        let from = ast.entities().get(rel.from_entity_id()).map(ErEntity::name).unwrap_or("?");
-        let to = ast.entities().get(rel.to_entity_id()).map(ErEntity::name).unwrap_or("?");
+    for (relationship_id, rel) in ast.relationships() {
+        let from =
+            ast.entities().get(rel.from_entity_id()).map(ErEntity::name).ok_or_else(|| {
+                MermaidErExportError::MissingRelationshipEndpoint {
+                    relationship_id: relationship_id.clone(),
+                    endpoint: "from",
+                    entity_id: rel.from_entity_id().clone(),
+                }
+            })?;
+        let to = ast.entities().get(rel.to_entity_id()).map(ErEntity::name).ok_or_else(|| {
+            MermaidErExportError::MissingRelationshipEndpoint {
+                relationship_id: relationship_id.clone(),
+                endpoint: "to",
+                entity_id: rel.to_entity_id().clone(),
+            }
+        })?;
         let left = card_export(rel.from_card(), true);
         let right = card_export(rel.to_card(), false);
         let sep = match rel.stroke() {
@@ -288,5 +314,26 @@ CUSTOMER }|..|{ DELIVERY-ADDRESS : uses
         let a2 = parse_er_diagram(&out).expect("p2");
         assert_eq!(a1.entities().len(), a2.entities().len());
         assert_eq!(a1.relationships().len(), a2.relationships().len());
+    }
+
+    #[test]
+    fn export_rejects_missing_relationship_endpoint() {
+        let mut ast = ErAst::default();
+        let a = entity_id_from_name("A");
+        ast.entities_mut().insert(a.clone(), ErEntity::new("A"));
+        ast.relationships_mut().insert(
+            ObjectId::new("r:1").unwrap(),
+            ErRelationship::new(
+                a,
+                ObjectId::new("e:missing").unwrap(),
+                ErCardinality::ExactlyOne,
+                ErCardinality::ExactlyOne,
+            ),
+        );
+
+        assert!(matches!(
+            export_er_diagram(&ast),
+            Err(MermaidErExportError::MissingRelationshipEndpoint { endpoint: "to", .. })
+        ));
     }
 }

@@ -89,6 +89,39 @@ fn demo_session() -> Session {
     session
 }
 
+fn new_diagram_kinds_session() -> Session {
+    let mut session = Session::new(SessionId::new("s:mcp-new-kinds").expect("session id"));
+
+    let class_id = DiagramId::new("d-class").expect("diagram id");
+    let class_ast = crate::format::mermaid::parse_class_diagram(
+        "classDiagram\n  Animal <|-- Duck : inherits\n  Animal : +age int\n  Duck : +swim()\n",
+    )
+    .expect("class diagram");
+    session.diagrams_mut().insert(
+        class_id.clone(),
+        Diagram::new(class_id.clone(), "Class", DiagramAst::Class(class_ast)),
+    );
+
+    let er_id = DiagramId::new("d-er").expect("diagram id");
+    let er_ast =
+        crate::format::mermaid::parse_er_diagram("erDiagram\n  CUSTOMER ||--o{ ORDER : places\n")
+            .expect("er diagram");
+    session.diagrams_mut().insert(er_id.clone(), Diagram::new(er_id, "ER", DiagramAst::Er(er_ast)));
+
+    let gantt_id = DiagramId::new("d-gantt").expect("diagram id");
+    let mut gantt_ast = crate::format::mermaid::parse_gantt_diagram(
+        "gantt\n  title Release\n  dateFormat YYYY-MM-DD\n  section Build\n  Design :design, 2026-01-01, 2d\n  Ship :ship, after design, 1d\n",
+    )
+    .expect("gantt diagram");
+    gantt_ast.set_lane_note(oid("lane:2026-01-01"), Some("release starts"));
+    session
+        .diagrams_mut()
+        .insert(gantt_id.clone(), Diagram::new(gantt_id, "Gantt", DiagramAst::Gantt(gantt_ast)));
+
+    session.set_active_diagram_id(Some(class_id));
+    session
+}
+
 fn demo_session_with_seq_blocks() -> Session {
     let mut session = Session::new(SessionId::new("s:mcp-seq-blocks").expect("session id"));
 
@@ -3200,6 +3233,149 @@ async fn diagram_get_ast_returns_sorted_flowchart_ast() {
 }
 
 #[tokio::test]
+async fn diagram_get_ast_returns_full_typed_new_kind_asts_and_counts() {
+    let server = NereidMcp::new(new_diagram_kinds_session());
+
+    let Json(class_result) = server
+        .diagram_get_ast(Parameters(DiagramTargetParams { diagram_id: Some("d-class".into()) }))
+        .await
+        .expect("class ast");
+    let McpDiagramAst::Class { classes, relations } = class_result.ast else {
+        panic!("expected class ast");
+    };
+    assert_eq!(classes.len(), 2);
+    let animal = classes.iter().find(|class| class.name == "Animal").expect("Animal class");
+    assert_eq!(animal.attributes, vec!["+age int"]);
+    assert_eq!(relations.len(), 1);
+    assert_eq!(relations[0].kind, McpClassRelationKind::Inheritance);
+    assert_eq!(relations[0].raw_connector.as_deref(), Some("<|--"));
+
+    let Json(er_result) = server
+        .diagram_get_ast(Parameters(DiagramTargetParams { diagram_id: Some("d-er".into()) }))
+        .await
+        .expect("er ast");
+    let McpDiagramAst::Er { entities, relationships } = er_result.ast else {
+        panic!("expected er ast");
+    };
+    assert_eq!(entities.len(), 2);
+    assert_eq!(relationships.len(), 1);
+    assert_eq!(relationships[0].from_cardinality, McpErCardinality::ExactlyOne);
+    assert_eq!(relationships[0].to_cardinality, McpErCardinality::ZeroOrMore);
+    assert_eq!(relationships[0].stroke, McpErStroke::Identifying);
+
+    let Json(gantt_result) = server
+        .diagram_get_ast(Parameters(DiagramTargetParams { diagram_id: Some("d-gantt".into()) }))
+        .await
+        .expect("gantt ast");
+    let McpDiagramAst::Gantt { title, date_format, sections, tasks, lanes } = gantt_result.ast
+    else {
+        panic!("expected gantt ast");
+    };
+    assert_eq!(title.as_deref(), Some("Release"));
+    assert_eq!(date_format.as_deref(), Some("YYYY-MM-DD"));
+    assert_eq!(sections.len(), 1);
+    assert_eq!(sections[0].name, "Build");
+    assert_eq!(tasks.len(), 2);
+    assert!(matches!(
+        &tasks.iter().find(|task| task.name == "Ship").expect("Ship task").start,
+        McpGanttTaskStart::After { .. }
+    ));
+    assert_eq!(
+        lanes
+            .iter()
+            .find(|lane| lane.lane_id == "lane:2026-01-01")
+            .and_then(|lane| lane.note.as_deref()),
+        Some("release starts")
+    );
+
+    let Json(class_stat) = server
+        .diagram_stat(Parameters(DiagramTargetParams { diagram_id: Some("d-class".into()) }))
+        .await
+        .expect("class stat");
+    assert_eq!(class_stat.counts.classes, 2);
+    assert_eq!(class_stat.counts.relations, 1);
+
+    let Json(er_stat) = server
+        .diagram_stat(Parameters(DiagramTargetParams { diagram_id: Some("d-er".into()) }))
+        .await
+        .expect("er stat");
+    assert_eq!(er_stat.counts.entities, 2);
+    assert_eq!(er_stat.counts.relationships, 1);
+
+    let Json(gantt_stat) = server
+        .diagram_stat(Parameters(DiagramTargetParams { diagram_id: Some("d-gantt".into()) }))
+        .await
+        .expect("gantt stat");
+    assert_eq!(gantt_stat.counts.sections, 1);
+    assert_eq!(gantt_stat.counts.tasks, 2);
+    assert_eq!(gantt_stat.counts.dependencies, 1);
+    assert_eq!(gantt_stat.counts.edges, 1);
+    assert_eq!(gantt_stat.counts.lanes, 1);
+}
+
+#[tokio::test]
+async fn object_read_returns_typed_new_kind_objects() {
+    let server = NereidMcp::new(new_diagram_kinds_session());
+    let Json(result) = server
+        .object_read(Parameters(ObjectGetParams {
+            object_ref: None,
+            object_refs: Some(vec![
+                "d:d-class/class/class/c:Animal".into(),
+                "d:d-class/class/relation/r:0001".into(),
+                "d:d-er/er/entity/e:CUSTOMER".into(),
+                "d:d-er/er/relationship/r:0001".into(),
+                "d:d-gantt/gantt/section/sec:0001".into(),
+                "d:d-gantt/gantt/task/t:0002".into(),
+                "d:d-gantt/gantt/lane/lane:2026-01-01".into(),
+            ]),
+        }))
+        .await
+        .expect("typed objects");
+
+    assert!(matches!(&result.objects[0].object, McpObject::ClassNode { .. }));
+    assert!(matches!(&result.objects[1].object, McpObject::ClassRelation { .. }));
+    assert!(matches!(&result.objects[2].object, McpObject::ErEntity { .. }));
+    assert!(matches!(&result.objects[3].object, McpObject::ErRelationship { .. }));
+    assert!(matches!(&result.objects[4].object, McpObject::GanttSection { .. }));
+    assert!(matches!(&result.objects[5].object, McpObject::GanttTask { .. }));
+    assert!(matches!(&result.objects[6].object, McpObject::GanttLane { .. }));
+}
+
+#[tokio::test]
+async fn diagram_get_slice_traverses_gantt_sections_dependencies_and_lanes() {
+    let server = NereidMcp::new(new_diagram_kinds_session());
+    let Json(result) = server
+        .diagram_get_slice(Parameters(DiagramGetSliceParams {
+            diagram_id: Some("d-gantt".into()),
+            center_ref: "d:d-gantt/gantt/section/sec:0001".into(),
+            radius: Some(2),
+            depth: None,
+            filters: None,
+        }))
+        .await
+        .expect("gantt slice");
+
+    assert!(result.objects.contains(&"d:d-gantt/gantt/section/sec:0001".to_owned()));
+    assert!(result.objects.contains(&"d:d-gantt/gantt/task/t:0001".to_owned()));
+    assert!(result.objects.contains(&"d:d-gantt/gantt/task/t:0002".to_owned()));
+    assert!(result.objects.contains(&"d:d-gantt/gantt/lane/lane:2026-01-01".to_owned()));
+    assert!(result.edges.is_empty());
+
+    let error = server
+        .diagram_get_slice(Parameters(DiagramGetSliceParams {
+            diagram_id: Some("d-gantt".into()),
+            center_ref: "d:d-gantt/gantt/lane/lane:9999".into(),
+            radius: Some(1),
+            depth: None,
+            filters: None,
+        }))
+        .await
+        .err()
+        .expect("nonexistent lane must be rejected");
+    assert_eq!(error.code, rmcp::model::ErrorCode::RESOURCE_NOT_FOUND);
+}
+
+#[tokio::test]
 async fn diagram_get_slice_flow_node_defaults_radius_to_one() {
     let server = NereidMcp::new(demo_session());
     let Json(result) = server
@@ -3917,6 +4093,105 @@ async fn diagram_replace_from_mermaid_records_delta_history_for_in_memory_sessio
         .expect("diff after in-memory replace must use recorded history");
     assert_eq!(delta.from_rev, 0);
     assert_eq!(delta.to_rev, 1);
+}
+
+#[tokio::test]
+async fn diagram_replace_diff_reports_new_kind_semantic_changes() {
+    let class_server = NereidMcp::new(new_diagram_kinds_session());
+    class_server
+        .diagram_replace_from_mermaid(Parameters(DiagramReplaceFromMermaidParams {
+            diagram_id: Some("d-class".into()),
+            base_rev: 0,
+            mermaid: "classDiagram\n  Animal <|-- Duck : inherits\n  Animal : +age long\n  Duck : +swim()\n"
+                .into(),
+        }))
+        .await
+        .expect("replace class member");
+    let Json(class_delta) = class_server
+        .diagram_diff(Parameters(GetDeltaParams {
+            diagram_id: Some("d-class".into()),
+            since_rev: 0,
+        }))
+        .await
+        .expect("class diff");
+    assert!(class_delta.changes.iter().any(|change| change.kind == DeltaChangeKind::Updated
+        && change.refs.contains(&"d:d-class/class/class/c:Animal".to_owned())));
+
+    let er_server = NereidMcp::new(new_diagram_kinds_session());
+    er_server
+        .diagram_replace_from_mermaid(Parameters(DiagramReplaceFromMermaidParams {
+            diagram_id: Some("d-er".into()),
+            base_rev: 0,
+            mermaid: "erDiagram\n  CUSTOMER o|--o{ ORDER : places\n".into(),
+        }))
+        .await
+        .expect("replace er cardinality");
+    let Json(er_delta) = er_server
+        .diagram_diff(Parameters(GetDeltaParams { diagram_id: Some("d-er".into()), since_rev: 0 }))
+        .await
+        .expect("er diff");
+    assert!(
+        er_delta
+            .changes
+            .iter()
+            .flat_map(|change| change.refs.iter())
+            .any(|reference| reference.contains("/er/relationship/")),
+        "unexpected ER delta: {er_delta:?}"
+    );
+
+    let gantt_server = NereidMcp::new(new_diagram_kinds_session());
+    gantt_server
+        .diagram_replace_from_mermaid(Parameters(DiagramReplaceFromMermaidParams {
+            diagram_id: Some("d-gantt".into()),
+            base_rev: 0,
+            mermaid: "gantt\n  title Release v2\n  dateFormat YYYY-MM-DD\n  section Build\n  Design :design, 2026-01-01, 8d\n  Ship :ship, after design, 1d\n"
+                .into(),
+        }))
+        .await
+        .expect("replace gantt metadata and duration");
+    let Json(gantt_delta) = gantt_server
+        .diagram_diff(Parameters(GetDeltaParams {
+            diagram_id: Some("d-gantt".into()),
+            since_rev: 0,
+        }))
+        .await
+        .expect("gantt diff");
+    assert!(gantt_delta
+        .changes
+        .iter()
+        .flat_map(|change| change.refs.iter())
+        .any(|reference| reference.contains("/gantt/task/")));
+    assert!(gantt_delta
+        .changes
+        .iter()
+        .filter(|change| change.kind == DeltaChangeKind::Updated)
+        .flat_map(|change| change.refs.iter())
+        .any(|reference| reference == "d:d-gantt/meta"));
+    assert!(gantt_delta.changes.iter().any(|change| {
+        change.kind == DeltaChangeKind::Added
+            && change.refs.contains(&"d:d-gantt/gantt/lane/lane:2026-01-08".to_owned())
+    }));
+
+    gantt_server
+        .diagram_replace_from_mermaid(Parameters(DiagramReplaceFromMermaidParams {
+            diagram_id: Some("d-gantt".into()),
+            base_rev: 1,
+            mermaid: "gantt\n  title Release v2\n  dateFormat YYYY-MM-DD\n  section Build\n  Design :design, 2026-01-01, 2d\n  Ship :ship, after design, 1d\n"
+                .into(),
+        }))
+        .await
+        .expect("shrink gantt duration");
+    let Json(shrink_delta) = gantt_server
+        .diagram_diff(Parameters(GetDeltaParams {
+            diagram_id: Some("d-gantt".into()),
+            since_rev: 1,
+        }))
+        .await
+        .expect("gantt lane removal diff");
+    assert!(shrink_delta.changes.iter().any(|change| {
+        change.kind == DeltaChangeKind::Removed
+            && change.refs.contains(&"d:d-gantt/gantt/lane/lane:2026-01-08".to_owned())
+    }));
 }
 
 #[tokio::test]

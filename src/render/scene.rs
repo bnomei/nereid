@@ -42,6 +42,8 @@ pub enum CapKind {
     ExactlyOne,
     /// ER many / crow's foot.
     CrowFoot,
+    /// ER zero-or-many; distinct from one-or-many in the folded single-cell paint.
+    ZeroOrMore,
     /// ER zero-or-one (alias of circle semantically; kept explicit for lowerers).
     ZeroOrOne,
 }
@@ -88,6 +90,7 @@ impl CapKind {
             Self::TriangleHollow => Some(triangle_glyph(toward_dx, toward_dy)),
             Self::ExactlyOne => Some('‖'),
             Self::CrowFoot => Some(crow_glyph(toward_dx, toward_dy)),
+            Self::ZeroOrMore => Some(zero_or_more_glyph(toward_dx, toward_dy)),
         }
     }
 }
@@ -144,6 +147,24 @@ fn crow_glyph(toward_dx: i32, toward_dy: i32) -> char {
         '∪'
     } else {
         '∩'
+    }
+}
+
+fn zero_or_more_glyph(toward_dx: i32, toward_dy: i32) -> char {
+    if toward_dx.abs() >= toward_dy.abs() {
+        if toward_dx < 0 {
+            '⋉'
+        } else if toward_dx > 0 {
+            '⋊'
+        } else if toward_dy < 0 {
+            '⋏'
+        } else {
+            '⋎'
+        }
+    } else if toward_dy < 0 {
+        '⋏'
+    } else {
+        '⋎'
     }
 }
 
@@ -513,6 +534,7 @@ mod tests {
             CapKind::ExactlyOne,
             CapKind::CrowFoot,
             CapKind::ZeroOrOne,
+            CapKind::ZeroOrMore,
         ] {
             for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
                 let g = kind.glyph(dx, dy);

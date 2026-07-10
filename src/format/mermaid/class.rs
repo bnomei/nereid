@@ -62,6 +62,7 @@ impl std::error::Error for MermaidClassParseError {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MermaidClassExportError {
     EmptyClassName { class_id: ObjectId },
+    MissingRelationEndpoint { relation_id: ObjectId, endpoint: &'static str, class_id: ObjectId },
 }
 
 impl fmt::Display for MermaidClassExportError {
@@ -69,6 +70,12 @@ impl fmt::Display for MermaidClassExportError {
         match self {
             Self::EmptyClassName { class_id } => {
                 write!(f, "class {class_id} has an empty name")
+            }
+            Self::MissingRelationEndpoint { relation_id, endpoint, class_id } => {
+                write!(
+                    f,
+                    "class relation {relation_id} references missing {endpoint} class {class_id}"
+                )
             }
         }
     }
@@ -234,8 +241,8 @@ pub fn parse_class_diagram(input: &str) -> Result<ClassAst, MermaidClassParseErr
 fn default_connector(kind: ClassRelationKind) -> &'static str {
     match kind {
         ClassRelationKind::Inheritance => "--|>",
-        ClassRelationKind::Composition => "*--",
-        ClassRelationKind::Aggregation => "o--",
+        ClassRelationKind::Composition => "--*",
+        ClassRelationKind::Aggregation => "--o",
         ClassRelationKind::Association => "-->",
         ClassRelationKind::Dependency => "..>",
         ClassRelationKind::Realization => "..|>",
@@ -263,9 +270,23 @@ pub fn export_class_diagram(ast: &ClassAst) -> Result<String, MermaidClassExport
         }
     }
 
-    for relation in ast.relations().values() {
-        let from = ast.classes().get(relation.from_class_id()).map(ClassNode::name).unwrap_or("?");
-        let to = ast.classes().get(relation.to_class_id()).map(ClassNode::name).unwrap_or("?");
+    for (relation_id, relation) in ast.relations() {
+        let from =
+            ast.classes().get(relation.from_class_id()).map(ClassNode::name).ok_or_else(|| {
+                MermaidClassExportError::MissingRelationEndpoint {
+                    relation_id: relation_id.clone(),
+                    endpoint: "from",
+                    class_id: relation.from_class_id().clone(),
+                }
+            })?;
+        let to =
+            ast.classes().get(relation.to_class_id()).map(ClassNode::name).ok_or_else(|| {
+                MermaidClassExportError::MissingRelationEndpoint {
+                    relation_id: relation_id.clone(),
+                    endpoint: "to",
+                    class_id: relation.to_class_id().clone(),
+                }
+            })?;
         let token = relation.raw_connector().unwrap_or_else(|| default_connector(relation.kind()));
         // Export in from→to order with raw token as stored; if reverse tokens were normalized
         // at parse, raw_connector preserves original orientation when present.
@@ -324,5 +345,25 @@ Class08 <--> C2 : Cool label
     fn rejects_missing_header() {
         let err = parse_class_diagram("A --> B\n").unwrap_err();
         assert_eq!(err, MermaidClassParseError::MissingHeader);
+    }
+
+    #[test]
+    fn export_rejects_missing_relation_endpoint() {
+        let mut ast = ClassAst::default();
+        let a = class_id_from_name("A");
+        ast.classes_mut().insert(a.clone(), ClassNode::new("A"));
+        ast.relations_mut().insert(
+            ObjectId::new("r:1").unwrap(),
+            ClassRelation::new(
+                a,
+                ObjectId::new("c:missing").unwrap(),
+                ClassRelationKind::Association,
+            ),
+        );
+
+        assert!(matches!(
+            export_class_diagram(&ast),
+            Err(MermaidClassExportError::MissingRelationEndpoint { endpoint: "to", .. })
+        ));
     }
 }
