@@ -287,12 +287,6 @@ pub fn render_gantt_unicode_annotated(
         for y in p.y0..=y1 {
             spans.push((y, p.x0, p.x1));
         }
-        // Sequence includes the lifeline under participants; gantt does the same for lanes.
-        if p.kind == GanttBoxKind::Lane {
-            // Lifeline spans are recorded from the bottom of the header to chart end so F/C
-            // placement still uses the title row (y0+1) but selection can cover the column.
-            // (Hint placement only needs the box title row; full spans aid selection highlight.)
-        }
         highlight_index.insert(object_ref, spans);
 
         if options.show_notes {
