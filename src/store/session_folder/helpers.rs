@@ -6,7 +6,8 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-// include!: session meta JSON codecs and atomic file writes.
+// Session-folder helpers (include!'d into parent): meta/walkthrough JSON codecs,
+// atomic writes, path safety, and durability-aware filesystem commits.
 
 fn export_diagram_mmd(
     folder: &SessionFolder,

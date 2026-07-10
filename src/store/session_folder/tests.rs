@@ -209,6 +209,45 @@ fn load_or_init_session_refuses_to_seed_when_diagram_files_exist(ctx: SessionFol
 }
 
 #[rstest]
+fn load_or_init_session_refuses_to_seed_when_walkthrough_files_exist(ctx: SessionFolderTestCtx) {
+    let folder = &ctx.folder;
+    let session_dir = &ctx.session_dir;
+
+    let walkthrough_id = WalkthroughId::new("wt-demo").unwrap();
+    let walkthrough = Walkthrough::new(walkthrough_id.clone(), "Demo walkthrough");
+    folder.save_walkthrough(&walkthrough).unwrap();
+
+    let meta_path = folder.meta_path();
+    if meta_path.exists() {
+        std::fs::remove_file(&meta_path).unwrap();
+    }
+    assert!(!meta_path.exists());
+
+    let wt_path = session_dir.join("walkthroughs/wt-demo.wt.json");
+    assert!(wt_path.is_file());
+    let wt_before = std::fs::read(&wt_path).unwrap();
+
+    let err = folder.load_or_init_session().unwrap_err();
+    match err {
+        StoreError::MetaMissingWithExistingWalkthroughs {
+            meta_path: reported,
+            walkthroughs_dir,
+        } => {
+            assert_eq!(reported, meta_path);
+            assert_eq!(walkthroughs_dir, session_dir.join("walkthroughs"));
+        }
+        other => panic!("expected MetaMissingWithExistingWalkthroughs, got: {other:?}"),
+    }
+
+    assert!(!meta_path.exists(), "load_or_init must not write a seed meta when walkthroughs exist");
+    assert_eq!(
+        std::fs::read(&wt_path).unwrap(),
+        wt_before,
+        "walkthrough-only folder without meta must not delete *.wt.json"
+    );
+}
+
+#[rstest]
 fn load_or_init_session_does_not_hide_missing_diagram_errors(ctx: SessionFolderTestCtx) {
     let missing_mmd_path = ctx.session_dir.join("diagrams/missing.mmd");
     let meta = SessionMeta {
@@ -678,7 +717,8 @@ fn ensure_real_dirs_under_session_refuses_parent_swapped_to_symlink() {
     std::fs::rename(&diagrams_dir, &real_parent).unwrap();
     symlink(&outside, &diagrams_dir).unwrap();
 
-    let err = super::ensure_real_dirs_under_session(&session_dir, Path::new("diagrams")).unwrap_err();
+    let err =
+        super::ensure_real_dirs_under_session(&session_dir, Path::new("diagrams")).unwrap_err();
     match err {
         StoreError::SymlinkRefused { path } => assert_eq!(path, diagrams_dir),
         other => panic!("expected SymlinkRefused, got: {other:?}"),
@@ -722,9 +762,10 @@ fn save_session_refuses_after_diagrams_dir_swapped_to_symlink(ctx: SessionFolder
         "Hello",
         1,
     ));
-    session
-        .diagrams_mut()
-        .insert(seq_id.clone(), Diagram::new(seq_id.clone(), "Seq Example", DiagramAst::Sequence(seq_ast)));
+    session.diagrams_mut().insert(
+        seq_id.clone(),
+        Diagram::new(seq_id.clone(), "Seq Example", DiagramAst::Sequence(seq_ast)),
+    );
 
     // First save creates a real diagrams/ parent.
     folder.save_session(&session).unwrap();
@@ -972,9 +1013,7 @@ fn walkthrough_files_remain_loadable_after_moving_session_folder(ctx: SessionFol
 }
 
 #[rstest]
-fn load_session_rejects_walkthrough_body_id_mismatch_with_meta_list_id(
-    ctx: SessionFolderTestCtx,
-) {
+fn load_session_rejects_walkthrough_body_id_mismatch_with_meta_list_id(ctx: SessionFolderTestCtx) {
     let session_dir = &ctx.session_dir;
     let folder = &ctx.folder;
     std::fs::create_dir_all(session_dir.join("walkthroughs")).unwrap();
@@ -1008,11 +1047,7 @@ fn load_session_rejects_walkthrough_body_id_mismatch_with_meta_list_id(
 
     let err = folder.load_session().unwrap_err();
     match err {
-        StoreError::WalkthroughIdMismatch {
-            path,
-            expected,
-            found,
-        } => {
+        StoreError::WalkthroughIdMismatch { path, expected, found } => {
             assert_eq!(path, session_dir.join("walkthroughs/w1.wt.json"));
             assert_eq!(expected, WalkthroughId::new("w1").unwrap());
             assert_eq!(found, WalkthroughId::new("w2").unwrap());
@@ -1043,11 +1078,7 @@ fn load_walkthrough_rejects_body_id_mismatch(ctx: SessionFolderTestCtx) {
 
     let err = folder.load_walkthrough(&expected_id).unwrap_err();
     match err {
-        StoreError::WalkthroughIdMismatch {
-            path,
-            expected,
-            found,
-        } => {
+        StoreError::WalkthroughIdMismatch { path, expected, found } => {
             assert_eq!(path, session_dir.join("walkthroughs/w1.wt.json"));
             assert_eq!(expected, expected_id);
             assert_eq!(found, WalkthroughId::new("w2").unwrap());

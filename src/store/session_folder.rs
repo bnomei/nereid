@@ -412,6 +412,10 @@ pub enum StoreError {
         meta_path: PathBuf,
         diagrams_dir: PathBuf,
     },
+    MetaMissingWithExistingWalkthroughs {
+        meta_path: PathBuf,
+        walkthroughs_dir: PathBuf,
+    },
     WalkthroughIdMismatch {
         path: PathBuf,
         expected: WalkthroughId,
@@ -577,6 +581,11 @@ impl fmt::Display for StoreError {
                 "session meta {meta_path:?} is missing but diagram files exist in {diagrams_dir:?}; \
                  refusing to seed a fresh session and orphan them (restore the meta index to repair)"
             ),
+            Self::MetaMissingWithExistingWalkthroughs { meta_path, walkthroughs_dir } => write!(
+                f,
+                "session meta {meta_path:?} is missing but walkthrough files exist in {walkthroughs_dir:?}; \
+                 refusing to seed a fresh session and orphan them (restore the meta index to repair)"
+            ),
             Self::WalkthroughIdMismatch {
                 path,
                 expected,
@@ -617,11 +626,15 @@ impl std::error::Error for StoreError {
             Self::SymlinkRefused { .. } => None,
             Self::SessionWriteLockTimeout { .. } => None,
             Self::MetaMissingWithExistingDiagrams { .. } => None,
+            Self::MetaMissingWithExistingWalkthroughs { .. } => None,
             Self::WalkthroughIdMismatch { .. } => None,
         }
     }
 }
 
+/// On-disk session catalog: active ids, diagram index, xrefs, and selection.
+///
+/// Written as `nereid-session.meta.json` at the session folder root.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SessionMeta {
     pub session_id: SessionId,
@@ -633,6 +646,7 @@ pub struct SessionMeta {
     pub selected_object_refs: Vec<ObjectRef>,
 }
 
+/// One diagram row in session meta (id, kind, relative `.mmd` path, revision).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SessionMetaDiagram {
     pub diagram_id: DiagramId,
@@ -642,6 +656,7 @@ pub struct SessionMetaDiagram {
     pub rev: u64,
 }
 
+/// Cross-diagram link persisted in session meta with resolved status.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SessionXRef {
     pub xref_id: XRefId,
@@ -685,6 +700,7 @@ pub struct DiagramStableIdMap {
     pub by_fingerprint: BTreeMap<String, String>,
 }
 
+/// XRef row stored in a diagram sidecar (stringified refs for JSON durability).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiagramXRef {
     pub xref_id: String,
@@ -838,6 +854,7 @@ fn gantt_sections_meta_from_ast(ast: &crate::model::GanttAst) -> Vec<DiagramGant
         .collect()
 }
 
+/// Endpoint validity of an xref after reconcile (ok or which side is missing).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XRefStatus {
     Ok,
@@ -1077,6 +1094,7 @@ impl SessionFolder {
         }
     }
 
+    /// Builder: choose best-effort vs fsync-oriented write durability for disk commits.
     pub fn with_durability(mut self, durability: WriteDurability) -> Self {
         self.durability = durability;
         self
@@ -1090,6 +1108,7 @@ impl SessionFolder {
         &self.root
     }
 
+    /// Path to `nereid-session.meta.json` under this session folder root.
     pub fn meta_path(&self) -> PathBuf {
         self.root.join(SESSION_META_FILENAME)
     }
@@ -1098,6 +1117,7 @@ impl SessionFolder {
         self.root.join(LEGACY_SESSION_META_FILENAME)
     }
 
+    /// Canonical relative Mermaid path for a diagram id (`diagrams/<id>.mmd`).
     pub fn default_diagram_mmd_path(&self, diagram_id: &DiagramId) -> PathBuf {
         let file_stem = encode_persisted_id_segment(diagram_id.as_str());
         self.root.join("diagrams").join(format!("{file_stem}.mmd"))
@@ -1115,12 +1135,14 @@ impl SessionFolder {
         Ok(self.root.join(relative_ascii_path))
     }
 
+    /// Sidecar path sibling to a diagram `.mmd` (`*.meta.json` with stable ids and notes).
     pub fn diagram_meta_path(&self, mmd_path: &Path) -> Result<PathBuf, StoreError> {
         let relative_mmd_path = to_relative_path(self.root(), mmd_path, "mmd_path")?;
         let relative_meta_path = relative_mmd_path.with_extension("meta.json");
         Ok(self.root.join(relative_meta_path))
     }
 
+    /// Canonical walkthrough JSON path (`walkthroughs/<id>.wt.json`).
     pub fn walkthrough_json_path(&self, walkthrough_id: &WalkthroughId) -> PathBuf {
         let file_stem = encode_persisted_id_segment(walkthrough_id.as_str());
         self.root.join("walkthroughs").join(format!("{file_stem}.wt.json"))
@@ -1145,6 +1167,7 @@ impl SessionFolder {
         self.root.join("walkthroughs").join(format!("{file_stem}.ascii.txt"))
     }
 
+    /// Block until async Unicode text exports for this session folder finish writing.
     pub fn flush_ascii_exports(&self) {
         ascii_exports().flush_session_dir(self.root());
     }
@@ -1179,7 +1202,8 @@ impl SessionFolder {
 
     /// Load an existing session, or seed a default flowchart when the folder is empty.
     ///
-    /// Refuses to invent meta if `diagrams/*.mmd` already exists without session meta.
+    /// Refuses to invent meta if `diagrams/*.mmd` or `walkthroughs/*.wt.json` already exists
+    /// without session meta (so seeding + GC cannot wipe durable artifacts).
     pub fn load_or_init_session(&self) -> Result<Session, StoreError> {
         match self.load_session() {
             Ok(session) => Ok(session),
@@ -1190,6 +1214,12 @@ impl SessionFolder {
                     return Err(StoreError::MetaMissingWithExistingDiagrams {
                         meta_path: self.meta_path(),
                         diagrams_dir: self.root.join("diagrams"),
+                    });
+                }
+                if self.has_existing_walkthrough_files()? {
+                    return Err(StoreError::MetaMissingWithExistingWalkthroughs {
+                        meta_path: self.meta_path(),
+                        walkthroughs_dir: self.root.join("walkthroughs"),
                     });
                 }
                 let session = self.initial_session();
@@ -1212,6 +1242,28 @@ impl SessionFolder {
                 entry.map_err(|source| StoreError::Io { path: diagrams_dir.clone(), source })?;
             let path = entry.path();
             if path.extension().and_then(|ext| ext.to_str()) == Some("mmd") && path.is_file() {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    fn has_existing_walkthrough_files(&self) -> Result<bool, StoreError> {
+        let walkthroughs_dir = self.root.join("walkthroughs");
+        let entries = match fs::read_dir(&walkthroughs_dir) {
+            Ok(entries) => entries,
+            Err(source) if source.kind() == io::ErrorKind::NotFound => return Ok(false),
+            Err(source) => return Err(StoreError::Io { path: walkthroughs_dir, source }),
+        };
+        for entry in entries {
+            let entry = entry
+                .map_err(|source| StoreError::Io { path: walkthroughs_dir.clone(), source })?;
+            let path = entry.path();
+            let is_wt_json = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.ends_with(".wt.json"));
+            if is_wt_json && path.is_file() {
                 return Ok(true);
             }
         }
@@ -1977,6 +2029,7 @@ impl SessionFolder {
         Ok(session)
     }
 
+    /// Read and decode `nereid-session.meta.json` (falls back to legacy `session.meta.json`).
     pub fn load_meta(&self) -> Result<SessionMeta, StoreError> {
         let meta_path = self.meta_path();
         let (meta_path, meta_str) = match fs::read_to_string(&meta_path) {
@@ -2004,6 +2057,7 @@ impl SessionFolder {
         session_meta_from_json(self.root(), meta_json)
     }
 
+    /// Atomically write session meta JSON under the configured write durability.
     pub fn save_meta(&self, meta: &SessionMeta) -> Result<(), StoreError> {
         fs::create_dir_all(self.root())
             .map_err(|source| StoreError::Io { path: self.root.clone(), source })?;
@@ -2032,6 +2086,7 @@ impl SessionFolder {
         Ok(())
     }
 
+    /// Patch selection into session meta under the write lock (full save if meta missing).
     pub fn save_selected_object_refs(&self, session: &Session) -> Result<(), StoreError> {
         let _guard = self.lock_session_write()?;
         match self.load_meta() {
@@ -2048,6 +2103,7 @@ impl SessionFolder {
         }
     }
 
+    /// Patch active diagram id into session meta under the write lock.
     pub fn save_active_diagram_id(&self, session: &Session) -> Result<(), StoreError> {
         let _guard = self.lock_session_write()?;
         match self.load_meta() {
@@ -2063,6 +2119,7 @@ impl SessionFolder {
         }
     }
 
+    /// Load one walkthrough JSON by id (checks id match; falls back to legacy path).
     pub fn load_walkthrough(
         &self,
         walkthrough_id: &WalkthroughId,
@@ -2095,6 +2152,7 @@ impl SessionFolder {
         Ok(walkthrough)
     }
 
+    /// Persist walkthrough JSON and schedule a best-effort Unicode text export.
     pub fn save_walkthrough(&self, walkthrough: &Walkthrough) -> Result<(), StoreError> {
         self.save_walkthrough_json(walkthrough)?;
         self.schedule_walkthrough_ascii_export(walkthrough)?;
@@ -2155,6 +2213,7 @@ impl SessionFolder {
         Ok(())
     }
 
+    /// Load a diagram sidecar (stable ids, fingerprints, notes, symbols) for reconcile on load.
     pub fn load_diagram_meta(&self, mmd_path: &Path) -> Result<DiagramMeta, StoreError> {
         let meta_path = self.diagram_meta_path(mmd_path)?;
         let meta_str = fs::read_to_string(&meta_path)
@@ -2166,6 +2225,7 @@ impl SessionFolder {
         diagram_meta_from_json(self.root(), meta_json)
     }
 
+    /// Atomically write a diagram sidecar next to its `.mmd` source.
     pub fn save_diagram_meta(&self, meta: &DiagramMeta) -> Result<(), StoreError> {
         let meta_path = self.diagram_meta_path(&meta.mmd_path)?;
 
