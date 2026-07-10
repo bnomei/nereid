@@ -466,22 +466,42 @@ pub(crate) fn reconcile_gantt_tasks(ast: &mut GanttAst, sidecar: &DiagramMeta) {
         *name_counts.entry(task.name()).or_default() += 1;
     }
 
+    // Reserve explicit and section-qualified matches globally before weaker bare-fingerprint
+    // fallbacks. Otherwise a newly prepended duplicate can claim an existing task's id first.
     for (parsed_id, task) in ast.tasks() {
-        let stable_id = task
-            .mermaid_tag()
-            .and_then(|tag| sidecar.stable_id_map.by_mermaid_id.get(tag))
-            .or_else(|| {
-                gantt_task_fingerprints(ast, parsed_id, task)
-                    .into_iter()
-                    .find_map(|fingerprint| sidecar.stable_id_map.by_fingerprint.get(&fingerprint))
-            })
-            .or_else(|| {
-                (name_counts.get(task.name()) == Some(&1))
-                    .then(|| sidecar.stable_id_map.by_name.get(task.name()))
-                    .flatten()
-            })
-            .and_then(|raw| parse_stable_object_id(raw));
-        let mapped_id = if let Some(stable_id) = stable_id.filter(|id| !assigned_ids.contains(id)) {
+        let fingerprints = gantt_task_fingerprints(ast, parsed_id, task);
+        let strong_count = fingerprints.len().saturating_sub(1);
+        let stable_id =
+            task.mermaid_tag()
+                .and_then(|tag| sidecar.stable_id_map.by_mermaid_id.get(tag))
+                .or_else(|| {
+                    fingerprints.into_iter().take(strong_count).find_map(|fingerprint| {
+                        sidecar.stable_id_map.by_fingerprint.get(&fingerprint)
+                    })
+                })
+                .or_else(|| {
+                    (name_counts.get(task.name()) == Some(&1))
+                        .then(|| sidecar.stable_id_map.by_name.get(task.name()))
+                        .flatten()
+                })
+                .and_then(|raw| parse_stable_object_id(raw));
+        if let Some(stable_id) = stable_id.filter(|id| !assigned_ids.contains(id)) {
+            assigned_ids.insert(stable_id.clone());
+            remap.insert(parsed_id.clone(), stable_id);
+        }
+    }
+
+    for (parsed_id, task) in ast.tasks() {
+        if remap.contains_key(parsed_id) {
+            continue;
+        }
+        let stable_id = gantt_task_fingerprints(ast, parsed_id, task)
+            .into_iter()
+            .next_back()
+            .and_then(|fingerprint| sidecar.stable_id_map.by_fingerprint.get(&fingerprint))
+            .and_then(|raw| parse_stable_object_id(raw))
+            .filter(|id| !assigned_ids.contains(id));
+        let mapped_id = if let Some(stable_id) = stable_id {
             stable_id
         } else if !reserved_ids.contains(parsed_id) && !assigned_ids.contains(parsed_id) {
             parsed_id.clone()

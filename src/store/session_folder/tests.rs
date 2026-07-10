@@ -1952,12 +1952,12 @@ fn replace_gantt_mermaid_preserves_task_across_unique_duplicate_transitions() {
 
     replace_diagram_from_mermaid(
         &mut diagram,
-        "gantt\ndateFormat YYYY-MM-DD\nsection Alpha\nCheck :2026-01-01, 2d\nsection Beta\nCheck :2026-01-01, 2d\n",
+        "gantt\ndateFormat YYYY-MM-DD\nsection Beta\nCheck :2026-01-01, 2d\nsection Alpha\nCheck :2026-01-01, 2d\n",
     )
     .unwrap();
     let DiagramAst::Gantt(ast) = diagram.ast() else { panic!("expected Gantt") };
     assert_eq!(ast.tasks()[&original_id].note(), Some("original check"));
-    assert_eq!(ast.sections()[0].task_ids(), std::slice::from_ref(&original_id));
+    assert_eq!(ast.sections()[1].task_ids(), std::slice::from_ref(&original_id));
 
     replace_diagram_from_mermaid(
         &mut diagram,
