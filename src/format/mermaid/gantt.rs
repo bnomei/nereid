@@ -60,10 +60,10 @@ impl std::error::Error for MermaidGanttExportError {}
 
 fn parse_duration_days(raw: &str) -> Option<u32> {
     let raw = raw.trim();
-    if let Some(num) = raw.strip_suffix('d').or_else(|| raw.strip_suffix('D')) {
-        return num.parse().ok();
-    }
-    raw.parse().ok()
+    // Require an explicit `d`/`D` suffix so bare integers remain available as mermaid tags
+    // (e.g. `Task :1, 2014-01-01, 30d` keeps tag `1` and duration `30d`).
+    let num = raw.strip_suffix('d').or_else(|| raw.strip_suffix('D'))?;
+    num.parse().ok()
 }
 
 fn looks_like_date(s: &str) -> bool {
@@ -210,6 +210,7 @@ pub fn parse_gantt_diagram(input: &str) -> Result<GanttAst, MermaidGanttParseErr
             return Err(MermaidGanttParseError::UnknownAfterTag { line_no, tag });
         };
         if let Some(task) = ast.tasks_mut().get_mut(&task_id) {
+            let note = task.note().map(str::to_owned);
             let updated = GanttTask::new(
                 task.task_id().clone(),
                 task.name(),
@@ -219,6 +220,9 @@ pub fn parse_gantt_diagram(input: &str) -> Result<GanttAst, MermaidGanttParseErr
             )
             .with_mermaid_tag(task.mermaid_tag().map(str::to_owned));
             *task = updated;
+            if let Some(note) = note {
+                ast.tasks_mut().get_mut(&task_id).expect("task just updated").set_note(Some(note));
+            }
         }
     }
 
