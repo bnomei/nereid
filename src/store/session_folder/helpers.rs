@@ -35,6 +35,20 @@ fn export_diagram_mmd(
                 source: Box::new(source),
             })?
         }
+        DiagramAst::Er(ast) => {
+            export_er_diagram(ast).map_err(|source| StoreError::MermaidErExport {
+                diagram_id: diagram.diagram_id().clone(),
+                path: mmd_path.to_path_buf(),
+                source: Box::new(source),
+            })?
+        }
+        DiagramAst::Gantt(ast) => {
+            export_gantt_diagram(ast).map_err(|source| StoreError::MermaidGanttExport {
+                diagram_id: diagram.diagram_id().clone(),
+                path: mmd_path.to_path_buf(),
+                source: Box::new(source),
+            })?
+        }
     };
 
     write_atomic_in_session(folder.root(), mmd_path, mmd.as_bytes(), folder.durability)?;
@@ -225,6 +239,8 @@ enum DiagramKindJson {
     Sequence,
     Flowchart,
     Class,
+    Er,
+    Gantt,
 }
 
 impl From<DiagramKind> for DiagramKindJson {
@@ -233,6 +249,8 @@ impl From<DiagramKind> for DiagramKindJson {
             DiagramKind::Sequence => Self::Sequence,
             DiagramKind::Flowchart => Self::Flowchart,
             DiagramKind::Class => Self::Class,
+            DiagramKind::Er => Self::Er,
+            DiagramKind::Gantt => Self::Gantt,
         }
     }
 }
@@ -243,6 +261,8 @@ impl From<DiagramKindJson> for DiagramKind {
             DiagramKindJson::Sequence => Self::Sequence,
             DiagramKindJson::Flowchart => Self::Flowchart,
             DiagramKindJson::Class => Self::Class,
+            DiagramKindJson::Er => Self::Er,
+            DiagramKindJson::Gantt => Self::Gantt,
         }
     }
 }
@@ -454,6 +474,10 @@ struct DiagramMetaJson {
     flow_node_notes: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     sequence_participant_notes: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    class_node_notes: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    er_entity_notes: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     flow_node_symbols: BTreeMap<String, DiagramSymbolAnchorJson>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -753,6 +777,18 @@ fn diagram_meta_to_json(
         .map(|(participant_id, note)| (participant_id.to_string(), note.clone()))
         .collect();
 
+    let class_node_notes: BTreeMap<String, String> = meta
+        .class_node_notes
+        .iter()
+        .map(|(class_id, note)| (class_id.to_string(), note.clone()))
+        .collect();
+
+    let er_entity_notes: BTreeMap<String, String> = meta
+        .er_entity_notes
+        .iter()
+        .map(|(entity_id, note)| (entity_id.to_string(), note.clone()))
+        .collect();
+
     let flow_node_symbols: BTreeMap<String, DiagramSymbolAnchorJson> = meta
         .flow_node_symbols
         .iter()
@@ -792,6 +828,8 @@ fn diagram_meta_to_json(
         sequence_blocks,
         flow_node_notes,
         sequence_participant_notes,
+        class_node_notes,
+        er_entity_notes,
         flow_node_symbols,
         sequence_participant_symbols,
     })
@@ -993,6 +1031,34 @@ fn diagram_meta_from_json(
         })
         .collect::<Result<BTreeMap<_, _>, StoreError>>()?;
 
+    let class_node_notes = meta_json
+        .class_node_notes
+        .into_iter()
+        .map(|(class_id, note)| {
+            let class_id =
+                ObjectId::new(class_id.clone()).map_err(|source| StoreError::InvalidId {
+                    field: "class_node_notes keys",
+                    value: class_id,
+                    source: Box::new(source),
+                })?;
+            Ok((class_id, note))
+        })
+        .collect::<Result<BTreeMap<_, _>, StoreError>>()?;
+
+    let er_entity_notes = meta_json
+        .er_entity_notes
+        .into_iter()
+        .map(|(entity_id, note)| {
+            let entity_id =
+                ObjectId::new(entity_id.clone()).map_err(|source| StoreError::InvalidId {
+                    field: "er_entity_notes keys",
+                    value: entity_id,
+                    source: Box::new(source),
+                })?;
+            Ok((entity_id, note))
+        })
+        .collect::<Result<BTreeMap<_, _>, StoreError>>()?;
+
     let flow_node_symbols = meta_json
         .flow_node_symbols
         .into_iter()
@@ -1046,6 +1112,8 @@ fn diagram_meta_from_json(
         default_symbol_repository_id: meta_json.default_symbol_repository_id,
         flow_node_notes,
         sequence_participant_notes,
+        class_node_notes,
+        er_entity_notes,
         flow_node_symbols,
         sequence_participant_symbols,
     })

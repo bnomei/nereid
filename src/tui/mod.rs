@@ -35,8 +35,9 @@ use ratatui::{
 use tokio::sync::Mutex;
 
 use crate::format::mermaid::{
-    export_class_diagram, export_flowchart, export_sequence_diagram, parse_class_diagram,
-    parse_flowchart, parse_sequence_diagram,
+    export_class_diagram, export_er_diagram, export_flowchart, export_gantt_diagram,
+    export_sequence_diagram, parse_class_diagram, parse_er_diagram, parse_flowchart,
+    parse_gantt_diagram, parse_sequence_diagram,
 };
 use crate::model::{
     CategoryPath, Diagram, DiagramAst, DiagramId, DiagramKind, FlowchartAst, ObjectId, ObjectRef,
@@ -556,6 +557,8 @@ fn diagram_kind_tag(kind: DiagramKind) -> &'static str {
         DiagramKind::Sequence => "SEQ",
         DiagramKind::Flowchart => "FLO",
         DiagramKind::Class => "CLS",
+        DiagramKind::Er => "ER",
+        DiagramKind::Gantt => "GNT",
     }
 }
 
@@ -2124,6 +2127,22 @@ impl App {
                 }
                 refs
             }
+            DiagramAst::Er(ast) => {
+                let mut refs = Vec::new();
+                let ent = category_path(&["er", "entity"]);
+                for id in ast.entities().keys() {
+                    refs.push(ObjectRef::new(diagram_id.clone(), ent.clone(), id.clone()));
+                }
+                refs
+            }
+            DiagramAst::Gantt(ast) => {
+                let mut refs = Vec::new();
+                let cat = category_path(&["gantt", "task"]);
+                for id in ast.tasks().keys() {
+                    refs.push(ObjectRef::new(diagram_id.clone(), cat.clone(), id.clone()));
+                }
+                refs
+            }
             DiagramAst::Sequence(ast) => {
                 let mut refs = Vec::new();
                 let participant_category = category_path(&["seq", "participant"]);
@@ -2159,7 +2178,12 @@ impl App {
                 continue;
             };
             let (y, inner_x0, inner_x1, fill_char) = match object_ref.category().segments() {
-                [a, b] if a == "flow" && b == "node" => {
+                // Flow / class / ER nodes: title-row interior of the box (same geometry).
+                [a, b]
+                    if (a == "flow" && b == "node")
+                        || (a == "class" && b == "class")
+                        || (a == "er" && b == "entity") =>
+                {
                     let Some((y0, x0, x1)) = hint_bounds_from_spans(spans) else {
                         continue;
                     };
@@ -2167,7 +2191,12 @@ impl App {
                     let inner_x1 = x1.saturating_sub(1);
                     (y0.saturating_add(1), inner_x0, inner_x1, ' ')
                 }
-                [a, b] if a == "flow" && b == "edge" => {
+                // Flow / class / ER edges: connector corridor.
+                [a, b]
+                    if (a == "flow" && b == "edge")
+                        || (a == "class" && b == "relation")
+                        || (a == "er" && b == "relationship") =>
+                {
                     let Some((y, inner_x0, inner_x1)) = flow_edge_hint_bounds(spans, &lines) else {
                         continue;
                     };
@@ -2198,7 +2227,7 @@ impl App {
             let Some(line) = lines.get(y) else {
                 continue;
             };
-            if !is_flow_edge_ref(&object_ref)
+            if !is_edge_like_hint_ref(&object_ref)
                 && !hint_range_has_text(line, inner_x0, inner_x1, fill_char)
             {
                 continue;
@@ -2332,7 +2361,7 @@ impl App {
                     )
                 })
             }
-            DiagramAst::Class(_) => None,
+            DiagramAst::Class(_) | DiagramAst::Er(_) | DiagramAst::Gantt(_) => None,
             DiagramAst::Sequence(ast) => {
                 let is_seq_participant = |r: &ObjectRef| matches!(r.category().segments(), [a, b] if a == "seq" && b == "participant");
                 if !is_seq_participant(current) || !is_seq_participant(previous) {
@@ -2903,6 +2932,11 @@ fn export_diagram_mermaid(diagram: &Diagram) -> Result<String, String> {
             .map_err(|err| format!("failed to export flowchart Mermaid: {err}")),
         DiagramAst::Class(ast) => export_class_diagram(ast)
             .map_err(|err| format!("failed to export class Mermaid: {err}")),
+        DiagramAst::Er(ast) => {
+            export_er_diagram(ast).map_err(|err| format!("failed to export er Mermaid: {err}"))
+        }
+        DiagramAst::Gantt(ast) => export_gantt_diagram(ast)
+            .map_err(|err| format!("failed to export gantt Mermaid: {err}")),
     }
 }
 
@@ -2917,6 +2951,12 @@ fn parse_mermaid_for_kind(kind: DiagramKind, source: &str) -> Result<DiagramAst,
         DiagramKind::Class => parse_class_diagram(source)
             .map(DiagramAst::Class)
             .map_err(|err| format!("class parse failed: {err}")),
+        DiagramKind::Er => parse_er_diagram(source)
+            .map(DiagramAst::Er)
+            .map_err(|err| format!("er parse failed: {err}")),
+        DiagramKind::Gantt => parse_gantt_diagram(source)
+            .map(DiagramAst::Gantt)
+            .map_err(|err| format!("gantt parse failed: {err}")),
     }
 }
 
@@ -2978,9 +3018,7 @@ fn prefix_xref_direction_labels_for_tui(diagram: &mut Diagram, session: &Session
 
     let mut ast = diagram.ast().clone();
     match &mut ast {
-        DiagramAst::Class(_) => {
-            // Class name labels stay as authored Mermaid; xref direction prefixes are flow/seq only for now.
-        }
+        DiagramAst::Class(_) | DiagramAst::Er(_) | DiagramAst::Gantt(_) => {}
         DiagramAst::Flowchart(flow_ast) => {
             let node_category = category_path(&["flow", "node"]);
             for (node_id, node) in flow_ast.nodes_mut() {
@@ -3206,6 +3244,17 @@ fn is_flow_edge_ref(object_ref: &ObjectRef) -> bool {
     matches!(
         object_ref.category().segments(),
         [a, b] if a == "flow" && b == "edge"
+    )
+}
+
+/// Connector-like refs skip the "must contain fill text" gate used for node boxes.
+fn is_edge_like_hint_ref(object_ref: &ObjectRef) -> bool {
+    matches!(
+        object_ref.category().segments(),
+        [a, b]
+            if (a == "flow" && b == "edge")
+                || (a == "class" && b == "relation")
+                || (a == "er" && b == "relationship")
     )
 }
 
@@ -3810,6 +3859,8 @@ fn objects_from_diagram(diagram: &Diagram) -> Vec<SelectableObject> {
         DiagramAst::Sequence(ast) => objects_from_sequence_ast(&diagram_id, ast),
         DiagramAst::Flowchart(ast) => objects_from_flowchart_ast(&diagram_id, ast),
         DiagramAst::Class(ast) => objects_from_class_ast(&diagram_id, ast),
+        DiagramAst::Er(ast) => objects_from_er_ast(&diagram_id, ast),
+        DiagramAst::Gantt(ast) => objects_from_gantt_ast(&diagram_id, ast),
     };
 
     objects.sort_by_cached_key(|obj| obj.object_ref.to_string());
@@ -3826,7 +3877,7 @@ fn objects_from_class_ast(
     for (class_id, class) in ast.classes() {
         out.push(SelectableObject {
             label: format!("class {} ({})", class_id, class.name()),
-            note: None,
+            note: class.note().map(str::to_owned),
             object_ref: ObjectRef::new(
                 diagram_id.clone(),
                 class_category.clone(),
@@ -3851,6 +3902,33 @@ fn objects_from_class_ast(
         });
     }
     out
+}
+
+fn objects_from_er_ast(diagram_id: &DiagramId, ast: &crate::model::ErAst) -> Vec<SelectableObject> {
+    let cat = category_path(&["er", "entity"]);
+    ast.entities()
+        .iter()
+        .map(|(id, e)| SelectableObject {
+            label: format!("entity {} ({})", id, e.name()),
+            note: e.note().map(str::to_owned),
+            object_ref: ObjectRef::new(diagram_id.clone(), cat.clone(), id.clone()),
+        })
+        .collect()
+}
+
+fn objects_from_gantt_ast(
+    diagram_id: &DiagramId,
+    ast: &crate::model::GanttAst,
+) -> Vec<SelectableObject> {
+    let cat = category_path(&["gantt", "task"]);
+    ast.tasks()
+        .iter()
+        .map(|(id, task)| SelectableObject {
+            label: format!("task {} ({})", id, task.name()),
+            note: None,
+            object_ref: ObjectRef::new(diagram_id.clone(), cat.clone(), id.clone()),
+        })
+        .collect()
 }
 
 fn objects_from_sequence_ast(diagram_id: &DiagramId, ast: &SequenceAst) -> Vec<SelectableObject> {
@@ -4274,8 +4352,17 @@ fn demo_session_fallback() -> Session {
     let flow_diagram =
         Diagram::new(flow_id.clone(), "Flowchart demo", DiagramAst::Flowchart(flow_ast));
 
-    session.diagrams_mut().insert(seq_id, seq_diagram);
+    let class_mmd =
+        "classDiagram\nClass01 <|-- AveryLongClass : Cool\nClass01 : size()\nClass01 : int chimp\n";
+    let class_ast = crate::format::mermaid::parse_class_diagram(class_mmd).expect("class parse");
+    let class_id = DiagramId::new("demo-class").expect("diagram id");
+    let class_diagram = Diagram::new(class_id.clone(), "Class demo", DiagramAst::Class(class_ast));
+
+    session.diagrams_mut().insert(seq_id.clone(), seq_diagram);
     session.diagrams_mut().insert(flow_id.clone(), flow_diagram);
+    session.diagrams_mut().insert(class_id, class_diagram);
+    // Prefer a sequence diagram with highlight spans for default TUI hint modes.
+    session.set_active_diagram_id(Some(seq_id));
 
     let x1 = XRef::new(
         ObjectRef::new(flow_id.clone(), category_path(&["flow", "node"]), n_a.clone()),

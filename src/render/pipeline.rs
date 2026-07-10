@@ -104,7 +104,7 @@ pub fn render_graph_unicode_with_options(
     options: RenderOptions,
 ) -> Result<String, PipelineRenderError> {
     let layout = layout_graph(model)?;
-    if crate::render::graph_paint::graph_model_has_compartments(model) {
+    if crate::render::graph_paint::graph_model_needs_scene_paint(model) {
         return Ok(crate::render::graph_paint::render_graph_model_with_compartments(
             model, &layout, options,
         )?);
@@ -114,19 +114,31 @@ pub fn render_graph_unicode_with_options(
 }
 
 /// Annotated graph-family render.
+///
+/// When `highlight_categories` is set (class/er scene paint), builds a real `HighlightIndex` for
+/// TUI hints. Flow-bridge path ignores it and uses flowchart categories.
 pub fn render_graph_unicode_annotated_with_options(
     diagram_id: &DiagramId,
     model: &GraphModel,
     options: RenderOptions,
 ) -> Result<AnnotatedRender, PipelineRenderError> {
+    render_graph_unicode_annotated_with_categories(diagram_id, model, options, None)
+}
+
+/// Annotated graph paint with explicit node/edge category segments for scene-native diagrams.
+pub fn render_graph_unicode_annotated_with_categories(
+    diagram_id: &DiagramId,
+    model: &GraphModel,
+    options: RenderOptions,
+    highlight_categories: Option<crate::render::graph_paint::GraphHighlightCategories<'_>>,
+) -> Result<AnnotatedRender, PipelineRenderError> {
     let layout = layout_graph(model)?;
-    if crate::render::graph_paint::graph_model_has_compartments(model) {
-        let text = crate::render::graph_paint::render_graph_model_with_compartments(
-            model, &layout, options,
-        )?;
-        // Highlight index for compartment graphs lands with scene-native paint; empty for now.
-        let _ = diagram_id;
-        return Ok(AnnotatedRender { text, highlight_index: Default::default() });
+    if crate::render::graph_paint::graph_model_needs_scene_paint(model) {
+        let categories = highlight_categories
+            .unwrap_or(crate::render::graph_paint::GraphHighlightCategories::CLASS);
+        return Ok(crate::render::graph_paint::render_graph_model_with_compartments_annotated(
+            diagram_id, model, &layout, options, categories,
+        )?);
     }
     let ast = model.to_flowchart_ast();
     Ok(render_flowchart_unicode_annotated_with_options(diagram_id, &ast, &layout, options)?)
@@ -187,6 +199,10 @@ pub fn render_ast_unicode_with_options(
     ast: &DiagramAst,
     options: RenderOptions,
 ) -> Result<String, PipelineRenderError> {
+    // Gantt keeps domain data that the track SequenceAst bridge cannot express yet.
+    if let DiagramAst::Gantt(gantt) = ast {
+        return Ok(crate::render::track_paint::render_gantt_unicode(gantt, options)?);
+    }
     let scene = lower_diagram_ast(ast);
     render_scene_unicode_with_options(&scene, options)
 }
@@ -197,8 +213,36 @@ pub fn render_ast_unicode_annotated_with_options(
     ast: &DiagramAst,
     options: RenderOptions,
 ) -> Result<AnnotatedRender, PipelineRenderError> {
-    let scene = lower_diagram_ast(ast);
-    render_scene_unicode_annotated_with_options(diagram_id, &scene, options)
+    use crate::render::graph_paint::GraphHighlightCategories;
+
+    match ast {
+        DiagramAst::Gantt(gantt) => {
+            let text = crate::render::track_paint::render_gantt_unicode(gantt, options)?;
+            Ok(AnnotatedRender { text, highlight_index: Default::default() })
+        }
+        DiagramAst::Class(class) => {
+            let model = crate::render::lower::lower_class(class);
+            render_graph_unicode_annotated_with_categories(
+                diagram_id,
+                &model,
+                options,
+                Some(GraphHighlightCategories::CLASS),
+            )
+        }
+        DiagramAst::Er(er) => {
+            let model = crate::render::lower::lower_er(er);
+            render_graph_unicode_annotated_with_categories(
+                diagram_id,
+                &model,
+                options,
+                Some(GraphHighlightCategories::ER),
+            )
+        }
+        other => {
+            let scene = lower_diagram_ast(other);
+            render_scene_unicode_annotated_with_options(diagram_id, &scene, options)
+        }
+    }
 }
 
 #[cfg(test)]

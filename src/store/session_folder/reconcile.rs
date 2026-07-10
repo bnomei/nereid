@@ -59,6 +59,18 @@ pub(crate) fn stable_id_map_from_ast(ast: &DiagramAst) -> DiagramStableIdMap {
             }
             DiagramStableIdMap { by_mermaid_id: BTreeMap::new(), by_name }
         }
+        DiagramAst::Er(er_ast) => {
+            let mut by_name = BTreeMap::new();
+            for (id, e) in er_ast.entities() {
+                if !e.name().is_empty() {
+                    by_name.entry(e.name().to_owned()).or_insert_with(|| id.to_string());
+                }
+            }
+            DiagramStableIdMap { by_mermaid_id: BTreeMap::new(), by_name }
+        }
+        DiagramAst::Gantt(_) => {
+            DiagramStableIdMap { by_mermaid_id: BTreeMap::new(), by_name: BTreeMap::new() }
+        }
     }
 }
 
@@ -490,6 +502,30 @@ pub(crate) fn reconcile_sequence_participant_notes(ast: &mut SequenceAst, sideca
     }
 }
 
+pub(crate) fn reconcile_class_notes(ast: &mut crate::model::ClassAst, sidecar: &DiagramMeta) {
+    if sidecar.class_node_notes.is_empty() {
+        return;
+    }
+
+    for (class_id, note) in &sidecar.class_node_notes {
+        if let Some(class) = ast.classes_mut().get_mut(class_id) {
+            class.set_note(Some(note.clone()));
+        }
+    }
+}
+
+pub(crate) fn reconcile_er_notes(ast: &mut crate::model::ErAst, sidecar: &DiagramMeta) {
+    if sidecar.er_entity_notes.is_empty() {
+        return;
+    }
+
+    for (entity_id, note) in &sidecar.er_entity_notes {
+        if let Some(entity) = ast.entities_mut().get_mut(entity_id) {
+            entity.set_note(Some(note.clone()));
+        }
+    }
+}
+
 pub(crate) fn reconcile_sequence_participant_symbols(ast: &mut SequenceAst, sidecar: &DiagramMeta) {
     if sidecar.sequence_participant_symbols.is_empty() {
         return;
@@ -748,8 +784,15 @@ pub(crate) fn reconcile_diagram_ast(ast: &mut DiagramAst, sidecar: &DiagramMeta)
             reconcile_sequence_participant_notes(seq_ast, sidecar);
             reconcile_sequence_participant_symbols(seq_ast, sidecar);
         }
-        DiagramAst::Class(_) => {
-            // Class identity reconciliation is name-based via stable_id_map; no sidecar fields yet.
+        DiagramAst::Class(class_ast) => {
+            // Name-based identity via stable_id_map; notes keyed by object id.
+            reconcile_class_notes(class_ast, sidecar);
+        }
+        DiagramAst::Er(er_ast) => {
+            reconcile_er_notes(er_ast, sidecar);
+        }
+        DiagramAst::Gantt(_) => {
+            // Name-based identity via stable_id_map; no extra sidecar fields yet.
         }
     }
 }
@@ -765,6 +808,8 @@ pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> 
         sequence_blocks,
         flow_node_notes,
         sequence_participant_notes,
+        class_node_notes,
+        er_entity_notes,
         flow_node_symbols,
         sequence_participant_symbols,
     ) = match diagram.ast() {
@@ -787,6 +832,8 @@ pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> 
                     node.note().map(|note| (node_id.clone(), note.to_owned()))
                 })
                 .collect(),
+            BTreeMap::new(),
+            BTreeMap::new(),
             BTreeMap::new(),
             ast.nodes()
                 .iter()
@@ -817,6 +864,8 @@ pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> 
                 })
                 .collect(),
             BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
             ast.participants()
                 .iter()
                 .filter_map(|(participant_id, participant)| {
@@ -824,10 +873,44 @@ pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> 
                 })
                 .collect(),
         ),
-        DiagramAst::Class(_) => (
+        DiagramAst::Class(ast) => (
             Vec::new(),
             Vec::new(),
             Vec::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            ast.classes()
+                .iter()
+                .filter_map(|(class_id, class)| {
+                    class.note().map(|note| (class_id.clone(), note.to_owned()))
+                })
+                .collect(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        ),
+        DiagramAst::Er(ast) => (
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            ast.entities()
+                .iter()
+                .filter_map(|(entity_id, entity)| {
+                    entity.note().map(|note| (entity_id.clone(), note.to_owned()))
+                })
+                .collect(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        ),
+        DiagramAst::Gantt(_) => (
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
             BTreeMap::new(),
             BTreeMap::new(),
             BTreeMap::new(),
@@ -846,6 +929,8 @@ pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> 
         default_symbol_repository_id: diagram.default_symbol_repository_id().map(ToOwned::to_owned),
         flow_node_notes,
         sequence_participant_notes,
+        class_node_notes,
+        er_entity_notes,
         flow_node_symbols,
         sequence_participant_symbols,
     }

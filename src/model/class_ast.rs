@@ -43,11 +43,13 @@ pub struct ClassNode {
     name: String,
     attributes: Vec<String>,
     methods: Vec<String>,
+    /// Top-level note (sidecar / UI); not part of Mermaid export.
+    note: Option<String>,
 }
 
 impl ClassNode {
     pub fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into(), attributes: Vec::new(), methods: Vec::new() }
+        Self { name: name.into(), attributes: Vec::new(), methods: Vec::new(), note: None }
     }
 
     pub fn with_attributes(mut self, attributes: Vec<String>) -> Self {
@@ -58,6 +60,10 @@ impl ClassNode {
     pub fn with_methods(mut self, methods: Vec<String>) -> Self {
         self.methods = methods;
         self
+    }
+
+    pub fn set_note<T: Into<String>>(&mut self, note: Option<T>) {
+        self.note = note.map(Into::into);
     }
 
     pub fn name(&self) -> &str {
@@ -72,12 +78,33 @@ impl ClassNode {
         &self.methods
     }
 
+    pub fn note(&self) -> Option<&str> {
+        self.note.as_deref()
+    }
+
     pub fn attributes_mut(&mut self) -> &mut Vec<String> {
         &mut self.attributes
     }
 
     pub fn methods_mut(&mut self) -> &mut Vec<String> {
         &mut self.methods
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ClassNode;
+
+    #[test]
+    fn class_node_note_can_be_set_and_cleared() {
+        let mut node = ClassNode::new("Foo");
+        assert_eq!(node.note(), None);
+
+        node.set_note(Some("domain aggregate root"));
+        assert_eq!(node.note(), Some("domain aggregate root"));
+
+        node.set_note::<&str>(None);
+        assert_eq!(node.note(), None);
     }
 }
 

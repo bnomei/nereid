@@ -14,8 +14,10 @@
 
 pub mod class_ast;
 pub mod diagram;
+pub mod er_ast;
 pub(crate) mod fixtures;
 pub mod flow_ast;
+pub mod gantt_ast;
 pub mod ids;
 pub mod object_ref;
 pub mod seq_ast;
@@ -26,7 +28,9 @@ pub mod xref;
 
 pub use class_ast::{ClassAst, ClassNode, ClassRelation, ClassRelationKind};
 pub use diagram::{Diagram, DiagramAst, DiagramAstKindMismatch, DiagramKind};
+pub use er_ast::{ErAst, ErCardinality, ErEntity, ErRelationship, ErStroke};
 pub use flow_ast::{FlowEdge, FlowNode, FlowchartAst};
+pub use gantt_ast::{GanttAst, GanttSection, GanttTask, GanttTaskStart};
 pub use ids::{
     DiagramId, Id, IdError, ObjectId, SessionId, WalkthroughId, WalkthroughNodeId, XRefId,
 };

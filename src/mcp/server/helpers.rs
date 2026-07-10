@@ -13,6 +13,8 @@ fn diagram_kind_label(kind: DiagramKind) -> &'static str {
         DiagramKind::Sequence => "Sequence",
         DiagramKind::Flowchart => "Flowchart",
         DiagramKind::Class => "Class",
+        DiagramKind::Er => "Er",
+        DiagramKind::Gantt => "Gantt",
     }
 }
 
@@ -31,6 +33,12 @@ fn detect_mermaid_kind(input: &str) -> Option<DiagramKind> {
         if trimmed.starts_with("classDiagram") {
             return Some(DiagramKind::Class);
         }
+        if trimmed.starts_with("erDiagram") {
+            return Some(DiagramKind::Er);
+        }
+        if trimmed.starts_with("gantt") {
+            return Some(DiagramKind::Gantt);
+        }
         return None;
     }
     None
@@ -41,6 +49,8 @@ fn allocate_diagram_id(session: &Session, kind: DiagramKind) -> DiagramId {
         DiagramKind::Sequence => "seq",
         DiagramKind::Flowchart => "flow",
         DiagramKind::Class => "class",
+        DiagramKind::Er => "er",
+        DiagramKind::Gantt => "gantt",
     };
 
     if !session.diagrams().contains_key(base) {
@@ -111,6 +121,28 @@ fn digest_for_diagram(diagram: &Diagram) -> DiagramDigest {
             key_names: ast.classes().values().map(|c| c.name().to_owned()).collect(),
             context: ReadContext::default(),
         },
+        DiagramAst::Er(ast) => DiagramDigest {
+            rev: diagram.rev(),
+            counts: DiagramCounts {
+                participants: 0,
+                messages: 0,
+                nodes: ast.entities().len() as u64,
+                edges: ast.relationships().len() as u64,
+            },
+            key_names: ast.entities().values().map(|e| e.name().to_owned()).collect(),
+            context: ReadContext::default(),
+        },
+        DiagramAst::Gantt(ast) => DiagramDigest {
+            rev: diagram.rev(),
+            counts: DiagramCounts {
+                participants: 0,
+                messages: 0,
+                nodes: ast.tasks().len() as u64,
+                edges: 0,
+            },
+            key_names: ast.tasks().values().map(|t| t.name().to_owned()).collect(),
+            context: ReadContext::default(),
+        },
     }
 }
 
@@ -129,7 +161,17 @@ fn mermaid_for_diagram(diagram: &Diagram) -> String {
         DiagramAst::Sequence(ast) => mermaid_for_sequence(ast),
         DiagramAst::Flowchart(ast) => mermaid_for_flowchart(ast),
         DiagramAst::Class(ast) => mermaid_for_class(ast),
+        DiagramAst::Er(ast) => mermaid_for_er(ast),
+        DiagramAst::Gantt(ast) => mermaid_for_gantt(ast),
     }
+}
+
+fn mermaid_for_er(ast: &crate::model::ErAst) -> String {
+    crate::format::mermaid::export_er_diagram(ast).unwrap_or_else(|_| "erDiagram\n".to_owned())
+}
+
+fn mermaid_for_gantt(ast: &crate::model::GanttAst) -> String {
+    crate::format::mermaid::export_gantt_diagram(ast).unwrap_or_else(|_| "gantt\n".to_owned())
 }
 
 fn mermaid_for_class(ast: &crate::model::ClassAst) -> String {
@@ -246,6 +288,51 @@ fn mcp_ast_for_diagram(diagram: &Diagram) -> McpDiagramAst {
             edges.sort_by(|a, b| a.edge_id.cmp(&b.edge_id));
 
             McpDiagramAst::Flowchart { nodes, edges }
+        }
+        DiagramAst::Er(ast) => {
+            let mut nodes = ast
+                .entities()
+                .iter()
+                .map(|(id, e)| McpFlowNodeAst {
+                    node_id: id.to_string(),
+                    label: e.name().to_owned(),
+                    shape: "entity".to_owned(),
+                    mermaid_id: Some(e.name().to_owned()),
+                    note: None,
+                    symbol: None,
+                })
+                .collect::<Vec<_>>();
+            nodes.sort_by(|a, b| a.node_id.cmp(&b.node_id));
+            let mut edges = ast
+                .relationships()
+                .iter()
+                .map(|(id, r)| McpFlowEdgeAst {
+                    edge_id: id.to_string(),
+                    from_node_id: r.from_entity_id().to_string(),
+                    to_node_id: r.to_entity_id().to_string(),
+                    label: r.label().map(ToOwned::to_owned),
+                    connector: r.raw_connector().map(ToOwned::to_owned),
+                    style: None,
+                })
+                .collect::<Vec<_>>();
+            edges.sort_by(|a, b| a.edge_id.cmp(&b.edge_id));
+            McpDiagramAst::Flowchart { nodes, edges }
+        }
+        DiagramAst::Gantt(ast) => {
+            let mut nodes = ast
+                .tasks()
+                .iter()
+                .map(|(id, task)| McpFlowNodeAst {
+                    node_id: id.to_string(),
+                    label: task.name().to_owned(),
+                    shape: "task".to_owned(),
+                    mermaid_id: task.mermaid_tag().map(ToOwned::to_owned),
+                    note: None,
+                    symbol: None,
+                })
+                .collect::<Vec<_>>();
+            nodes.sort_by(|a, b| a.node_id.cmp(&b.node_id));
+            McpDiagramAst::Flowchart { nodes, edges: Vec::new() }
         }
     }
 }
@@ -1029,6 +1116,14 @@ fn map_replace_error(err: crate::store::DiagramMermaidReplaceError) -> ErrorData
         ),
         DiagramMermaidReplaceError::ParseClass(err) => ErrorData::invalid_params(
             format!("cannot parse Mermaid class diagram: {err}"),
+            None,
+        ),
+        DiagramMermaidReplaceError::ParseEr(err) => ErrorData::invalid_params(
+            format!("cannot parse Mermaid er diagram: {err}"),
+            None,
+        ),
+        DiagramMermaidReplaceError::ParseGantt(err) => ErrorData::invalid_params(
+            format!("cannot parse Mermaid gantt diagram: {err}"),
             None,
         ),
         DiagramMermaidReplaceError::ParseFlowchart(err) => ErrorData::invalid_params(

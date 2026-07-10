@@ -934,6 +934,48 @@ fn objects_focus_f_enters_hint_mode() {
 }
 
 #[test]
+fn class_diagram_f_enters_hint_mode_with_class_targets() {
+    let mut app = App::new(demo_session());
+    app.set_active_diagram_id(DiagramId::new("demo-class").expect("diagram id"));
+    app.handle_key_code(KeyCode::Char('f'));
+    let targets = match &app.hint_mode {
+        HintMode::AwaitingFirst { kind: HintKind::Jump, targets } => targets,
+        other => panic!("expected AwaitingFirst Jump on class diagram, got {other:?}"),
+    };
+    assert!(!targets.is_empty(), "class diagram should expose hint targets");
+    assert!(
+        targets.iter().any(|t| {
+            matches!(
+                t.object_ref.category().segments(),
+                [a, b] if a == "class" && (b == "class" || b == "relation")
+            )
+        }),
+        "expected class/class or class/relation targets"
+    );
+}
+
+#[test]
+fn er_diagram_f_enters_hint_mode_with_entity_targets() {
+    let mut app = App::new(demo_session());
+    app.set_active_diagram_id(DiagramId::new("demo-er").expect("diagram id"));
+    app.handle_key_code(KeyCode::Char('f'));
+    let targets = match &app.hint_mode {
+        HintMode::AwaitingFirst { kind: HintKind::Jump, targets } => targets,
+        other => panic!("expected AwaitingFirst Jump on er diagram, got {other:?}"),
+    };
+    assert!(!targets.is_empty(), "er diagram should expose hint targets");
+    assert!(
+        targets.iter().any(|t| {
+            matches!(
+                t.object_ref.category().segments(),
+                [a, b] if a == "er" && (b == "entity" || b == "relationship")
+            )
+        }),
+        "expected er/entity or er/relationship targets"
+    );
+}
+
+#[test]
 fn diagram_y_yanks_ref() {
     let mut app = App::new(demo_session_fallback());
     app.handle_key_code(KeyCode::Char('y'));

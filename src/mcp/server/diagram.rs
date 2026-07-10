@@ -13,7 +13,10 @@
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::{tool, tool_router};
 
-use crate::format::mermaid::{parse_class_diagram, parse_flowchart, parse_sequence_diagram};
+use crate::format::mermaid::{
+    parse_class_diagram, parse_er_diagram, parse_flowchart, parse_gantt_diagram,
+    parse_sequence_diagram,
+};
 use crate::model::{CategoryPath, DiagramAst, DiagramId, ObjectId, ObjectRef};
 use crate::ops::apply_ops;
 use crate::render::render_diagram_unicode;
@@ -42,7 +45,7 @@ fn stable_object_snapshots(
             for (class_id, node) in class_ast.classes() {
                 snapshots.insert(
                     object_ref(diagram_id, class_category.clone(), class_id),
-                    format!("name={:?}", node.name()),
+                    format!("name={:?};note={:?}", node.name(), node.note()),
                 );
             }
             for (rel_id, rel) in class_ast.relations() {
@@ -55,6 +58,31 @@ fn stable_object_snapshots(
                         rel.kind(),
                         rel.label()
                     ),
+                );
+            }
+        }
+        DiagramAst::Er(er_ast) => {
+            let ent_cat = category(&["er", "entity"]);
+            let rel_cat = category(&["er", "relationship"]);
+            for (id, e) in er_ast.entities() {
+                snapshots.insert(
+                    object_ref(diagram_id, ent_cat.clone(), id),
+                    format!("name={:?};note={:?}", e.name(), e.note()),
+                );
+            }
+            for (id, r) in er_ast.relationships() {
+                snapshots.insert(
+                    object_ref(diagram_id, rel_cat.clone(), id),
+                    format!("label={:?}", r.label()),
+                );
+            }
+        }
+        DiagramAst::Gantt(gantt_ast) => {
+            let task_cat = category(&["gantt", "task"]);
+            for (id, task) in gantt_ast.tasks() {
+                snapshots.insert(
+                    object_ref(diagram_id, task_cat.clone(), id),
+                    format!("name={:?}", task.name()),
                 );
             }
         }
@@ -432,7 +460,7 @@ impl NereidMcp {
 
         let Some(kind) = detect_mermaid_kind(&mermaid) else {
             return Err(ErrorData::invalid_params(
-                "expected 'flowchart'/'graph', 'sequenceDiagram', or 'classDiagram' as the first non-empty line",
+                "expected flowchart/graph, sequenceDiagram, classDiagram, erDiagram, or gantt as the first non-empty line",
                 None,
             ));
         };
@@ -458,6 +486,17 @@ impl NereidMcp {
                 DiagramAst::Class(parse_class_diagram(&mermaid).map_err(|err| {
                     ErrorData::invalid_params(
                         format!("cannot parse Mermaid class diagram: {err}"),
+                        None,
+                    )
+                })?)
+            }
+            DiagramKind::Er => DiagramAst::Er(parse_er_diagram(&mermaid).map_err(|err| {
+                ErrorData::invalid_params(format!("cannot parse Mermaid er diagram: {err}"), None)
+            })?),
+            DiagramKind::Gantt => {
+                DiagramAst::Gantt(parse_gantt_diagram(&mermaid).map_err(|err| {
+                    ErrorData::invalid_params(
+                        format!("cannot parse Mermaid gantt diagram: {err}"),
                         None,
                     )
                 })?)
@@ -918,8 +957,7 @@ impl NereidMcp {
             )
         })?;
         let (mut objects, mut edges) = match diagram.ast() {
-            DiagramAst::Class(_ast) => {
-                // Class slice neighborhood lands with dedicated category paths; empty for v1.
+            DiagramAst::Class(_) | DiagramAst::Er(_) | DiagramAst::Gantt(_) => {
                 (Vec::new(), Vec::new())
             }
             DiagramAst::Flowchart(ast) => {

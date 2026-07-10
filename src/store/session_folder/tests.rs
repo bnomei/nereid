@@ -22,10 +22,11 @@ use super::{
 use crate::format::mermaid::{export_flowchart, export_sequence_diagram};
 use crate::layout::{layout_flowchart, layout_sequence};
 use crate::model::{
-    CategoryPath, Diagram, DiagramAst, DiagramId, DiagramKind, FlowEdge, FlowNode, FlowchartAst,
-    ObjectId, ObjectRef, SequenceAst, SequenceMessage, SequenceMessageKind, SequenceParticipant,
-    Session, SessionId, SymbolAnchor, Walkthrough, WalkthroughEdge, WalkthroughId, WalkthroughNode,
-    WalkthroughNodeId, XRef, XRefId, XRefStatus as ModelXRefStatus,
+    CategoryPath, ClassAst, ClassNode, Diagram, DiagramAst, DiagramId, DiagramKind, ErAst,
+    ErEntity, FlowEdge, FlowNode, FlowchartAst, ObjectId, ObjectRef, SequenceAst, SequenceMessage,
+    SequenceMessageKind, SequenceParticipant, Session, SessionId, SymbolAnchor, Walkthrough,
+    WalkthroughEdge, WalkthroughId, WalkthroughNode, WalkthroughNodeId, XRef, XRefId,
+    XRefStatus as ModelXRefStatus,
 };
 use crate::render::{
     render_flowchart_unicode, render_sequence_unicode, render_walkthrough_unicode,
@@ -437,6 +438,8 @@ fn save_diagram_meta_stores_relative_paths_and_load_resolves_them(ctx: SessionFo
         default_symbol_repository_id: None,
         flow_node_notes: Default::default(),
         sequence_participant_notes: Default::default(),
+        class_node_notes: Default::default(),
+        er_entity_notes: Default::default(),
         flow_node_symbols: Default::default(),
         sequence_participant_symbols: Default::default(),
     };
@@ -471,6 +474,8 @@ fn save_diagram_meta_rejects_paths_outside_session(ctx: SessionFolderTestCtx) {
         default_symbol_repository_id: None,
         flow_node_notes: Default::default(),
         sequence_participant_notes: Default::default(),
+        class_node_notes: Default::default(),
+        er_entity_notes: Default::default(),
         flow_node_symbols: Default::default(),
         sequence_participant_symbols: Default::default(),
     };
@@ -1428,6 +1433,68 @@ fn save_and_load_session_round_trips_inline_notes_via_sidecar(ctx: SessionFolder
     let loaded = folder.load_session().unwrap();
 
     assert_eq!(loaded, session);
+}
+
+#[rstest]
+fn save_and_load_session_round_trips_class_and_er_notes_via_sidecar(ctx: SessionFolderTestCtx) {
+    let folder = &ctx.folder;
+
+    let mut session = Session::new(SessionId::new("s1").unwrap());
+
+    let class_id = DiagramId::new("d-class").unwrap();
+    let mut class_ast = ClassAst::default();
+    let c_foo = ObjectId::new("c:Foo").unwrap();
+    let c_bar = ObjectId::new("c:Bar").unwrap();
+    let mut foo = ClassNode::new("Foo");
+    foo.set_note(Some("aggregate root"));
+    class_ast.classes_mut().insert(c_foo, foo);
+    class_ast.classes_mut().insert(c_bar, ClassNode::new("Bar"));
+    session.diagrams_mut().insert(
+        class_id.clone(),
+        Diagram::new(class_id, "Class Notes", DiagramAst::Class(class_ast)),
+    );
+
+    let er_id = DiagramId::new("d-er").unwrap();
+    let mut er_ast = ErAst::default();
+    let e_customer = ObjectId::new("e:CUSTOMER").unwrap();
+    let e_order = ObjectId::new("e:ORDER").unwrap();
+    let mut customer = ErEntity::new("CUSTOMER");
+    customer.set_note(Some("billing party"));
+    er_ast.entities_mut().insert(e_customer, customer);
+    er_ast.entities_mut().insert(e_order, ErEntity::new("ORDER"));
+    session
+        .diagrams_mut()
+        .insert(er_id.clone(), Diagram::new(er_id, "ER Notes", DiagramAst::Er(er_ast)));
+
+    folder.save_session(&session).unwrap();
+    let loaded = folder.load_session().unwrap();
+
+    assert_eq!(loaded, session);
+
+    match loaded.diagrams().get(&DiagramId::new("d-class").unwrap()).unwrap().ast() {
+        DiagramAst::Class(ast) => {
+            assert_eq!(
+                ast.classes().get(&ObjectId::new("c:Foo").unwrap()).unwrap().note(),
+                Some("aggregate root")
+            );
+            assert_eq!(ast.classes().get(&ObjectId::new("c:Bar").unwrap()).unwrap().note(), None);
+        }
+        other => panic!("expected class diagram, got {other:?}"),
+    }
+
+    match loaded.diagrams().get(&DiagramId::new("d-er").unwrap()).unwrap().ast() {
+        DiagramAst::Er(ast) => {
+            assert_eq!(
+                ast.entities().get(&ObjectId::new("e:CUSTOMER").unwrap()).unwrap().note(),
+                Some("billing party")
+            );
+            assert_eq!(
+                ast.entities().get(&ObjectId::new("e:ORDER").unwrap()).unwrap().note(),
+                None
+            );
+        }
+        other => panic!("expected er diagram, got {other:?}"),
+    }
 }
 
 #[rstest]

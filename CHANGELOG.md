@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-07-10
+- Introduced a shared graph/track render pipeline: domain ASTs lower into `GraphModel` / `TrackModel`, then family layout and paint, so new diagram kinds add lowerers instead of private layout/render stacks.
+- Rehomed flowchart and sequence diagram rendering through that pipeline with a temporary domain-AST bridge; existing Unicode snapshots stay bit-identical.
+- Added graph compartment painting (variable-height multi-compartment boxes with full-width interior dividers) and an expanded single-cell endpoint cap alphabet for class/ER-style relations.
+- Added class diagrams end-to-end: `ClassAst`, limited Mermaid `classDiagram` parse/export, graph-family lowerer, compartment render path, and session/MCP/TUI kind wiring (`classDiagram` create/replace/export/render).
+- Added entity-relationship diagrams: `ErAst`, limited `erDiagram` parse/export with 2→1 char cardinality folding, graph lowerer, and session/MCP/TUI kind wiring.
+- Added gantt charts: `GanttAst`, limited `gantt` parse/export (sections, dates, durations, `after`), track bar paint, and session/MCP/TUI kind wiring.
+- Expanded the built-in demo session with class, ER, and gantt fixtures linked from the demo index.
+- Added top-level node notes for class and ER diagrams (AST + diagram sidecar + render/TUI), matching flowchart notes.
+
 ## [0.8.0] - 2026-07-09
 - Added sequence structure ops for alt/opt/loop/par blocks, sections, and message membership (including nested ancestor membership).
 - Added `diagram_replace_from_mermaid` with identity reconciliation (messages, blocks/sections, participants/nodes/edges) and dangling-xref reporting scoped to the target diagram.

@@ -10,12 +10,14 @@
 
 use crate::model::class_ast::{ClassAst, ClassRelationKind};
 use crate::model::diagram::DiagramAst;
+use crate::model::er_ast::{ErAst, ErCardinality, ErStroke};
 use crate::model::flow_ast::FlowchartAst;
+use crate::model::gantt_ast::GanttAst;
 use crate::model::seq_ast::SequenceAst;
 
 use super::scene::{
     CapKind, EdgeStroke, GraphCompartment, GraphEdge, GraphModel, GraphNode, RenderScene,
-    TrackModel,
+    TrackModel, TrackSpanStyle,
 };
 
 /// Lower a flowchart AST into the shared graph scene.
@@ -126,7 +128,9 @@ pub fn lower_class(ast: &ClassAst) -> GraphModel {
             compartments.push(GraphCompartment::new(class.attributes().iter().cloned()));
             compartments.push(GraphCompartment::new(class.methods().iter().cloned()));
         }
-        let node = GraphNode::new(class.name()).with_compartments(compartments);
+        let node = GraphNode::new(class.name())
+            .with_compartments(compartments)
+            .with_note(class.note().map(str::to_owned));
         model.nodes_mut().insert(id.clone(), node);
     }
 
@@ -158,12 +162,64 @@ pub fn lower_class(ast: &ClassAst) -> GraphModel {
     model
 }
 
+fn er_card_to_cap(card: ErCardinality) -> CapKind {
+    match card {
+        ErCardinality::ExactlyOne => CapKind::ExactlyOne,
+        ErCardinality::ZeroOrOne => CapKind::ZeroOrOne,
+        ErCardinality::OneOrMore | ErCardinality::ZeroOrMore => CapKind::CrowFoot,
+    }
+}
+
+/// Lower ER diagram into graph scene (plain entity boxes + folded 1-cell cardinality caps).
+pub fn lower_er(ast: &ErAst) -> GraphModel {
+    let mut model = GraphModel::default();
+    for (id, entity) in ast.entities() {
+        let node = GraphNode::new(entity.name()).with_note(entity.note().map(str::to_owned));
+        model.nodes_mut().insert(id.clone(), node);
+    }
+    for (id, rel) in ast.relationships() {
+        let start_cap = er_card_to_cap(rel.from_card());
+        let end_cap = er_card_to_cap(rel.to_card());
+        let stroke = match rel.stroke() {
+            ErStroke::Identifying => EdgeStroke::Solid,
+            ErStroke::NonIdentifying => EdgeStroke::Dashed,
+        };
+        // Bridge connector for flowchart paint fallback when no compartments.
+        let bridge = match (start_cap, end_cap) {
+            (CapKind::ZeroOrOne, _) => Some("o--".to_owned()),
+            (_, CapKind::ZeroOrOne) => Some("--o".to_owned()),
+            _ => Some("-->".to_owned()),
+        };
+        let edge = GraphEdge::new(rel.from_entity_id().clone(), rel.to_entity_id().clone())
+            .with_label(rel.label().map(str::to_owned))
+            .with_connector(bridge)
+            .with_caps(start_cap, end_cap)
+            .with_stroke(stroke);
+        model.edges_mut().insert(id.clone(), edge);
+    }
+    model
+}
+
+/// Lower gantt into track scene (bar spans; layout resolved in track paint).
+pub fn lower_gantt(ast: &GanttAst) -> TrackModel {
+    // Carry gantt as an empty sequence shell + bar style; dedicated gantt paint reads GanttAst
+    // from the domain path. TrackModel currently wraps SequenceAst — store a marker sequence
+    // and use default_span_style Bar so pipeline dispatches gantt paint via domain AST.
+    //
+    // Pipeline renders Gantt through `render_gantt_unicode` directly from domain AST; this
+    // lowerer exists for family tagging.
+    let _ = ast;
+    TrackModel::from_sequence(SequenceAst::default()).with_default_span_style(TrackSpanStyle::Bar)
+}
+
 /// Lower any supported diagram AST into a render scene.
 pub fn lower_diagram_ast(ast: &DiagramAst) -> RenderScene {
     match ast {
         DiagramAst::Flowchart(flow) => RenderScene::Graph(lower_flowchart(flow)),
         DiagramAst::Sequence(seq) => RenderScene::Track(lower_sequence(seq)),
         DiagramAst::Class(class) => RenderScene::Graph(lower_class(class)),
+        DiagramAst::Er(er) => RenderScene::Graph(lower_er(er)),
+        DiagramAst::Gantt(gantt) => RenderScene::Track(lower_gantt(gantt)),
     }
 }
 

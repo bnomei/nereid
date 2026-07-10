@@ -11,7 +11,9 @@
 //! `rev` is the optimistic-concurrency token for MCP/TUI mutations.
 
 use super::class_ast::ClassAst;
+use super::er_ast::ErAst;
 use super::flow_ast::FlowchartAst;
+use super::gantt_ast::GanttAst;
 use super::ids::DiagramId;
 use super::seq_ast::SequenceAst;
 use std::fmt;
@@ -22,6 +24,8 @@ pub enum DiagramKind {
     Sequence,
     Flowchart,
     Class,
+    Er,
+    Gantt,
 }
 
 /// Kind-tagged diagram AST wrapper used by [`Diagram`].
@@ -30,6 +34,8 @@ pub enum DiagramAst {
     Sequence(SequenceAst),
     Flowchart(FlowchartAst),
     Class(ClassAst),
+    Er(ErAst),
+    Gantt(GanttAst),
 }
 
 impl DiagramAst {
@@ -38,6 +44,8 @@ impl DiagramAst {
             Self::Sequence(_) => DiagramKind::Sequence,
             Self::Flowchart(_) => DiagramKind::Flowchart,
             Self::Class(_) => DiagramKind::Class,
+            Self::Er(_) => DiagramKind::Er,
+            Self::Gantt(_) => DiagramKind::Gantt,
         }
     }
 }

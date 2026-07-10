@@ -29,10 +29,12 @@ use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 
 use crate::format::mermaid::{
-    export_class_diagram, export_flowchart, export_sequence_diagram, parse_class_diagram,
-    parse_flowchart, parse_sequence_diagram, MermaidClassExportError, MermaidClassParseError,
-    MermaidFlowchartExportError, MermaidFlowchartParseError, MermaidSequenceExportError,
-    MermaidSequenceParseError,
+    export_class_diagram, export_er_diagram, export_flowchart, export_gantt_diagram,
+    export_sequence_diagram, parse_class_diagram, parse_er_diagram, parse_flowchart,
+    parse_gantt_diagram, parse_sequence_diagram, MermaidClassExportError, MermaidClassParseError,
+    MermaidErExportError, MermaidErParseError, MermaidFlowchartExportError,
+    MermaidFlowchartParseError, MermaidGanttExportError, MermaidGanttParseError,
+    MermaidSequenceExportError, MermaidSequenceParseError,
 };
 use crate::layout::{layout_flowchart, layout_sequence, FlowchartLayoutError, SequenceLayoutError};
 use crate::model::seq_ast::{SequenceBlock, SequenceBlockKind, SequenceSectionKind};
@@ -195,6 +197,18 @@ impl AsciiExportManager {
                             let model = lower_class(&ast);
                             render_graph_unicode_with_options(&model, RenderOptions::default()).ok()
                         }
+                        DiagramAst::Er(ast) => {
+                            use crate::render::{
+                                lower_er, render_graph_unicode_with_options, RenderOptions,
+                            };
+                            let model = lower_er(&ast);
+                            render_graph_unicode_with_options(&model, RenderOptions::default()).ok()
+                        }
+                        DiagramAst::Gantt(ast) => crate::render::track_paint::render_gantt_unicode(
+                            &ast,
+                            crate::render::RenderOptions::default(),
+                        )
+                        .ok(),
                     } {
                         if !text.ends_with('\n') {
                             text.push('\n');
@@ -283,6 +297,26 @@ pub enum StoreError {
         diagram_id: DiagramId,
         path: PathBuf,
         source: Box<MermaidClassExportError>,
+    },
+    MermaidErParse {
+        diagram_id: DiagramId,
+        path: PathBuf,
+        source: Box<MermaidErParseError>,
+    },
+    MermaidErExport {
+        diagram_id: DiagramId,
+        path: PathBuf,
+        source: Box<MermaidErExportError>,
+    },
+    MermaidGanttParse {
+        diagram_id: DiagramId,
+        path: PathBuf,
+        source: Box<MermaidGanttParseError>,
+    },
+    MermaidGanttExport {
+        diagram_id: DiagramId,
+        path: PathBuf,
+        source: Box<MermaidGanttExportError>,
     },
     SequenceLayout {
         diagram_id: DiagramId,
@@ -397,6 +431,38 @@ impl fmt::Display for StoreError {
                 f,
                 "cannot export Mermaid class diagram {diagram_id} to {path:?}: {source}"
             ),
+            Self::MermaidErParse {
+                diagram_id,
+                path,
+                source,
+            } => write!(
+                f,
+                "cannot parse Mermaid er diagram {diagram_id} from {path:?}: {source}"
+            ),
+            Self::MermaidErExport {
+                diagram_id,
+                path,
+                source,
+            } => write!(
+                f,
+                "cannot export Mermaid er diagram {diagram_id} to {path:?}: {source}"
+            ),
+            Self::MermaidGanttParse {
+                diagram_id,
+                path,
+                source,
+            } => write!(
+                f,
+                "cannot parse Mermaid gantt diagram {diagram_id} from {path:?}: {source}"
+            ),
+            Self::MermaidGanttExport {
+                diagram_id,
+                path,
+                source,
+            } => write!(
+                f,
+                "cannot export Mermaid gantt diagram {diagram_id} to {path:?}: {source}"
+            ),
             Self::SequenceLayout {
                 diagram_id,
                 path,
@@ -485,6 +551,10 @@ impl std::error::Error for StoreError {
             Self::MermaidFlowchartExport { source, .. } => Some(source),
             Self::MermaidClassParse { source, .. } => Some(source),
             Self::MermaidClassExport { source, .. } => Some(source),
+            Self::MermaidErParse { source, .. } => Some(source),
+            Self::MermaidErExport { source, .. } => Some(source),
+            Self::MermaidGanttParse { source, .. } => Some(source),
+            Self::MermaidGanttExport { source, .. } => Some(source),
             Self::SequenceLayout { source, .. } => Some(source),
             Self::SequenceRender { source, .. } => Some(source),
             Self::FlowchartLayout { source, .. } => Some(source),
@@ -545,6 +615,8 @@ pub struct DiagramMeta {
     pub default_symbol_repository_id: Option<String>,
     pub flow_node_notes: BTreeMap<ObjectId, String>,
     pub sequence_participant_notes: BTreeMap<ObjectId, String>,
+    pub class_node_notes: BTreeMap<ObjectId, String>,
+    pub er_entity_notes: BTreeMap<ObjectId, String>,
     pub flow_node_symbols: BTreeMap<ObjectId, SymbolAnchor>,
     pub sequence_participant_symbols: BTreeMap<ObjectId, SymbolAnchor>,
 }
@@ -1253,7 +1325,10 @@ impl SessionFolder {
                             style: edge.style().map(ToOwned::to_owned),
                         })
                         .collect(),
-                    DiagramAst::Sequence(_) | DiagramAst::Class(_) => Vec::new(),
+                    DiagramAst::Sequence(_)
+                    | DiagramAst::Class(_)
+                    | DiagramAst::Er(_)
+                    | DiagramAst::Gantt(_) => Vec::new(),
                 };
 
                 let sequence_messages = match diagram.ast() {
@@ -1268,12 +1343,18 @@ impl SessionFolder {
                             text: msg.text().to_owned(),
                         })
                         .collect(),
-                    DiagramAst::Flowchart(_) | DiagramAst::Class(_) => Vec::new(),
+                    DiagramAst::Flowchart(_)
+                    | DiagramAst::Class(_)
+                    | DiagramAst::Er(_)
+                    | DiagramAst::Gantt(_) => Vec::new(),
                 };
 
                 let sequence_blocks = match diagram.ast() {
                     DiagramAst::Sequence(ast) => sequence_blocks_meta_from_ast(ast),
-                    DiagramAst::Flowchart(_) | DiagramAst::Class(_) => Vec::new(),
+                    DiagramAst::Flowchart(_)
+                    | DiagramAst::Class(_)
+                    | DiagramAst::Er(_)
+                    | DiagramAst::Gantt(_) => Vec::new(),
                 };
 
                 let flow_node_notes = match diagram.ast() {
@@ -1284,7 +1365,10 @@ impl SessionFolder {
                             node.note().map(|note| (node_id.clone(), note.to_owned()))
                         })
                         .collect(),
-                    DiagramAst::Sequence(_) | DiagramAst::Class(_) => BTreeMap::new(),
+                    DiagramAst::Sequence(_)
+                    | DiagramAst::Class(_)
+                    | DiagramAst::Er(_)
+                    | DiagramAst::Gantt(_) => BTreeMap::new(),
                 };
 
                 let sequence_participant_notes = match diagram.ast() {
@@ -1295,7 +1379,38 @@ impl SessionFolder {
                             participant.note().map(|note| (participant_id.clone(), note.to_owned()))
                         })
                         .collect(),
-                    DiagramAst::Flowchart(_) | DiagramAst::Class(_) => BTreeMap::new(),
+                    DiagramAst::Flowchart(_)
+                    | DiagramAst::Class(_)
+                    | DiagramAst::Er(_)
+                    | DiagramAst::Gantt(_) => BTreeMap::new(),
+                };
+
+                let class_node_notes = match diagram.ast() {
+                    DiagramAst::Class(ast) => ast
+                        .classes()
+                        .iter()
+                        .filter_map(|(class_id, class)| {
+                            class.note().map(|note| (class_id.clone(), note.to_owned()))
+                        })
+                        .collect(),
+                    DiagramAst::Sequence(_)
+                    | DiagramAst::Flowchart(_)
+                    | DiagramAst::Er(_)
+                    | DiagramAst::Gantt(_) => BTreeMap::new(),
+                };
+
+                let er_entity_notes = match diagram.ast() {
+                    DiagramAst::Er(ast) => ast
+                        .entities()
+                        .iter()
+                        .filter_map(|(entity_id, entity)| {
+                            entity.note().map(|note| (entity_id.clone(), note.to_owned()))
+                        })
+                        .collect(),
+                    DiagramAst::Sequence(_)
+                    | DiagramAst::Flowchart(_)
+                    | DiagramAst::Class(_)
+                    | DiagramAst::Gantt(_) => BTreeMap::new(),
                 };
 
                 let flow_node_symbols = match diagram.ast() {
@@ -1306,7 +1421,10 @@ impl SessionFolder {
                             node.symbol().map(|symbol| (node_id.clone(), symbol.clone()))
                         })
                         .collect(),
-                    DiagramAst::Sequence(_) | DiagramAst::Class(_) => BTreeMap::new(),
+                    DiagramAst::Sequence(_)
+                    | DiagramAst::Class(_)
+                    | DiagramAst::Er(_)
+                    | DiagramAst::Gantt(_) => BTreeMap::new(),
                 };
 
                 let sequence_participant_symbols = match diagram.ast() {
@@ -1319,7 +1437,10 @@ impl SessionFolder {
                                 .map(|symbol| (participant_id.clone(), symbol.clone()))
                         })
                         .collect(),
-                    DiagramAst::Flowchart(_) | DiagramAst::Class(_) => BTreeMap::new(),
+                    DiagramAst::Flowchart(_)
+                    | DiagramAst::Class(_)
+                    | DiagramAst::Er(_)
+                    | DiagramAst::Gantt(_) => BTreeMap::new(),
                 };
 
                 let diagram_meta = DiagramMeta {
@@ -1335,6 +1456,8 @@ impl SessionFolder {
                         .map(ToOwned::to_owned),
                     flow_node_notes,
                     sequence_participant_notes,
+                    class_node_notes,
+                    er_entity_notes,
                     flow_node_symbols,
                     sequence_participant_symbols,
                 };
@@ -1574,6 +1697,22 @@ impl SessionFolder {
                 DiagramKind::Class => {
                     DiagramAst::Class(parse_class_diagram(&mmd).map_err(|source| {
                         StoreError::MermaidClassParse {
+                            diagram_id: diagram_id.clone(),
+                            path: mmd_path.clone(),
+                            source: Box::new(source),
+                        }
+                    })?)
+                }
+                DiagramKind::Er => DiagramAst::Er(parse_er_diagram(&mmd).map_err(|source| {
+                    StoreError::MermaidErParse {
+                        diagram_id: diagram_id.clone(),
+                        path: mmd_path.clone(),
+                        source: Box::new(source),
+                    }
+                })?),
+                DiagramKind::Gantt => {
+                    DiagramAst::Gantt(parse_gantt_diagram(&mmd).map_err(|source| {
+                        StoreError::MermaidGanttParse {
                             diagram_id: diagram_id.clone(),
                             path: mmd_path.clone(),
                             source: Box::new(source),
@@ -1869,6 +2008,8 @@ pub enum DiagramMermaidReplaceError {
     ParseSequence(Box<MermaidSequenceParseError>),
     ParseFlowchart(Box<MermaidFlowchartParseError>),
     ParseClass(Box<MermaidClassParseError>),
+    ParseEr(Box<MermaidErParseError>),
+    ParseGantt(Box<MermaidGanttParseError>),
     AstKindMismatch(DiagramAstKindMismatch),
 }
 
@@ -1890,6 +2031,8 @@ impl fmt::Display for DiagramMermaidReplaceError {
             Self::ParseSequence(err) => write!(f, "cannot parse Mermaid sequence diagram: {err}"),
             Self::ParseFlowchart(err) => write!(f, "cannot parse Mermaid flowchart diagram: {err}"),
             Self::ParseClass(err) => write!(f, "cannot parse Mermaid class diagram: {err}"),
+            Self::ParseEr(err) => write!(f, "cannot parse Mermaid er diagram: {err}"),
+            Self::ParseGantt(err) => write!(f, "cannot parse Mermaid gantt diagram: {err}"),
             Self::AstKindMismatch(err) => write!(f, "{err}"),
         }
     }
@@ -1930,6 +2073,22 @@ fn collect_stable_object_ids(ast: &DiagramAst) -> BTreeSet<String> {
                 ids.insert(id.to_string());
             }
         }
+        DiagramAst::Er(er) => {
+            for id in er.entities().keys() {
+                ids.insert(id.to_string());
+            }
+            for id in er.relationships().keys() {
+                ids.insert(id.to_string());
+            }
+        }
+        DiagramAst::Gantt(gantt) => {
+            for id in gantt.tasks().keys() {
+                ids.insert(id.to_string());
+            }
+            for sec in gantt.sections() {
+                ids.insert(sec.section_id().to_string());
+            }
+        }
     }
     ids
 }
@@ -1956,6 +2115,10 @@ pub fn replace_diagram_from_mermaid(
                 found = Some(DiagramKind::Flowchart);
             } else if trimmed.starts_with("classDiagram") {
                 found = Some(DiagramKind::Class);
+            } else if trimmed.starts_with("erDiagram") {
+                found = Some(DiagramKind::Er);
+            } else if trimmed.starts_with("gantt") {
+                found = Some(DiagramKind::Gantt);
             }
             break;
         }
@@ -1989,6 +2152,14 @@ pub fn replace_diagram_from_mermaid(
         DiagramKind::Class => DiagramAst::Class(
             parse_class_diagram(mermaid)
                 .map_err(|err| DiagramMermaidReplaceError::ParseClass(Box::new(err)))?,
+        ),
+        DiagramKind::Er => DiagramAst::Er(
+            parse_er_diagram(mermaid)
+                .map_err(|err| DiagramMermaidReplaceError::ParseEr(Box::new(err)))?,
+        ),
+        DiagramKind::Gantt => DiagramAst::Gantt(
+            parse_gantt_diagram(mermaid)
+                .map_err(|err| DiagramMermaidReplaceError::ParseGantt(Box::new(err)))?,
         ),
     };
 

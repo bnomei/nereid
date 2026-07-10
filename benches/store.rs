@@ -34,7 +34,7 @@ fn checksum_compute_only_save(session: &Session) -> u64 {
                 acc = acc.wrapping_mul(131).wrapping_add(layout.messages().len() as u64);
                 acc = acc.wrapping_mul(131).wrapping_add(rendered.len() as u64);
             }
-            DiagramAst::Class(_) => {}
+            DiagramAst::Class(_) | DiagramAst::Er(_) | DiagramAst::Gantt(_) => {}
             DiagramAst::Flowchart(ast) => {
                 let mmd = export_flowchart(black_box(ast)).expect("export_flowchart");
                 let layout = layout_flowchart(black_box(ast)).expect("layout_flowchart");

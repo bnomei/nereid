@@ -332,7 +332,9 @@ pub fn apply_ops(
     diagram.set_ast(new_ast).map_err(|mismatch| {
         let op_kind = match mismatch.found() {
             DiagramKind::Sequence => OpKind::Seq,
-            DiagramKind::Flowchart | DiagramKind::Class => OpKind::Flow,
+            DiagramKind::Flowchart | DiagramKind::Class | DiagramKind::Er | DiagramKind::Gantt => {
+                OpKind::Flow
+            }
         };
         ApplyError::KindMismatch { diagram_kind: mismatch.expected(), op_kind }
     })?;
