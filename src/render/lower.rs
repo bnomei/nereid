@@ -17,7 +17,7 @@ use crate::model::seq_ast::SequenceAst;
 
 use super::scene::{
     CapKind, EdgeStroke, GraphCompartment, GraphEdge, GraphModel, GraphNode, RenderScene,
-    TrackModel, TrackSpanStyle,
+    TrackModel,
 };
 
 /// Lower a flowchart AST into the shared graph scene.
@@ -139,18 +139,22 @@ pub fn lower_class(ast: &ClassAst) -> GraphModel {
         let stroke = class_relation_stroke(rel.kind(), rel.raw_connector());
         // Bridge connector: use a flow-compatible token so existing paint shows arrows when
         // CapKind is not yet fully wired; store semantic caps on the edge for future paint.
-        let bridge_connector = match (start_cap, end_cap) {
-            (CapKind::Arrow, CapKind::Arrow) => Some("<-->".to_owned()),
-            (CapKind::Arrow, _) => Some("<--".to_owned()),
-            (_, CapKind::Arrow) => Some("-->".to_owned()),
-            (CapKind::Circle | CapKind::DiamondHollow | CapKind::ZeroOrOne, _) => {
-                Some("o--".to_owned())
-            }
-            (_, CapKind::Circle | CapKind::DiamondHollow | CapKind::ZeroOrOne) => {
-                Some("--o".to_owned())
-            }
-            _ => Some("-->".to_owned()),
-        };
+        // Prefer raw Mermaid token when present so dashed/no-cap links do not gain false arrows
+        // if the model ever falls through to flowchart paint.
+        let bridge_connector =
+            rel.raw_connector().map(str::to_owned).or_else(|| match (start_cap, end_cap) {
+                (CapKind::Arrow, CapKind::Arrow) => Some("<-->".to_owned()),
+                (CapKind::Arrow, _) => Some("<--".to_owned()),
+                (_, CapKind::Arrow) => Some("-->".to_owned()),
+                (CapKind::Circle | CapKind::DiamondHollow | CapKind::ZeroOrOne, _) => {
+                    Some("o--".to_owned())
+                }
+                (_, CapKind::Circle | CapKind::DiamondHollow | CapKind::ZeroOrOne) => {
+                    Some("--o".to_owned())
+                }
+                (CapKind::None, CapKind::None) => Some("---".to_owned()),
+                _ => Some("---".to_owned()),
+            });
         let edge = GraphEdge::new(rel.from_class_id().clone(), rel.to_class_id().clone())
             .with_label(rel.label().map(str::to_owned))
             .with_connector(bridge_connector)
@@ -184,12 +188,13 @@ pub fn lower_er(ast: &ErAst) -> GraphModel {
             ErStroke::Identifying => EdgeStroke::Solid,
             ErStroke::NonIdentifying => EdgeStroke::Dashed,
         };
-        // Bridge connector for flowchart paint fallback when no compartments.
-        let bridge = match (start_cap, end_cap) {
-            (CapKind::ZeroOrOne, _) => Some("o--".to_owned()),
-            (_, CapKind::ZeroOrOne) => Some("--o".to_owned()),
-            _ => Some("-->".to_owned()),
-        };
+        // Prefer raw Mermaid token; never invent arrow heads for pure cardinality ends.
+        let bridge =
+            rel.raw_connector().map(str::to_owned).or_else(|| match (start_cap, end_cap) {
+                (CapKind::ZeroOrOne, _) => Some("o--".to_owned()),
+                (_, CapKind::ZeroOrOne) => Some("--o".to_owned()),
+                _ => Some("---".to_owned()),
+            });
         let edge = GraphEdge::new(rel.from_entity_id().clone(), rel.to_entity_id().clone())
             .with_label(rel.label().map(str::to_owned))
             .with_connector(bridge)
@@ -200,16 +205,9 @@ pub fn lower_er(ast: &ErAst) -> GraphModel {
     model
 }
 
-/// Lower gantt into track scene (bar spans; layout resolved in track paint).
+/// Lower gantt into track scene (domain AST retained for multi-col bar paint).
 pub fn lower_gantt(ast: &GanttAst) -> TrackModel {
-    // Carry gantt as an empty sequence shell + bar style; dedicated gantt paint reads GanttAst
-    // from the domain path. TrackModel currently wraps SequenceAst — store a marker sequence
-    // and use default_span_style Bar so pipeline dispatches gantt paint via domain AST.
-    //
-    // Pipeline renders Gantt through `render_gantt_unicode` directly from domain AST; this
-    // lowerer exists for family tagging.
-    let _ = ast;
-    TrackModel::from_sequence(SequenceAst::default()).with_default_span_style(TrackSpanStyle::Bar)
+    TrackModel::from_gantt(ast.clone())
 }
 
 /// Lower any supported diagram AST into a render scene.
