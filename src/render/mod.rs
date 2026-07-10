@@ -18,6 +18,9 @@ use crate::model::ObjectRef;
 
 pub mod diagram;
 pub mod flowchart;
+pub mod lower;
+pub mod pipeline;
+pub mod scene;
 pub mod sequence;
 #[cfg(test)]
 mod test_utils;
@@ -27,6 +30,18 @@ pub mod walkthrough;
 pub use diagram::{render_diagram_unicode, render_diagram_unicode_annotated, DiagramRenderError};
 pub use flowchart::{
     render_flowchart_unicode, render_flowchart_unicode_annotated, FlowchartRenderError,
+};
+pub use lower::{lower_diagram_ast, lower_flowchart, lower_sequence};
+pub use pipeline::{
+    render_ast_unicode_annotated_with_options, render_ast_unicode_with_options,
+    render_graph_unicode_annotated_with_options, render_graph_unicode_with_options,
+    render_scene_unicode_annotated_with_options, render_scene_unicode_with_options,
+    render_track_unicode_annotated_with_options, render_track_unicode_with_options,
+    PipelineRenderError,
+};
+pub use scene::{
+    CapKind, EdgeStroke, GraphCompartment, GraphEdge, GraphModel, GraphNode, RenderScene,
+    TrackModel, TrackSpanStyle,
 };
 pub use sequence::{
     render_sequence_unicode, render_sequence_unicode_annotated, SequenceRenderError,

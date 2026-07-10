@@ -832,29 +832,24 @@ fn first_outward_direction_from_end(points: &[(usize, usize)]) -> Option<(i32, i
 }
 
 fn edge_endpoint_cap_kinds(connector: Option<&str>) -> (Option<EndpointCapKind>, Option<EndpointCapKind>) {
-    let op = connector.unwrap_or("-->").trim();
-    if op.is_empty() {
-        return (None, None);
-    }
-
-    let start = match op.chars().next() {
-        Some('<') => Some(EndpointCapKind::Arrow),
-        Some('o') => Some(EndpointCapKind::Circle),
-        Some('x') => Some(EndpointCapKind::Cross),
-        _ => None,
+    // Single source of truth: CapKind::from_flow_connector (scene). Map to local paint enum.
+    use crate::render::scene::CapKind;
+    let (start, end) = CapKind::from_flow_connector(connector);
+    let map = |kind: CapKind| -> Option<EndpointCapKind> {
+        match kind {
+            CapKind::None => None,
+            CapKind::Arrow => Some(EndpointCapKind::Arrow),
+            CapKind::Circle | CapKind::ZeroOrOne => Some(EndpointCapKind::Circle),
+            CapKind::Cross => Some(EndpointCapKind::Cross),
+            // Extended kinds land in graph paint later; flowchart path only knows arrow/circle/cross.
+            CapKind::DiamondFilled
+            | CapKind::DiamondHollow
+            | CapKind::TriangleHollow
+            | CapKind::ExactlyOne
+            | CapKind::CrowFoot => None,
+        }
     };
-
-    let end = if op.ends_with('o') {
-        Some(EndpointCapKind::Circle)
-    } else if op.ends_with('x') {
-        Some(EndpointCapKind::Cross)
-    } else if op.ends_with('>') {
-        Some(EndpointCapKind::Arrow)
-    } else {
-        None
-    };
-
-    (start, end)
+    (map(start), map(end))
 }
 
 fn endpoint_cap_char(kind: EndpointCapKind, outward_dx: i32, outward_dy: i32) -> char {

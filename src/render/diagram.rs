@@ -6,21 +6,20 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Kind-dispatching diagram renderer: layout then Unicode canvas output.
+//! Kind-dispatching diagram renderer via the coherent scene pipeline.
+//!
+//! Domain ASTs lower to graph/track scenes; family layout + paint live in [`super::pipeline`].
 
 use std::fmt;
 
-use crate::layout::{layout_flowchart, layout_sequence, FlowchartLayoutError, SequenceLayoutError};
-use crate::model::diagram::{Diagram, DiagramAst};
+use crate::layout::{FlowchartLayoutError, SequenceLayoutError};
+use crate::model::diagram::Diagram;
 
-use super::flowchart::{
-    render_flowchart_unicode_annotated_with_options, render_flowchart_unicode_with_options,
-    FlowchartRenderError,
+use super::flowchart::FlowchartRenderError;
+use super::pipeline::{
+    render_ast_unicode_annotated_with_options, render_ast_unicode_with_options, PipelineRenderError,
 };
-use super::sequence::{
-    render_sequence_unicode_annotated_with_options, render_sequence_unicode_with_options,
-    SequenceRenderError,
-};
+use super::sequence::SequenceRenderError;
 use super::{AnnotatedRender, RenderOptions};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -77,6 +76,17 @@ impl From<FlowchartRenderError> for DiagramRenderError {
     }
 }
 
+impl From<PipelineRenderError> for DiagramRenderError {
+    fn from(value: PipelineRenderError) -> Self {
+        match value {
+            PipelineRenderError::SequenceLayout(err) => Self::SequenceLayout(err),
+            PipelineRenderError::FlowchartLayout(err) => Self::FlowchartLayout(err),
+            PipelineRenderError::SequenceRender(err) => Self::SequenceRender(err),
+            PipelineRenderError::FlowchartRender(err) => Self::FlowchartRender(err),
+        }
+    }
+}
+
 pub fn render_diagram_unicode(diagram: &Diagram) -> Result<String, DiagramRenderError> {
     render_diagram_unicode_with_options(diagram, RenderOptions::default())
 }
@@ -85,16 +95,7 @@ pub fn render_diagram_unicode_with_options(
     diagram: &Diagram,
     options: RenderOptions,
 ) -> Result<String, DiagramRenderError> {
-    match diagram.ast() {
-        DiagramAst::Sequence(ast) => {
-            let layout = layout_sequence(ast)?;
-            Ok(render_sequence_unicode_with_options(ast, &layout, options)?)
-        }
-        DiagramAst::Flowchart(ast) => {
-            let layout = layout_flowchart(ast)?;
-            Ok(render_flowchart_unicode_with_options(ast, &layout, options)?)
-        }
-    }
+    Ok(render_ast_unicode_with_options(diagram.ast(), options)?)
 }
 
 pub fn render_diagram_unicode_annotated(
@@ -107,26 +108,7 @@ pub fn render_diagram_unicode_annotated_with_options(
     diagram: &Diagram,
     options: RenderOptions,
 ) -> Result<AnnotatedRender, DiagramRenderError> {
-    match diagram.ast() {
-        DiagramAst::Sequence(ast) => {
-            let layout = layout_sequence(ast)?;
-            Ok(render_sequence_unicode_annotated_with_options(
-                diagram.diagram_id(),
-                ast,
-                &layout,
-                options,
-            )?)
-        }
-        DiagramAst::Flowchart(ast) => {
-            let layout = layout_flowchart(ast)?;
-            Ok(render_flowchart_unicode_annotated_with_options(
-                diagram.diagram_id(),
-                ast,
-                &layout,
-                options,
-            )?)
-        }
-    }
+    Ok(render_ast_unicode_annotated_with_options(diagram.diagram_id(), diagram.ast(), options)?)
 }
 
 #[cfg(test)]
@@ -137,6 +119,7 @@ mod tests {
         SequenceAst, SequenceMessage, SequenceMessageKind, SequenceParticipant,
     };
     use crate::model::{Diagram, DiagramAst, DiagramId};
+    use crate::render::lower::lower_diagram_ast;
 
     fn oid(value: &str) -> ObjectId {
         ObjectId::new(value).expect("object id")
@@ -168,6 +151,7 @@ mod tests {
             rendered,
             " ┌───────┐        ┌─────┐\n │ Alice │        │ Bob │\n └───────┘        └─────┘\n     │               │\n     │               │\n     ├────Hello─────▶│\n     │               │"
         );
+        assert_eq!(lower_diagram_ast(diagram.ast()).family_name(), "track");
     }
 
     #[test]
@@ -182,5 +166,6 @@ mod tests {
             rendered,
             "┌───┐   ┌───┐   ┌───┐\n│ A ├──▶│ B ├──▶│ D │\n└───┘  │└───┘  │└───┘\n       │       │\n       │       │\n       │┌───┐  │\n       └┤ C ├──┘\n        └───┘"
         );
+        assert_eq!(lower_diagram_ast(diagram.ast()).family_name(), "graph");
     }
 }

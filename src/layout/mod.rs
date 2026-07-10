@@ -12,10 +12,14 @@
 //! Unicode renderers. Layout is pure: no I/O; failures are unrouteable or incomplete graphs.
 
 pub mod flowchart;
+pub mod graph;
 pub mod sequence;
+pub mod track;
 
 pub use flowchart::{
     layout_flowchart, route_flowchart_edges_orthogonal, FlowNodePlacement, FlowchartLayout,
     FlowchartLayoutError, GridPoint,
 };
+pub use graph::layout_graph;
 pub use sequence::{layout_sequence, SequenceLayout, SequenceLayoutError};
+pub use track::layout_track;
