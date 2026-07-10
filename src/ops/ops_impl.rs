@@ -674,9 +674,18 @@ fn record_structure_prune_delta(
             delta.record_updated(seq_section_ref(diagram_id, section_id));
         }
     }
+    for section_id in &after_sections {
+        if !before.section_ids.contains(section_id) {
+            // Synthetic Main (or other structure) created during prune must appear in added.
+            delta.record_added(seq_section_ref(diagram_id, section_id));
+        }
+    }
     for block_id in &after_blocks {
         if before.block_ids.contains(block_id) {
             delta.record_updated(seq_block_ref(diagram_id, block_id));
+        } else {
+            // Symmetric with sections: newly materialized blocks are rare but must be listed.
+            delta.record_added(seq_block_ref(diagram_id, block_id));
         }
     }
 }

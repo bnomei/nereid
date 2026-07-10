@@ -1425,6 +1425,119 @@ fn remove_message_keeps_parent_block_when_nested_content_survives() {
 }
 
 #[test]
+fn remove_message_records_synthetic_main_section_in_delta_added() {
+    use crate::format::mermaid::sequence::export_sequence_diagram;
+    use crate::model::seq_ast::{
+        SequenceBlock, SequenceBlockKind, SequenceMessage, SequenceMessageKind, SequenceSection,
+        SequenceSectionKind,
+    };
+    use crate::model::{CategoryPath, Diagram, ObjectRef};
+
+    // Parent Main holds only M1; nested block holds M2. Removing M1 empties parent sections and
+    // synthesizes Main `b:0001:main` with nested membership — that new section id must appear in
+    // delta.added so diagram_diff / MCP clients learn the live ref.
+    let a = ObjectId::new("p:a").expect("id");
+    let b = ObjectId::new("p:b").expect("id");
+    let m1 = ObjectId::new("m:0001").expect("id");
+    let m2 = ObjectId::new("m:0002").expect("id");
+    let parent_main = ObjectId::new("sec:0001:00").expect("id");
+    let block_id = ObjectId::new("b:0001").expect("id");
+    let synthetic_main = ObjectId::new("b:0001:main").expect("id");
+
+    let mut ast = SequenceAst::default();
+    ast.participants_mut().insert(a.clone(), SequenceParticipant::new("A"));
+    ast.participants_mut().insert(b.clone(), SequenceParticipant::new("B"));
+    ast.messages_mut().push(SequenceMessage::new(
+        m1.clone(),
+        a.clone(),
+        b.clone(),
+        SequenceMessageKind::Sync,
+        "outer",
+        1000,
+    ));
+    ast.messages_mut().push(SequenceMessage::new(
+        m2.clone(),
+        b.clone(),
+        a.clone(),
+        SequenceMessageKind::Sync,
+        "inner",
+        2000,
+    ));
+    ast.blocks_mut().push(SequenceBlock::new(
+        block_id.clone(),
+        SequenceBlockKind::Alt,
+        Some("outer".to_owned()),
+        vec![SequenceSection::new(
+            parent_main.clone(),
+            SequenceSectionKind::Main,
+            None,
+            vec![m1.clone()],
+        )],
+        vec![SequenceBlock::new(
+            ObjectId::new("b:0002").expect("id"),
+            SequenceBlockKind::Loop,
+            Some("inner".to_owned()),
+            vec![SequenceSection::new(
+                ObjectId::new("sec:0002:00").expect("id"),
+                SequenceSectionKind::Main,
+                None,
+                vec![m2.clone()],
+            )],
+            Vec::new(),
+        )],
+    ));
+
+    let diagram_id = DiagramId::new("d:1").expect("id");
+    let mut diagram = Diagram::new(diagram_id.clone(), "seq", DiagramAst::Sequence(ast));
+
+    let result =
+        apply_ops(&mut diagram, 0, &[Op::Seq(SeqOp::RemoveMessage { message_id: m1.clone() })])
+            .expect("remove message that triggers synthetic Main");
+
+    let expected_synthetic = ObjectRef::new(
+        diagram_id.clone(),
+        CategoryPath::new(vec!["seq".to_owned(), "section".to_owned()]).expect("category"),
+        synthetic_main.clone(),
+    );
+    let expected_removed_section = ObjectRef::new(
+        diagram_id.clone(),
+        CategoryPath::new(vec!["seq".to_owned(), "section".to_owned()]).expect("category"),
+        parent_main.clone(),
+    );
+    let expected_removed_message = ObjectRef::new(
+        diagram_id,
+        CategoryPath::new(vec!["seq".to_owned(), "message".to_owned()]).expect("category"),
+        m1.clone(),
+    );
+
+    assert!(
+        result.delta.added.contains(&expected_synthetic),
+        "synthetic Main section must appear in delta.added; got added={:?}",
+        result.delta.added,
+    );
+    assert!(
+        result.delta.removed.contains(&expected_removed_section),
+        "old emptied Main should be removed; got removed={:?}",
+        result.delta.removed,
+    );
+    assert!(
+        result.delta.removed.contains(&expected_removed_message),
+        "removed message should be listed; got removed={:?}",
+        result.delta.removed,
+    );
+    assert!(
+        !result.delta.updated.iter().any(|r| r.object_id() == &synthetic_main),
+        "synthetic Main must not also be listed as updated",
+    );
+
+    let DiagramAst::Sequence(ast) = diagram.ast() else { panic!("sequence") };
+    assert_eq!(ast.blocks()[0].sections().len(), 1);
+    assert_eq!(ast.blocks()[0].sections()[0].section_id(), &synthetic_main);
+    assert_eq!(ast.blocks()[0].sections()[0].message_ids(), &[m2.clone()]);
+    export_sequence_diagram(ast).expect("export after synthetic Main recovery");
+}
+
+#[test]
 fn remove_message_keeps_single_main_when_nested_and_main_remain() {
     use crate::format::mermaid::sequence::export_sequence_diagram;
     use crate::model::seq_ast::{
