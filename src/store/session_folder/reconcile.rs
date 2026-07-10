@@ -104,9 +104,9 @@ pub(crate) fn stable_id_map_from_ast(ast: &DiagramAst) -> DiagramStableIdMap {
                 if !task.name().is_empty() && name_counts.get(task.name()) == Some(&1) {
                     by_name.entry(task.name().to_owned()).or_insert_with(|| task_id.to_string());
                 }
-                by_fingerprint
-                    .entry(gantt_task_fingerprint(gantt_ast, task_id, task))
-                    .or_insert_with(|| task_id.to_string());
+                for fingerprint in gantt_task_fingerprints(gantt_ast, task_id, task) {
+                    by_fingerprint.entry(fingerprint).or_insert_with(|| task_id.to_string());
+                }
             }
             DiagramStableIdMap { by_mermaid_id, by_name, by_fingerprint }
         }
@@ -135,47 +135,18 @@ fn gantt_task_base_fingerprint(ast: &GanttAst, task: &GanttTask) -> String {
     )
 }
 
-fn gantt_task_fingerprint(ast: &GanttAst, task_id: &ObjectId, task: &GanttTask) -> String {
+fn gantt_task_fingerprints(ast: &GanttAst, task_id: &ObjectId, task: &GanttTask) -> Vec<String> {
     let base = gantt_task_base_fingerprint(ast, task);
-    let matching_task_count = ast
-        .tasks()
-        .values()
-        .filter(|candidate| gantt_task_base_fingerprint(ast, candidate) == base)
-        .count();
-    if matching_task_count == 1 {
-        return base;
-    }
-    let section_context = ast
+    let section_contexts = ast
         .sections()
         .iter()
         .enumerate()
         .find(|(_, section)| section.task_ids().contains(task_id))
         .map(|(section_index, section)| {
-            let matching_named_sections = ast
-                .sections()
+            let section_occurrence = ast.sections()[..section_index]
                 .iter()
-                .filter(|candidate| {
-                    candidate.name() == section.name()
-                        && candidate.task_ids().iter().any(|candidate_id| {
-                            ast.tasks().get(candidate_id).is_some_and(|candidate| {
-                                gantt_task_base_fingerprint(ast, candidate) == base
-                            })
-                        })
-                })
+                .filter(|candidate| candidate.name() == section.name())
                 .count();
-            let section_occurrence = (matching_named_sections > 1).then(|| {
-                ast.sections()[..section_index]
-                    .iter()
-                    .filter(|candidate| {
-                        candidate.name() == section.name()
-                            && candidate.task_ids().iter().any(|candidate_id| {
-                                ast.tasks().get(candidate_id).is_some_and(|candidate| {
-                                    gantt_task_base_fingerprint(ast, candidate) == base
-                                })
-                            })
-                    })
-                    .count()
-            });
             let occurrence = section
                 .task_ids()
                 .iter()
@@ -186,13 +157,19 @@ fn gantt_task_fingerprint(ast: &GanttAst, task_id: &ObjectId, task: &GanttTask) 
                     })
                 })
                 .count();
-            format!(
-                "section={:?};section_occurrence={section_occurrence:?};occurrence={occurrence}",
-                section.name()
-            )
+            vec![
+                format!(
+                    "section={:?};section_occurrence={section_occurrence};occurrence={occurrence}",
+                    section.name()
+                ),
+                format!("section={:?};occurrence={occurrence}", section.name()),
+            ]
         })
-        .unwrap_or_else(|| "section=<unsectioned>;section_occurrence=0;occurrence=0".to_owned());
-    format!("{base};{section_context}")
+        .unwrap_or_else(|| vec!["section=<unsectioned>;occurrence=0".to_owned()]);
+    let mut fingerprints =
+        section_contexts.into_iter().map(|context| format!("{base};{context}")).collect::<Vec<_>>();
+    fingerprints.push(base);
+    fingerprints
 }
 
 fn flow_node_mermaid_id(node_id: &ObjectId, mermaid_id: Option<&str>) -> Option<String> {
@@ -494,10 +471,9 @@ pub(crate) fn reconcile_gantt_tasks(ast: &mut GanttAst, sidecar: &DiagramMeta) {
             .mermaid_tag()
             .and_then(|tag| sidecar.stable_id_map.by_mermaid_id.get(tag))
             .or_else(|| {
-                sidecar
-                    .stable_id_map
-                    .by_fingerprint
-                    .get(&gantt_task_fingerprint(ast, parsed_id, task))
+                gantt_task_fingerprints(ast, parsed_id, task)
+                    .into_iter()
+                    .find_map(|fingerprint| sidecar.stable_id_map.by_fingerprint.get(&fingerprint))
             })
             .or_else(|| {
                 (name_counts.get(task.name()) == Some(&1))
