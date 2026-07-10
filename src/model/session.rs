@@ -103,6 +103,28 @@ impl Session {
             (DiagramAst::Flowchart(ast), [left, right]) if left == "flow" && right == "edge" => {
                 ast.edges().contains_key(object_id)
             }
+            (DiagramAst::Class(ast), [left, right]) if left == "class" && right == "class" => {
+                ast.classes().contains_key(object_id)
+            }
+            (DiagramAst::Class(ast), [left, right]) if left == "class" && right == "relation" => {
+                ast.relations().contains_key(object_id)
+            }
+            (DiagramAst::Er(ast), [left, right]) if left == "er" && right == "entity" => {
+                ast.entities().contains_key(object_id)
+            }
+            (DiagramAst::Er(ast), [left, right]) if left == "er" && right == "relationship" => {
+                ast.relationships().contains_key(object_id)
+            }
+            (DiagramAst::Gantt(ast), [left, right]) if left == "gantt" && right == "task" => {
+                ast.tasks().contains_key(object_id)
+            }
+            (DiagramAst::Gantt(ast), [left, right]) if left == "gantt" && right == "lane" => {
+                // Lanes are paint-derived; accept known note keys or the stable lane:NNNN form.
+                ast.lane_notes().contains_key(object_id)
+                    || object_id.as_str().strip_prefix("lane:").is_some_and(|rest| {
+                        rest.len() == 4 && rest.chars().all(|c| c.is_ascii_digit())
+                    })
+            }
             _ => false,
         }
     }
