@@ -1108,6 +1108,44 @@ fn removed_walkthrough_does_not_resurrect_after_save_load(ctx: SessionFolderTest
     assert!(!loaded.walkthroughs().contains_key(&w2));
 }
 
+#[rstest]
+fn walkthrough_gc_cancels_ascii_export_by_text_path_and_removes_artifacts(
+    ctx: SessionFolderTestCtx,
+) {
+    let folder = &ctx.folder;
+
+    let mut session = Session::new(SessionId::new("s1").unwrap());
+    let w1 = WalkthroughId::new("w1").unwrap();
+    session.walkthroughs_mut().insert(w1.clone(), Walkthrough::new(w1.clone(), "One"));
+    folder.save_session(&session).unwrap();
+    folder.flush_ascii_exports();
+
+    let json_path = folder.walkthrough_json_path(&w1);
+    let ascii_path = folder.walkthrough_ascii_path(&w1);
+    assert!(json_path.is_file(), "precondition: walkthrough JSON written");
+    assert!(ascii_path.is_file(), "precondition: walkthrough ascii written");
+
+    // Bump rev so save schedules a new text-path-keyed export, then immediately drop the
+    // walkthrough. GC must cancel both `{stem}.wt.json` and `{stem}.ascii.txt` keys and
+    // delete artifacts so the export cannot leave an orphan sidecar after flush.
+    {
+        let walkthrough = session.walkthroughs_mut().get_mut(&w1).unwrap();
+        walkthrough.set_title("Updated");
+        walkthrough.bump_rev();
+    }
+    folder.save_session(&session).unwrap();
+
+    session.walkthroughs_mut().remove(&w1);
+    folder.save_session(&session).unwrap();
+    folder.flush_ascii_exports();
+
+    assert!(!json_path.is_file(), "GC must delete walkthrough JSON");
+    assert!(
+        !ascii_path.is_file(),
+        "GC must cancel text-path-keyed export and leave no orphan ascii sidecar",
+    );
+}
+
 #[cfg(unix)]
 #[rstest]
 fn walkthrough_gc_refuses_symlinked_walkthroughs_dir(ctx: SessionFolderTestCtx) {

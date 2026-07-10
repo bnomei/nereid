@@ -270,12 +270,16 @@ impl AsciiExportManager {
                         if !text.ends_with('\n') {
                             text.push('\n');
                         }
-                        let _ = write_atomic_in_session_if_session_dir_exists(
-                            &session_dir,
-                            &text_path,
-                            text.as_bytes(),
-                            durability,
-                        );
+                        // Re-check after render: GC may have cancelled/deleted while we
+                        // were working. Avoid resurrecting orphan `*.ascii.txt` sidecars.
+                        if json_path.is_file() {
+                            let _ = write_atomic_in_session_if_session_dir_exists(
+                                &session_dir,
+                                &text_path,
+                                text.as_bytes(),
+                                durability,
+                            );
+                        }
                     }
                 }
             }
@@ -1868,7 +1872,13 @@ impl SessionFolder {
                 });
             }
 
-            ascii_exports().cancel(&path);
+            // Pending walkthrough ascii exports are keyed by text path (`*.ascii.txt`).
+            // Cancel both sibling keys so GC works whether we encounter the json or ascii
+            // entry first (cancel by directory-entry path alone misses the scheduled key).
+            let json_path = walkthroughs_dir.join(format!("{walkthrough_id}.wt.json"));
+            let ascii_path = walkthroughs_dir.join(format!("{walkthrough_id}.ascii.txt"));
+            ascii_exports().cancel(&json_path);
+            ascii_exports().cancel(&ascii_path);
 
             match fs::remove_file(&path) {
                 Ok(()) => {}
