@@ -2046,13 +2046,13 @@ impl fmt::Display for DiagramMermaidReplaceError {
                 write!(f, "mermaid kind mismatch (expected {expected:?}, found {found:?})")
             }
             Self::MissingOrUnknownKind { first_line: None } => f.write_str(
-                "expected 'flowchart'/'graph', 'sequenceDiagram', or 'classDiagram' as the first non-empty line",
+                "expected 'flowchart'/'graph', 'sequenceDiagram', 'classDiagram', 'erDiagram', or 'gantt' as the first non-empty line",
             ),
             Self::MissingOrUnknownKind {
                 first_line: Some(line),
             } => write!(
                 f,
-                "expected 'flowchart'/'graph', 'sequenceDiagram', or 'classDiagram' as the first non-empty line, found: {line}"
+                "expected 'flowchart'/'graph', 'sequenceDiagram', 'classDiagram', 'erDiagram', or 'gantt' as the first non-empty line, found: {line}"
             ),
             Self::ParseSequence(err) => write!(f, "cannot parse Mermaid sequence diagram: {err}"),
             Self::ParseFlowchart(err) => write!(f, "cannot parse Mermaid flowchart diagram: {err}"),
