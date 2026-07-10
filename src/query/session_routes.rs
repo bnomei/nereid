@@ -184,6 +184,17 @@ fn derive_adjacency(session: &Session) -> BTreeMap<ObjectRef, BTreeSet<ObjectRef
                 for id in ast.tasks().keys() {
                     insert_node(&mut adjacency, gantt_task_ref(diagram_id, id));
                 }
+                // Wire `after` dependency chains as undirected route hops.
+                for (id, task) in ast.tasks() {
+                    if let crate::model::GanttTaskStart::After(dep) = task.start() {
+                        if ast.tasks().contains_key(dep) {
+                            let from = gantt_task_ref(diagram_id, id);
+                            let to = gantt_task_ref(diagram_id, dep);
+                            insert_edge(&mut adjacency, from.clone(), to.clone());
+                            insert_edge(&mut adjacency, to, from);
+                        }
+                    }
+                }
             }
             DiagramAst::Sequence(ast) => {
                 for participant_id in ast.participants().keys() {
