@@ -484,6 +484,129 @@ fn apply_seq_update_message_rejects_missing_to_participant() {
 }
 
 #[test]
+fn apply_seq_add_message_rejects_empty_text() {
+    let diagram_id = DiagramId::new("d:add-empty-text").expect("diagram id");
+    let diagram = crate::model::Diagram::new(
+        diagram_id,
+        "seq",
+        DiagramAst::Sequence(crate::model::SequenceAst::default()),
+    );
+
+    let alice = ObjectId::new("p:alice").expect("participant id");
+    let bob = ObjectId::new("p:bob").expect("participant id");
+    let message_id = ObjectId::new("m:1").expect("message id");
+
+    for text in ["", "   ", "\t\n"] {
+        let mut diagram = diagram.clone();
+        let err = apply_ops(
+            &mut diagram,
+            0,
+            &[
+                Op::Seq(SeqOp::AddParticipant {
+                    participant_id: alice.clone(),
+                    mermaid_name: "Alice".to_owned(),
+                }),
+                Op::Seq(SeqOp::AddParticipant {
+                    participant_id: bob.clone(),
+                    mermaid_name: "Bob".to_owned(),
+                }),
+                Op::Seq(SeqOp::AddMessage {
+                    message_id: message_id.clone(),
+                    from_participant_id: alice.clone(),
+                    to_participant_id: bob.clone(),
+                    kind: crate::model::SequenceMessageKind::Sync,
+                    arrow: None,
+                    text: text.to_owned(),
+                    order_key: 0,
+                    section_id: None,
+                }),
+            ],
+        )
+        .unwrap_err();
+        assert_eq!(
+            err,
+            super::ApplyError::InvalidSeqMessageText {
+                text: text.to_owned(),
+            },
+            "expected rejection for {text:?}"
+        );
+        assert_eq!(diagram.rev(), 0, "failed apply must not bump rev");
+    }
+}
+
+#[test]
+fn apply_seq_update_message_rejects_empty_text() {
+    let diagram_id = DiagramId::new("d:update-empty-text").expect("diagram id");
+    let mut diagram = crate::model::Diagram::new(
+        diagram_id,
+        "seq",
+        DiagramAst::Sequence(crate::model::SequenceAst::default()),
+    );
+
+    let alice = ObjectId::new("p:alice").expect("participant id");
+    let bob = ObjectId::new("p:bob").expect("participant id");
+    let message_id = ObjectId::new("m:1").expect("message id");
+
+    let setup = [
+        Op::Seq(SeqOp::AddParticipant {
+            participant_id: alice.clone(),
+            mermaid_name: "Alice".to_owned(),
+        }),
+        Op::Seq(SeqOp::AddParticipant {
+            participant_id: bob.clone(),
+            mermaid_name: "Bob".to_owned(),
+        }),
+        Op::Seq(SeqOp::AddMessage {
+            message_id: message_id.clone(),
+            from_participant_id: alice,
+            to_participant_id: bob,
+            kind: crate::model::SequenceMessageKind::Sync,
+            arrow: None,
+            text: "hi".to_owned(),
+            order_key: 0,
+            section_id: None,
+        }),
+    ];
+    apply_ops(&mut diagram, 0, &setup).expect("setup");
+    let rev = diagram.rev();
+
+    for text in ["", "   ", "\t\n"] {
+        let err = apply_ops(
+            &mut diagram,
+            rev,
+            &[Op::Seq(SeqOp::UpdateMessage {
+                message_id: message_id.clone(),
+                patch: SeqMessagePatch {
+                    text: Some(text.to_owned()),
+                    ..Default::default()
+                },
+            })],
+        )
+        .unwrap_err();
+        assert_eq!(
+            err,
+            super::ApplyError::InvalidSeqMessageText {
+                text: text.to_owned(),
+            },
+            "expected rejection for {text:?}"
+        );
+        assert_eq!(diagram.rev(), rev, "failed apply must not bump rev");
+    }
+
+    let DiagramAst::Sequence(ast) = diagram.ast() else {
+        panic!("expected sequence ast");
+    };
+    assert_eq!(
+        ast.messages()
+            .iter()
+            .find(|m| m.message_id() == &message_id)
+            .expect("message")
+            .text(),
+        "hi"
+    );
+}
+
+#[test]
 fn apply_flow_op_adds_node_edge_and_bumps_rev() {
     let diagram_id = DiagramId::new("d:2").expect("diagram id");
     let mut diagram = crate::model::Diagram::new(

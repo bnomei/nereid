@@ -425,6 +425,10 @@ pub enum ApplyError {
     InvalidSeqBlockStructure {
         reason: String,
     },
+    /// Empty or whitespace-only sequence message text (parser would reject on reload).
+    InvalidSeqMessageText {
+        text: String,
+    },
 }
 
 impl fmt::Display for ApplyError {
@@ -479,6 +483,9 @@ impl fmt::Display for ApplyError {
                     f,
                     "invalid sequence block structure: {reason} (section messages must be contiguous in order_key order; nested messages must also belong to ancestor sections)"
                 )
+            }
+            Self::InvalidSeqMessageText { text } => {
+                write!(f, "sequence message text must be non-empty (got {text:?})")
             }
         }
     }

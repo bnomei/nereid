@@ -148,6 +148,7 @@ fn apply_seq_op(
                     });
                 }
             }
+            validate_seq_message_text(text)?;
             let mut message = SequenceMessage::new(
                 message_id.clone(),
                 from_participant_id.clone(),
@@ -209,6 +210,7 @@ fn apply_seq_op(
                     object_id: updated_to.clone(),
                 });
             }
+            validate_seq_message_text(&updated_text)?;
 
             let mut updated = SequenceMessage::new(
                 message_id.clone(),
@@ -799,6 +801,17 @@ fn validate_mermaid_ident_for_ops(ident: &str) -> Result<(), MermaidIdentError> 
         .find(|ch| !ch.is_ascii_alphanumeric() && *ch != '_')
     {
         return Err(MermaidIdentError::InvalidChar { ch });
+    }
+    Ok(())
+}
+
+fn validate_seq_message_text(text: &str) -> Result<(), ApplyError> {
+    // Match the sequence Mermaid parser oracle (`MissingMessageText`): reject empty and
+    // whitespace-only labels so export cannot produce lines that fail parse on reload.
+    if text.trim().is_empty() {
+        return Err(ApplyError::InvalidSeqMessageText {
+            text: text.to_owned(),
+        });
     }
     Ok(())
 }

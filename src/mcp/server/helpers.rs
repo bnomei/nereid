@@ -1150,6 +1150,10 @@ fn map_apply_error(err: ApplyError) -> ErrorData {
                 "hint": "section messages must be contiguous in order_key order",
             })),
         ),
+        ApplyError::InvalidSeqMessageText { text } => ErrorData::invalid_params(
+            "sequence message text must be non-empty",
+            Some(serde_json::json!({ "text": text })),
+        ),
     }
 }
 
