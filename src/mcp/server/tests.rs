@@ -3032,6 +3032,59 @@ async fn diagram_read_returns_mermaid_and_kind() {
 }
 
 #[tokio::test]
+async fn diagram_read_flowchart_uses_mermaid_id_not_object_id() {
+    let mut session = Session::new(SessionId::new("s:mcp-flow-mermaid-id").expect("session id"));
+
+    let diagram_id = DiagramId::new("d-flow-mermaid-id").expect("diagram id");
+    let mut ast = FlowchartAst::default();
+    let n_a = oid("n:A");
+    let n_b = oid("n:B");
+
+    let mut node_a = FlowNode::new("Start");
+    node_a.set_mermaid_id(Some("A"));
+    let mut node_b = FlowNode::new("Done");
+    node_b.set_mermaid_id(Some("B"));
+    ast.nodes_mut().insert(n_a.clone(), node_a);
+    ast.nodes_mut().insert(n_b.clone(), node_b);
+    ast.edges_mut().insert(oid("e:ab"), FlowEdge::new(n_a, n_b));
+
+    session.diagrams_mut().insert(
+        diagram_id.clone(),
+        Diagram::new(diagram_id.clone(), "Flow Mermaid Ids", DiagramAst::Flowchart(ast)),
+    );
+    session.set_active_diagram_id(Some(diagram_id));
+
+    let server = NereidMcp::new(session);
+    let Json(snapshot) = server
+        .diagram_read(Parameters(DiagramTargetParams { diagram_id: None }))
+        .await
+        .expect("read");
+
+    assert_eq!(snapshot.kind, "Flowchart");
+    // Canonical export uses mermaid_id (A/B), not sanitized object ids (n_A/n_B).
+    assert!(
+        snapshot.mermaid.contains("A[Start]"),
+        "expected mermaid_id A, got:\n{}",
+        snapshot.mermaid
+    );
+    assert!(
+        snapshot.mermaid.contains("B[Done]"),
+        "expected mermaid_id B, got:\n{}",
+        snapshot.mermaid
+    );
+    assert!(
+        snapshot.mermaid.contains("A --> B"),
+        "expected edge with mermaid ids, got:\n{}",
+        snapshot.mermaid
+    );
+    assert!(
+        !snapshot.mermaid.contains("n_A") && !snapshot.mermaid.contains("n_B"),
+        "must not emit object-id mermaid tokens, got:\n{}",
+        snapshot.mermaid
+    );
+}
+
+#[tokio::test]
 async fn diagram_get_ast_returns_sorted_sequence_ast() {
     let mut session = Session::new(SessionId::new("s:mcp-get-ast-seq").expect("session id"));
 

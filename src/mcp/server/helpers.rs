@@ -564,89 +564,9 @@ fn mermaid_for_sequence(ast: &crate::model::SequenceAst) -> String {
 }
 
 fn mermaid_for_flowchart(ast: &crate::model::FlowchartAst) -> String {
-    let mut out = String::new();
-    out.push_str("flowchart TD\n");
-
-    for (node_id, node) in ast.nodes().iter() {
-        let mermaid_id = mermaid_safe_id(node_id.as_str());
-        out.push_str("    ");
-        out.push_str(&mermaid_id);
-        out.push_str(&mermaid_node_shape(node.label(), Some(node.shape())));
-        out.push('\n');
-    }
-
-    let mut styled_links = Vec::new();
-    for (edge_index, (_edge_id, edge)) in ast.edges().iter().enumerate() {
-        let from_id = mermaid_safe_id(edge.from_node_id().as_str());
-        let to_id = mermaid_safe_id(edge.to_node_id().as_str());
-        out.push_str("    ");
-        out.push_str(&from_id);
-        out.push(' ');
-        let op = edge.connector().filter(|connector| !connector.is_empty()).unwrap_or("-->");
-        out.push_str(op);
-        if let Some(label) = edge.label().filter(|label| !label.is_empty()) {
-            out.push('|');
-            out.push_str(label);
-            out.push('|');
-        }
-        out.push(' ');
-        out.push_str(&to_id);
-        out.push('\n');
-
-        if let Some(style) = edge.style().filter(|style| !style.is_empty()) {
-            styled_links.push((edge_index as u64, style.to_owned()));
-        }
-    }
-
-    if let Some(style) = ast.default_edge_style().filter(|style| !style.is_empty()) {
-        out.push_str("    linkStyle default ");
-        out.push_str(style);
-        out.push('\n');
-    }
-
-    for (edge_index, style) in styled_links {
-        out.push_str("    linkStyle ");
-        out.push_str(&edge_index.to_string());
-        out.push(' ');
-        out.push_str(&style);
-        out.push('\n');
-    }
-
-    out
-}
-
-fn mermaid_safe_id(raw: &str) -> String {
-    let mut out = String::with_capacity(raw.len());
-    for ch in raw.chars() {
-        if ch.is_ascii_alphanumeric() || ch == '_' {
-            out.push(ch);
-        } else {
-            out.push('_');
-        }
-    }
-
-    if out.is_empty() || !out.chars().next().unwrap().is_ascii_alphabetic() {
-        out.insert_str(0, "id_");
-    }
-
-    out
-}
-
-fn mermaid_escape_text(raw: &str) -> String {
-    raw.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n")
-}
-
-fn mermaid_node_shape(label: &str, shape: Option<&str>) -> String {
-    let label = mermaid_escape_text(label);
-    match shape.unwrap_or("").trim() {
-        "round" => format!("(\"{label}\")"),
-        "circle" => format!("((\"{label}\"))"),
-        "stadium" => format!("([\"{label}\"])"),
-        "subroutine" => format!("[[\"{label}\"]]"),
-        "cylindrical" => format!("[(\"{label}\")]"),
-        "rhombus" | "diamond" => format!("{{\"{label}\"}}"),
-        _ => format!("[\"{label}\"]"),
-    }
+    // Prefer the same exporter as store/TUI so mermaid_id (not object id) is used.
+    // Fail closed on export error rather than emitting wrong identities.
+    crate::format::mermaid::export_flowchart(ast).unwrap_or_else(|_| "flowchart\n".to_owned())
 }
 
 fn delta_response_from_history(
