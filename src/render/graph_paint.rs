@@ -12,9 +12,11 @@
 //! Variable height is content-driven; edge attach policy for tall boxes is mid-y of the full box.
 
 use crate::layout::FlowchartLayout;
-use crate::render::scene::{CapKind, GraphEdge, GraphModel, GraphNode};
+use crate::render::scene::{CapKind, EdgeStroke, GraphEdge, GraphModel, GraphNode};
 use crate::render::text::{text_len, truncate_with_ellipsis};
-use crate::render::{Canvas, CanvasError, RenderOptions};
+use crate::render::{
+    Canvas, CanvasError, RenderOptions, UNICODE_BOX_HORIZONTAL, UNICODE_BOX_VERTICAL,
+};
 
 /// Minimum inner width for a graph node box (title padding).
 pub const GRAPH_MIN_INNER_WIDTH: usize = 3;
@@ -150,18 +152,61 @@ pub fn graph_model_has_compartments(model: &crate::render::scene::GraphModel) ->
     model.nodes().values().any(|n| !n.compartments().is_empty())
 }
 
-/// True when the scene-native graph painter must run (compartments and/or non-flow caps).
+/// True when the scene-native graph painter must run (compartments, non-flow caps, or dashed stroke).
 pub fn graph_model_needs_scene_paint(model: &crate::render::scene::GraphModel) -> bool {
     if graph_model_has_compartments(model) {
         return true;
     }
     model.edges().values().any(|edge| {
-        !matches!(edge.start_cap(), CapKind::None | CapKind::Arrow)
+        edge.stroke() == EdgeStroke::Dashed
+            || !matches!(edge.start_cap(), CapKind::None | CapKind::Arrow)
             || !matches!(
                 edge.end_cap(),
                 CapKind::None | CapKind::Arrow | CapKind::Circle | CapKind::Cross
             )
     })
+}
+
+fn draw_hline_stroke(
+    canvas: &mut Canvas,
+    x0: usize,
+    x1: usize,
+    y: usize,
+    stroke: EdgeStroke,
+) -> Result<(), CanvasError> {
+    match stroke {
+        EdgeStroke::Solid => canvas.draw_hline(x0, x1, y),
+        EdgeStroke::Dashed => {
+            let (min_x, max_x) = if x0 <= x1 { (x0, x1) } else { (x1, x0) };
+            for (i, x) in (min_x..=max_x).enumerate() {
+                if i % 2 == 0 {
+                    canvas.set(x, y, UNICODE_BOX_HORIZONTAL)?;
+                }
+            }
+            Ok(())
+        }
+    }
+}
+
+fn draw_vline_stroke(
+    canvas: &mut Canvas,
+    x: usize,
+    y0: usize,
+    y1: usize,
+    stroke: EdgeStroke,
+) -> Result<(), CanvasError> {
+    match stroke {
+        EdgeStroke::Solid => canvas.draw_vline(x, y0, y1),
+        EdgeStroke::Dashed => {
+            let (min_y, max_y) = if y0 <= y1 { (y0, y1) } else { (y1, y0) };
+            for (i, y) in (min_y..=max_y).enumerate() {
+                if i % 2 == 0 {
+                    canvas.set(x, y, UNICODE_BOX_VERTICAL)?;
+                }
+            }
+            Ok(())
+        }
+    }
 }
 
 /// True if `(x, y)` lies on any placed node box, including its border.
@@ -456,7 +501,7 @@ fn render_graph_model_with_compartments_inner(
                 let y0 = from.mid_y.min(to.mid_y);
                 let y1 = from.mid_y.max(to.mid_y);
                 if y0 < y1 {
-                    canvas.draw_vline(x_stub, y0, y1)?;
+                    draw_vline_stroke(&mut canvas, x_stub, y0, y1, edge.stroke())?;
                     push_vline_spans(spans, x_stub, y0, y1);
                 }
                 // Caps sit on the stub, one cell out from each box's right wall.
@@ -494,16 +539,17 @@ fn render_graph_model_with_compartments_inner(
         let y_dst = dst.mid_y;
         let bend_x = (gap_left + gap_right) / 2;
 
+        let stroke = edge.stroke();
         if gap_left <= bend_x {
-            canvas.draw_hline(gap_left, bend_x, y_src)?;
+            draw_hline_stroke(&mut canvas, gap_left, bend_x, y_src, stroke)?;
             push_hline_span(spans, y_src, gap_left, bend_x);
         }
         if y_src != y_dst {
-            canvas.draw_vline(bend_x, y_src.min(y_dst), y_src.max(y_dst))?;
+            draw_vline_stroke(&mut canvas, bend_x, y_src.min(y_dst), y_src.max(y_dst), stroke)?;
             push_vline_spans(spans, bend_x, y_src, y_dst);
         }
         if bend_x <= gap_right {
-            canvas.draw_hline(bend_x, gap_right, y_dst)?;
+            draw_hline_stroke(&mut canvas, bend_x, gap_right, y_dst, stroke)?;
             push_hline_span(spans, y_dst, bend_x, gap_right);
         }
 
