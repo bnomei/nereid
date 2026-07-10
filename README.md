@@ -22,6 +22,14 @@ Nereid is source-available for noncommercial use only. Commercial use, product u
 
 <a title="click to open" target="_blank" style="cursor: zoom-in;" href="https://raw.githubusercontent.com/bnomei/nereid/main/screenshot.png"><img src="https://raw.githubusercontent.com/bnomei/nereid/main/screenshot.png" alt="Nereid TUI screenshot" style="width: 100%;" /></a>
 
+## Recent releases
+
+- **0.9:** Added class, entity-relationship, and Gantt diagrams across parsing, text rendering, the TUI, persisted sessions, and typed MCP reads. The built-in demo now covers all five diagram families.
+- **0.8:** Added structured sequence block and section ops plus `diagram_replace_from_mermaid`, which reconciles stable identities during bulk Mermaid rewrites and reports dangling xrefs.
+- **0.7:** Added the fuzzy `:` diagram switcher and persisted Frigg symbol anchors for sequence participants and flowchart nodes.
+
+See [CHANGELOG.md](CHANGELOG.md) for the complete release history.
+
 ## Installation
 
 ### Prerequisites
@@ -48,6 +56,8 @@ nereid --version
 
 ### npm wrapper
 
+Requires Node.js 18 or newer. The wrapper supports Linux and macOS on x64 or arm64, plus Windows on x64. Linux and macOS also need `tar` to extract the downloaded release archive.
+
 ```bash
 npx @bnomei/nereid --version
 ```
@@ -63,8 +73,10 @@ docker run --rm ghcr.io/bnomei/nereid:0.9.0 --version
 The image is built from published musl Linux release assets. Prefer binding a session directory for MCP or file-backed work:
 
 ```bash
-docker run --rm -v "$PWD/my-session:/workspace/my-session" ghcr.io/bnomei/nereid:0.9.0 --mcp --session /workspace/my-session
+docker run --rm -i -v "$PWD/my-session:/workspace/my-session" ghcr.io/bnomei/nereid:0.9.0 --mcp --session /workspace/my-session
 ```
+
+The `-i` flag keeps stdin open for the stdio MCP transport. Add `-t` as well when you run the interactive TUI in Docker.
 
 ### GitHub Releases
 
@@ -107,7 +119,7 @@ mkdir my-session
 nereid my-session
 ```
 
-If the folder has no session metadata and no existing `diagrams/*.mmd` files, Nereid initializes a seed `flow` diagram. For an existing session, Nereid loads `nereid-session.meta.json` and the referenced diagram and walkthrough files.
+If the folder has no session metadata, no existing `diagrams/*.mmd` files, and no existing `walkthroughs/*.wt.json` files, Nereid initializes a seed `flow` diagram. If durable diagram or walkthrough files exist without `nereid-session.meta.json`, Nereid refuses to seed a new session so those files cannot be orphaned; restore the metadata index to repair the session. For an existing session, Nereid loads the metadata index and its referenced diagram and walkthrough files.
 
 ## Run modes
 
@@ -120,6 +132,8 @@ If the folder has no session metadata and no existing `diagrams/*.mmd` files, Ne
 | Change the TUI MCP HTTP port | `nereid --mcp-http-port 27500` | Serves MCP at `http://127.0.0.1:27500/mcp`. |
 | Run MCP over stdio without the TUI | `nereid --mcp --session path/to/session` | Serves MCP on stdin/stdout for tool integrations. |
 | Print the MCP schema snapshot | `nereid --dump-mcp-tool-schema` | Prints the registered tool schemas and exits. |
+| Show CLI help | `nereid --help` or `nereid -h` | Prints the supported command forms and options. |
+| Show the installed version | `nereid --version` or `nereid -V` | Prints the package name and version. |
 
 CLI synopsis:
 
@@ -182,7 +196,7 @@ Flowcharts support:
 - edges with common Mermaid flowchart operators, normalized internally,
 - edge labels in `A -->|label| B` and `A -- label --> B` forms,
 - chained edges such as `A --> B --> C`,
-- `linkStyle` statements, which are preserved on export but ignored by the text renderer.
+- `linkStyle` statements, which are preserved on export. Per-edge styles containing the literal word `dashed` produce dashed text-render strokes; other CSS properties and `linkStyle default` do not affect text rendering.
 
 Class diagrams support:
 
@@ -231,7 +245,7 @@ Common keys:
 | `4` / `5` | Toggle Inspector / Notes. |
 | `Tab` / `Shift-Tab` | Focus next / previous panel. |
 | `[` / `]` | Open previous / next diagram. |
-| `:` | Open the diagram switcher. |
+| `:` | Open the fuzzy diagram switcher; `Tab` completes the selected `[SEQ]`, `[FLO]`, `[CLS]`, `[ER]`, or `[GNT]` result. |
 | `/` / `\` | Regular / fuzzy search. |
 | `n` / `N` | Next / previous search result. |
 | Arrow keys or `h`/`j`/`k`/`l` | Pan or move within the focused panel. |
@@ -262,10 +276,29 @@ Sources: [src/tui/chrome.rs](src/tui/chrome.rs), [src/tui/theme.rs](src/tui/them
 
 Nereid exposes MCP tools for live diagram collaboration.
 
+The server advertises tools only; it does not expose MCP resources or prompts. The repository playbooks described below are examples for MCP clients, not registered prompt capabilities.
+
 Transports:
 
 - TUI mode: Streamable HTTP at `http://127.0.0.1:<port>/mcp`, default port `27435`.
 - Stdio mode: `nereid --mcp --session path/to/session`.
+
+### Connect an MCP client
+
+For clients that launch stdio servers, add a server entry like this and replace the session path with an absolute path:
+
+```json
+{
+  "mcpServers": {
+    "nereid": {
+      "command": "nereid",
+      "args": ["--mcp", "--session", "/absolute/path/to/session"]
+    }
+  }
+}
+```
+
+If Nereid is already running in TUI mode, connect a Streamable HTTP client to `http://127.0.0.1:27435/mcp`, or to the port selected with `--mcp-http-port`.
 
 Tool groups:
 
@@ -302,6 +335,12 @@ Canonical category pairs are `seq/participant`, `seq/message`, `seq/block`, `seq
 
 Gantt lanes with valid `YYYY-MM-DD` task starts use calendar-stable ids such as
 `lane:2026-01-08`; charts without parseable absolute dates use relative ids such as `lane:0007`.
+
+### Code symbol anchors
+
+Sequence participants and flowchart nodes can carry an optional Frigg code-symbol anchor with a lowercase hexadecimal `stable_symbol_id` such as `sym-16c57df0026ced40` and an optional `repository_id`. Set or clear anchors with the `seq_set_participant_symbol` and `flow_set_node_symbol` ops passed to `diagram_apply_ops` or `diagram_propose_ops`.
+
+Anchors appear in `diagram_get_ast` and `object_read` responses. Nereid persists them in `diagrams/*.meta.json`, separate from Mermaid source, so adding an anchor does not rewrite the corresponding `.mmd` file.
 
 Sequence and flowchart diagrams support structured MCP mutation ops. Edit class, ER, and Gantt diagrams with `diagram_replace_from_mermaid` or the TUI editor; their kind-specific AST and object reads remain available for inspection and verification.
 
