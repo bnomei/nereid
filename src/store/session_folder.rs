@@ -722,6 +722,8 @@ pub struct DiagramFlowEdgeMeta {
     pub from_node_id: ObjectId,
     pub to_node_id: ObjectId,
     pub label: Option<String>,
+    /// Normalized Mermaid connector; `None` means default solid `-->`.
+    pub connector: Option<String>,
     pub style: Option<String>,
 }
 
@@ -1506,6 +1508,7 @@ impl SessionFolder {
                             from_node_id: edge.from_node_id().clone(),
                             to_node_id: edge.to_node_id().clone(),
                             label: edge.label().map(ToOwned::to_owned),
+                            connector: edge.connector().map(ToOwned::to_owned),
                             style: edge.style().map(ToOwned::to_owned),
                         })
                         .collect(),

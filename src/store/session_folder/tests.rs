@@ -2365,6 +2365,108 @@ fn save_and_load_flowchart_preserves_edge_ids_and_style_via_sidecar(ctx: Session
     assert_eq!(edge.style(), Some("dashed"));
 }
 
+#[test]
+fn replace_flowchart_mermaid_preserves_parallel_edge_ids_differing_only_by_connector() {
+    let node_a = ObjectId::new("n:a").unwrap();
+    let node_b = ObjectId::new("n:b").unwrap();
+    let solid_id = ObjectId::new("e:solid").unwrap();
+    let dotted_id = ObjectId::new("e:dotted").unwrap();
+
+    let mut ast = FlowchartAst::default();
+    let mut a = FlowNode::new("A");
+    a.set_mermaid_id(Some("A"));
+    let mut b = FlowNode::new("B");
+    b.set_mermaid_id(Some("B"));
+    ast.nodes_mut().insert(node_a.clone(), a);
+    ast.nodes_mut().insert(node_b.clone(), b);
+
+    let mut solid = FlowEdge::new(node_a.clone(), node_b.clone());
+    solid.set_style(Some("solid-style"));
+    ast.edges_mut().insert(solid_id.clone(), solid);
+
+    let mut dotted = FlowEdge::new(node_a.clone(), node_b.clone());
+    dotted.set_connector(Some("-.->"));
+    dotted.set_style(Some("dotted-style"));
+    ast.edges_mut().insert(dotted_id.clone(), dotted);
+
+    let mut diagram =
+        Diagram::new(DiagramId::new("d-flow-parallel").unwrap(), "Flow", DiagramAst::Flowchart(ast));
+
+    // Reorder edges and keep both connectors so fingerprint must include connector.
+    replace_diagram_from_mermaid(&mut diagram, "flowchart\nB\nA -.-> B\nA --> B\n").unwrap();
+
+    let DiagramAst::Flowchart(ast) = diagram.ast() else {
+        panic!("expected flowchart");
+    };
+    let solid = ast.edges().get(&solid_id).expect("solid edge stable id");
+    assert_eq!(solid.connector(), None);
+    assert_eq!(solid.style(), Some("solid-style"));
+    let dotted = ast.edges().get(&dotted_id).expect("dotted edge stable id");
+    assert_eq!(dotted.connector(), Some("-.->"));
+    assert_eq!(dotted.style(), Some("dotted-style"));
+}
+
+#[rstest]
+fn save_and_load_preserves_parallel_flow_edge_ids_differing_only_by_connector(
+    ctx: SessionFolderTestCtx,
+) {
+    let folder = &ctx.folder;
+    let mut session = Session::new(SessionId::new("s-parallel-edges").unwrap());
+    let flow_id = DiagramId::new("d1").unwrap();
+    let node_a = ObjectId::new("n:a").unwrap();
+    let node_b = ObjectId::new("n:b").unwrap();
+    let solid_id = ObjectId::new("e:solid").unwrap();
+    let dotted_id = ObjectId::new("e:dotted").unwrap();
+
+    let mut flow_ast = FlowchartAst::default();
+    let mut a = FlowNode::new("A");
+    a.set_mermaid_id(Some("A"));
+    let mut b = FlowNode::new("B");
+    b.set_mermaid_id(Some("B"));
+    flow_ast.nodes_mut().insert(node_a.clone(), a);
+    flow_ast.nodes_mut().insert(node_b.clone(), b);
+
+    let mut solid = FlowEdge::new(node_a.clone(), node_b.clone());
+    solid.set_style(Some("solid-style"));
+    flow_ast.edges_mut().insert(solid_id.clone(), solid);
+
+    let mut dotted = FlowEdge::new(node_a, node_b);
+    dotted.set_connector(Some("-.->"));
+    dotted.set_style(Some("dotted-style"));
+    flow_ast.edges_mut().insert(dotted_id.clone(), dotted);
+
+    session.diagrams_mut().insert(
+        flow_id.clone(),
+        Diagram::new(flow_id.clone(), "Flow", DiagramAst::Flowchart(flow_ast)),
+    );
+    folder.save_session(&session).unwrap();
+
+    // Reorder lines in the on-disk mermaid so parse order no longer matches save order.
+    let mmd_path = folder.default_diagram_mmd_path(&flow_id);
+    std::fs::write(&mmd_path, "flowchart\nA -.-> B\nA --> B\n").unwrap();
+
+    let loaded = folder.load_session().unwrap();
+    let DiagramAst::Flowchart(loaded_ast) =
+        loaded.diagrams().get(&flow_id).expect("flow diagram").ast()
+    else {
+        panic!("expected flowchart ast");
+    };
+
+    let solid = loaded_ast.edges().get(&solid_id).expect("solid edge stable id");
+    assert_eq!(solid.connector(), None);
+    assert_eq!(solid.style(), Some("solid-style"));
+    let dotted = loaded_ast.edges().get(&dotted_id).expect("dotted edge stable id");
+    assert_eq!(dotted.connector(), Some("-.->"));
+    assert_eq!(dotted.style(), Some("dotted-style"));
+
+    let meta = folder.load_diagram_meta(&mmd_path).unwrap();
+    assert!(meta.flow_edges.iter().any(|e| e.edge_id == solid_id && e.connector.is_none()));
+    assert!(meta
+        .flow_edges
+        .iter()
+        .any(|e| e.edge_id == dotted_id && e.connector.as_deref() == Some("-.->")));
+}
+
 #[rstest]
 fn load_session_does_not_reuse_edge_ids_from_sidecar_for_new_edges(ctx: SessionFolderTestCtx) {
     let folder = &ctx.folder;

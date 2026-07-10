@@ -531,6 +531,8 @@ struct DiagramFlowEdgeMetaJson {
     #[serde(default)]
     label: Option<String>,
     #[serde(default)]
+    connector: Option<String>,
+    #[serde(default)]
     style: Option<String>,
 }
 
@@ -866,6 +868,7 @@ fn diagram_meta_to_json(
             from_node_id: edge.from_node_id.to_string(),
             to_node_id: edge.to_node_id.to_string(),
             label: edge.label.clone(),
+            connector: edge.connector.clone(),
             style: edge.style.clone(),
         })
         .collect();
@@ -1096,6 +1099,7 @@ fn diagram_meta_from_json(
                 from_node_id,
                 to_node_id,
                 label: edge_json.label,
+                connector: edge_json.connector,
                 style: edge_json.style,
             })
         })

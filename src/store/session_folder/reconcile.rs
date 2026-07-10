@@ -561,6 +561,15 @@ pub(crate) fn reconcile_flowchart_edges(ast: &mut FlowchartAst, sidecar: &Diagra
         from_node_id: ObjectId,
         to_node_id: ObjectId,
         label: Option<String>,
+        /// Normalized connector; `None` means default solid `-->`.
+        connector: Option<String>,
+    }
+
+    fn normalize_flow_connector(connector: Option<&str>) -> Option<String> {
+        match connector {
+            None | Some("-->") => None,
+            Some(other) => Some(other.to_owned()),
+        }
     }
 
     fn numeric_edge_id(edge_id: &ObjectId) -> Option<u64> {
@@ -591,6 +600,7 @@ pub(crate) fn reconcile_flowchart_edges(ast: &mut FlowchartAst, sidecar: &Diagra
             from_node_id: entry.from_node_id.clone(),
             to_node_id: entry.to_node_id.clone(),
             label: entry.label.clone(),
+            connector: normalize_flow_connector(entry.connector.as_deref()),
         };
         by_fingerprint
             .entry(fingerprint)
@@ -612,6 +622,7 @@ pub(crate) fn reconcile_flowchart_edges(ast: &mut FlowchartAst, sidecar: &Diagra
             from_node_id: edge.from_node_id().clone(),
             to_node_id: edge.to_node_id().clone(),
             label: edge.label().map(ToOwned::to_owned),
+            connector: normalize_flow_connector(edge.connector()),
         };
 
         if let Some(queue) = by_fingerprint.get_mut(&fingerprint) {
@@ -1441,6 +1452,7 @@ pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> 
                     from_node_id: edge.from_node_id().clone(),
                     to_node_id: edge.to_node_id().clone(),
                     label: edge.label().map(ToOwned::to_owned),
+                    connector: edge.connector().map(ToOwned::to_owned),
                     style: edge.style().map(ToOwned::to_owned),
                 })
                 .collect(),
