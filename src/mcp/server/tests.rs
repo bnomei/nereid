@@ -3920,6 +3920,40 @@ async fn diagram_replace_from_mermaid_records_delta_history_for_in_memory_sessio
 }
 
 #[tokio::test]
+async fn diagram_replace_from_mermaid_reports_default_edge_style_changes() {
+    let mut session = Session::new(SessionId::new("s-replace-flow-style").expect("session id"));
+    let diagram_id = DiagramId::new("d-replace-flow-style").expect("diagram id");
+    let ast = crate::format::mermaid::parse_flowchart("flowchart TD\n  A --> B\n")
+        .expect("initial flowchart");
+    session.diagrams_mut().insert(
+        diagram_id.clone(),
+        Diagram::new(diagram_id.clone(), "Flow Style", DiagramAst::Flowchart(ast)),
+    );
+    session.set_active_diagram_id(Some(diagram_id));
+    let server = NereidMcp::new(session);
+
+    server
+        .diagram_replace_from_mermaid(Parameters(DiagramReplaceFromMermaidParams {
+            diagram_id: None,
+            base_rev: 0,
+            mermaid: "flowchart TD\n  A --> B\n  linkStyle default stroke:#333;\n".into(),
+        }))
+        .await
+        .expect("replace default edge style");
+
+    let Json(delta) = server
+        .diagram_diff(Parameters(GetDeltaParams { diagram_id: None, since_rev: 0 }))
+        .await
+        .expect("diff after default edge style change");
+
+    assert_eq!(delta.from_rev, 0);
+    assert_eq!(delta.to_rev, 1);
+    assert_eq!(delta.changes.len(), 1);
+    assert_eq!(delta.changes[0].kind, DeltaChangeKind::Updated);
+    assert_eq!(delta.changes[0].refs, vec!["d:d-replace-flow-style/flow/edge/e:0001"]);
+}
+
+#[tokio::test]
 async fn diagram_replace_from_mermaid_rejects_stale_base_rev_and_kind_mismatch() {
     let server = NereidMcp::new(demo_session());
 

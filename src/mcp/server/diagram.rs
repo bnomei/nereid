@@ -206,12 +206,13 @@ fn stable_object_snapshots(
                 snapshots.insert(
                     object_ref(diagram_id, edge_category.clone(), edge_id),
                     format!(
-                        "from={};to={};label={:?};connector={:?};style={:?}",
+                        "from={};to={};label={:?};connector={:?};style={:?};default_edge_style={:?}",
                         edge.from_node_id(),
                         edge.to_node_id(),
                         edge.label(),
                         edge.connector(),
-                        edge.style()
+                        edge.style(),
+                        flow.default_edge_style()
                     ),
                 );
             }
