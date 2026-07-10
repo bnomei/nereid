@@ -972,6 +972,91 @@ fn walkthrough_files_remain_loadable_after_moving_session_folder(ctx: SessionFol
 }
 
 #[rstest]
+fn load_session_rejects_walkthrough_body_id_mismatch_with_meta_list_id(
+    ctx: SessionFolderTestCtx,
+) {
+    let session_dir = &ctx.session_dir;
+    let folder = &ctx.folder;
+    std::fs::create_dir_all(session_dir.join("walkthroughs")).unwrap();
+
+    // Meta lists w1, but the body claims walkthrough_id w2.
+    std::fs::write(
+        folder.meta_path(),
+        r#"{
+  "session_id": "s1",
+  "active_diagram_id": null,
+  "active_walkthrough_id": null,
+  "walkthrough_ids": ["w1"],
+  "diagrams": [],
+  "xrefs": []
+}"#,
+    )
+    .unwrap();
+
+    std::fs::write(
+        session_dir.join("walkthroughs/w1.wt.json"),
+        r#"{
+  "walkthrough_id": "w2",
+  "title": "Split",
+  "rev": 0,
+  "nodes": [],
+  "edges": [],
+  "source": null
+}"#,
+    )
+    .unwrap();
+
+    let err = folder.load_session().unwrap_err();
+    match err {
+        StoreError::WalkthroughIdMismatch {
+            path,
+            expected,
+            found,
+        } => {
+            assert_eq!(path, session_dir.join("walkthroughs/w1.wt.json"));
+            assert_eq!(expected, WalkthroughId::new("w1").unwrap());
+            assert_eq!(found, WalkthroughId::new("w2").unwrap());
+        }
+        other => panic!("expected WalkthroughIdMismatch, got {other:?}"),
+    }
+}
+
+#[rstest]
+fn load_walkthrough_rejects_body_id_mismatch(ctx: SessionFolderTestCtx) {
+    let session_dir = &ctx.session_dir;
+    let folder = &ctx.folder;
+    std::fs::create_dir_all(session_dir.join("walkthroughs")).unwrap();
+
+    let expected_id = WalkthroughId::new("w1").unwrap();
+    std::fs::write(
+        folder.walkthrough_json_path(&expected_id),
+        r#"{
+  "walkthrough_id": "w2",
+  "title": "Split",
+  "rev": 0,
+  "nodes": [],
+  "edges": [],
+  "source": null
+}"#,
+    )
+    .unwrap();
+
+    let err = folder.load_walkthrough(&expected_id).unwrap_err();
+    match err {
+        StoreError::WalkthroughIdMismatch {
+            path,
+            expected,
+            found,
+        } => {
+            assert_eq!(path, session_dir.join("walkthroughs/w1.wt.json"));
+            assert_eq!(expected, expected_id);
+            assert_eq!(found, WalkthroughId::new("w2").unwrap());
+        }
+        other => panic!("expected WalkthroughIdMismatch, got {other:?}"),
+    }
+}
+
+#[rstest]
 fn removed_walkthrough_does_not_resurrect_after_save_load(ctx: SessionFolderTestCtx) {
     let folder = &ctx.folder;
 

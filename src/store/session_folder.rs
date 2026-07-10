@@ -412,6 +412,11 @@ pub enum StoreError {
         meta_path: PathBuf,
         diagrams_dir: PathBuf,
     },
+    WalkthroughIdMismatch {
+        path: PathBuf,
+        expected: WalkthroughId,
+        found: WalkthroughId,
+    },
 }
 
 impl fmt::Display for StoreError {
@@ -572,6 +577,14 @@ impl fmt::Display for StoreError {
                 "session meta {meta_path:?} is missing but diagram files exist in {diagrams_dir:?}; \
                  refusing to seed a fresh session and orphan them (restore the meta index to repair)"
             ),
+            Self::WalkthroughIdMismatch {
+                path,
+                expected,
+                found,
+            } => write!(
+                f,
+                "walkthrough id mismatch at {path:?}: expected {expected}, found {found}"
+            ),
         }
     }
 }
@@ -604,6 +617,7 @@ impl std::error::Error for StoreError {
             Self::SymlinkRefused { .. } => None,
             Self::SessionWriteLockTimeout { .. } => None,
             Self::MetaMissingWithExistingDiagrams { .. } => None,
+            Self::WalkthroughIdMismatch { .. } => None,
         }
     }
 }
@@ -2070,7 +2084,15 @@ impl SessionFolder {
         let wt_json: WalkthroughJson = serde_json::from_str(&wt_str)
             .map_err(|source| StoreError::Json { path: wt_path.clone(), source })?;
 
-        walkthrough_from_json(wt_json)
+        let walkthrough = walkthrough_from_json(wt_json)?;
+        if walkthrough.walkthrough_id() != walkthrough_id {
+            return Err(StoreError::WalkthroughIdMismatch {
+                path: wt_path,
+                expected: walkthrough_id.clone(),
+                found: walkthrough.walkthrough_id().clone(),
+            });
+        }
+        Ok(walkthrough)
     }
 
     pub fn save_walkthrough(&self, walkthrough: &Walkthrough) -> Result<(), StoreError> {
