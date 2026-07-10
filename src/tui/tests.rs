@@ -883,6 +883,60 @@ fn sync_ignores_agent_highlight_when_follow_ai_is_disabled() {
 }
 
 #[test]
+fn follow_ai_jump_does_not_persist_active_diagram_id() {
+    let session = demo_session();
+    let before = session.active_diagram_id().cloned().expect("active diagram");
+    assert_eq!(before.as_str(), "demo-00-index");
+
+    let tmp_dir = std::env::temp_dir().join(format!(
+        "nereid-tui-follow-ai-active-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&tmp_dir).expect("create temp session dir");
+
+    let folder = SessionFolder::new(&tmp_dir);
+    folder.save_session(&session).expect("save session");
+
+    let mut app = App::new(session);
+    app.session_folder = Some(folder.clone());
+
+    let agent_target: ObjectRef =
+        "d:demo-seq/seq/participant/p:alice".parse().expect("agent object ref");
+    app.agent_highlights.blocking_lock().insert(agent_target.clone());
+    app.follow_ai = true;
+
+    app.sync_from_ui_state();
+
+    assert_eq!(app.selected_ref(), Some(&agent_target), "viewport should follow the agent target");
+    assert_eq!(
+        app.active_diagram_id().map(ToString::to_string).as_deref(),
+        Some("demo-seq"),
+        "camera follow may switch the TUI view diagram",
+    );
+    assert_eq!(app.focus_owner, FocusOwner::Agent);
+
+    let meta = folder.load_meta().expect("load session meta");
+    assert_eq!(
+        meta.active_diagram_id.as_ref(),
+        Some(&before),
+        "agent follow must not persist active_diagram_id to session meta",
+    );
+
+    let loaded = folder.load_session().expect("reload session");
+    assert_eq!(
+        loaded.active_diagram_id(),
+        Some(&before),
+        "agent follow must not change the on-disk collaboration active diagram",
+    );
+
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+}
+
+#[test]
 fn scrolls_with_arrows() {
     let mut app = App::new(demo_session());
     assert!(!app.handle_key_code(KeyCode::Down));

@@ -995,11 +995,19 @@ impl App {
     }
 
     fn set_active_diagram_id(&mut self, diagram_id: DiagramId) {
+        self.switch_active_diagram(diagram_id, true);
+    }
+
+    /// Switch the TUI active diagram. When `persist` is false (agent follow camera),
+    /// update in-memory session state for the viewport without writing session meta.
+    fn switch_active_diagram(&mut self, diagram_id: DiagramId, persist: bool) {
         self.cancel_hint_mode();
         self.session.set_active_diagram_id(Some(diagram_id));
-        if let Some(session_folder) = self.session_folder.as_ref() {
-            if let Err(err) = session_folder.save_active_diagram_id(&self.session) {
-                self.set_toast(format!("Active diagram persist failed: {err}"));
+        if persist {
+            if let Some(session_folder) = self.session_folder.as_ref() {
+                if let Err(err) = session_folder.save_active_diagram_id(&self.session) {
+                    self.set_toast(format!("Active diagram persist failed: {err}"));
+                }
             }
         }
         self.refresh_active_diagram_view();
@@ -2736,7 +2744,10 @@ impl App {
             .map(|active| active == object_ref.diagram_id())
             .unwrap_or(false);
         if !active_matches {
-            self.set_active_diagram_id(object_ref.diagram_id().clone());
+            // Agent follow is camera-only: show the target diagram without treating it as an
+            // intentional open/switch that persists session.active_diagram_id for MCP tools.
+            let persist = self.focus_owner != FocusOwner::Agent;
+            self.switch_active_diagram(object_ref.diagram_id().clone(), persist);
         }
 
         let Some(object_idx) = self.object_index_for_ref(object_ref) else {
