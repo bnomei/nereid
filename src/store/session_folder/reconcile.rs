@@ -137,16 +137,45 @@ fn gantt_task_base_fingerprint(ast: &GanttAst, task: &GanttTask) -> String {
 
 fn gantt_task_fingerprint(ast: &GanttAst, task_id: &ObjectId, task: &GanttTask) -> String {
     let base = gantt_task_base_fingerprint(ast, task);
+    let matching_task_count = ast
+        .tasks()
+        .values()
+        .filter(|candidate| gantt_task_base_fingerprint(ast, candidate) == base)
+        .count();
+    if matching_task_count == 1 {
+        return base;
+    }
     let section_context = ast
         .sections()
         .iter()
         .enumerate()
         .find(|(_, section)| section.task_ids().contains(task_id))
         .map(|(section_index, section)| {
-            let section_occurrence = ast.sections()[..section_index]
+            let matching_named_sections = ast
+                .sections()
                 .iter()
-                .filter(|candidate| candidate.name() == section.name())
+                .filter(|candidate| {
+                    candidate.name() == section.name()
+                        && candidate.task_ids().iter().any(|candidate_id| {
+                            ast.tasks().get(candidate_id).is_some_and(|candidate| {
+                                gantt_task_base_fingerprint(ast, candidate) == base
+                            })
+                        })
+                })
                 .count();
+            let section_occurrence = (matching_named_sections > 1).then(|| {
+                ast.sections()[..section_index]
+                    .iter()
+                    .filter(|candidate| {
+                        candidate.name() == section.name()
+                            && candidate.task_ids().iter().any(|candidate_id| {
+                                ast.tasks().get(candidate_id).is_some_and(|candidate| {
+                                    gantt_task_base_fingerprint(ast, candidate) == base
+                                })
+                            })
+                    })
+                    .count()
+            });
             let occurrence = section
                 .task_ids()
                 .iter()
@@ -158,7 +187,7 @@ fn gantt_task_fingerprint(ast: &GanttAst, task_id: &ObjectId, task: &GanttTask) 
                 })
                 .count();
             format!(
-                "section={:?};section_occurrence={section_occurrence};occurrence={occurrence}",
+                "section={:?};section_occurrence={section_occurrence:?};occurrence={occurrence}",
                 section.name()
             )
         })

@@ -142,7 +142,13 @@ impl GanttAst {
             .collect::<Vec<_>>();
         lanes.sort_by_key(|(_, day, _)| *day);
         if lanes.is_empty() {
-            lanes.push((ObjectId::new("lane:0000").expect("static lane id"), 0, "d0".to_owned()));
+            let lane_id = ObjectId::new("lane:0000").expect("static lane id");
+            let label = self
+                .lane_label_prefixes
+                .get(&lane_id)
+                .map(|prefix| format!("{prefix}d0"))
+                .unwrap_or_else(|| "d0".to_owned());
+            lanes.push((lane_id, 0, label));
         }
         lanes
     }

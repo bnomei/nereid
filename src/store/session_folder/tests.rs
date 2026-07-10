@@ -1908,6 +1908,35 @@ fn replace_gantt_mermaid_disambiguates_identical_tasks_in_duplicate_named_sectio
 }
 
 #[test]
+fn replace_gantt_mermaid_keeps_unique_task_fingerprints_when_same_named_sections_reorder() {
+    let mut ast = crate::format::mermaid::parse_gantt_diagram(
+        "gantt\ndateFormat YYYY-MM-DD\nsection Review\nCheck :2026-01-01, 2d\nsection Review\nCheck :2026-02-01, 2d\n",
+    )
+    .unwrap();
+    let january_id = ast.sections()[0].task_ids()[0].clone();
+    let february_id = ast.sections()[1].task_ids()[0].clone();
+    ast.tasks_mut().get_mut(&january_id).unwrap().set_note(Some("january check"));
+    ast.tasks_mut().get_mut(&february_id).unwrap().set_note(Some("february check"));
+    let mut diagram = Diagram::new(
+        DiagramId::new("d-gantt-reordered-duplicate-sections").unwrap(),
+        "Gantt",
+        DiagramAst::Gantt(ast),
+    );
+
+    replace_diagram_from_mermaid(
+        &mut diagram,
+        "gantt\ndateFormat YYYY-MM-DD\nsection Review\nCheck :2026-02-01, 2d\nsection Review\nCheck :2026-01-01, 2d\n",
+    )
+    .unwrap();
+
+    let DiagramAst::Gantt(ast) = diagram.ast() else { panic!("expected Gantt") };
+    assert_eq!(ast.tasks()[&january_id].note(), Some("january check"));
+    assert_eq!(ast.tasks()[&february_id].note(), Some("february check"));
+    assert_eq!(ast.sections()[0].task_ids(), &[february_id]);
+    assert_eq!(ast.sections()[1].task_ids(), &[january_id]);
+}
+
+#[test]
 fn replace_gantt_mermaid_preserves_section_id_when_task_is_inserted() {
     let section_id = ObjectId::new("section:build-stable").unwrap();
     let task_id = ObjectId::new("task:design-stable").unwrap();

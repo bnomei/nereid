@@ -1804,6 +1804,34 @@ fn diagram_view_prefixes_xrefs_on_gantt_lanes() {
 }
 
 #[test]
+fn diagram_view_prefixes_xrefs_on_empty_gantt_fallback_lane() {
+    let diagram_id = DiagramId::new("empty-gantt").unwrap();
+    let mut session = Session::new(SessionId::new("s:empty-gantt").unwrap());
+    session.diagrams_mut().insert(
+        diagram_id.clone(),
+        Diagram::new(
+            diagram_id.clone(),
+            "Empty Gantt",
+            DiagramAst::Gantt(crate::model::GanttAst::default()),
+        ),
+    );
+    session.set_active_diagram_id(Some(diagram_id.clone()));
+    let lane_ref = ObjectRef::new(
+        diagram_id,
+        super::category_path(&["gantt", "lane"]),
+        ObjectId::new("lane:0000").unwrap(),
+    );
+    session.xrefs_mut().insert(
+        XRefId::new("x:empty-gantt-lane-marker").unwrap(),
+        XRef::new(lane_ref.clone(), lane_ref, "anchors", XRefStatus::Ok),
+    );
+
+    let app = App::new(session);
+    let rendered = text_to_string(&app.diagram_text());
+    assert!(rendered.contains("▾▴"), "{rendered}");
+}
+
+#[test]
 fn diagram_view_renders_direction_markers_in_cyan() {
     let mut app = App::new(demo_session());
     app.set_active_diagram_id(DiagramId::new("demo-00-index").expect("diagram id"));
