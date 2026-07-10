@@ -67,7 +67,19 @@ fn parse_duration_days(raw: &str) -> Option<u32> {
 }
 
 fn looks_like_date(s: &str) -> bool {
-    s.chars().any(|c| c == '-') && s.chars().any(|c| c.is_ascii_digit())
+    // Require YYYY-MM-DD so tags like `task-1` / `a-1` are not misclassified as dates.
+    let mut parts = s.split('-');
+    let (Some(y), Some(m), Some(d), None) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
+    else {
+        return false;
+    };
+    y.len() == 4
+        && y.chars().all(|c| c.is_ascii_digit())
+        && m.len() == 2
+        && m.chars().all(|c| c.is_ascii_digit())
+        && d.len() == 2
+        && d.chars().all(|c| c.is_ascii_digit())
 }
 
 /// Parse limited gantt subset (title, dateFormat, section, tasks with date/after/duration).
