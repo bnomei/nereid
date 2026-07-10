@@ -513,6 +513,7 @@ impl NereidMcp {
         if let Some((diagram_id, history)) = history_update {
             state.delta_history.insert(diagram_id, history);
         }
+        self.prune_missing_agent_highlights(&state.session).await;
         drop(state);
         self.notify_ui_session_changed().await;
         Ok(response)

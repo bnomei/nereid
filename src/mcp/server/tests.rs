@@ -845,6 +845,33 @@ async fn diagram_apply_ops_prunes_agent_spotlight_for_removed_object() {
 }
 
 #[tokio::test]
+async fn diagram_replace_from_mermaid_prunes_agent_spotlight_for_removed_object() {
+    let server = NereidMcp::new(demo_session());
+
+    server
+        .attention_agent_set(Parameters(AttentionAgentSetParams {
+            object_ref: "d:d-flow/flow/node/n:a".to_owned(),
+        }))
+        .await
+        .expect("set spotlight");
+
+    server
+        .diagram_replace_from_mermaid(Parameters(DiagramReplaceFromMermaidParams {
+            diagram_id: Some("d-flow".into()),
+            base_rev: 0,
+            mermaid: "flowchart TD\n  B[B]\n".into(),
+        }))
+        .await
+        .expect("replace");
+
+    let Json(read) = server.attention_agent_read().await.expect("attention_agent_read");
+    assert_eq!(
+        read.object_ref, None,
+        "agent spotlight must be pruned once replace_from_mermaid drops its target object",
+    );
+}
+
+#[tokio::test]
 async fn attention_agent_set_overwrites_previous_value() {
     let server = NereidMcp::new(demo_session());
 
