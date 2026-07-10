@@ -248,16 +248,9 @@ pub fn export_class_diagram(ast: &ClassAst) -> Result<String, MermaidClassExport
     let mut out = String::from("classDiagram\n");
 
     // Emit members first for stable readability.
-    for class in ast.classes().values() {
+    for (class_id, class) in ast.classes() {
         if class.name().is_empty() {
-            // Find id for error — scan map
-            let id = ast
-                .classes()
-                .iter()
-                .find(|(_, c)| c.name().is_empty())
-                .map(|(id, _)| id.clone())
-                .unwrap_or_else(|| ObjectId::new("c:unknown").expect("id"));
-            return Err(MermaidClassExportError::EmptyClassName { class_id: id });
+            return Err(MermaidClassExportError::EmptyClassName { class_id: class_id.clone() });
         }
         for attr in class.attributes() {
             out.push_str(&format!("    {} : {}\n", class.name(), attr));
