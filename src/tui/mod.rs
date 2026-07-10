@@ -2130,8 +2130,12 @@ impl App {
             DiagramAst::Er(ast) => {
                 let mut refs = Vec::new();
                 let ent = category_path(&["er", "entity"]);
+                let rel = category_path(&["er", "relationship"]);
                 for id in ast.entities().keys() {
                     refs.push(ObjectRef::new(diagram_id.clone(), ent.clone(), id.clone()));
+                }
+                for id in ast.relationships().keys() {
+                    refs.push(ObjectRef::new(diagram_id.clone(), rel.clone(), id.clone()));
                 }
                 refs
             }
@@ -3935,15 +3939,24 @@ fn objects_from_class_ast(
 }
 
 fn objects_from_er_ast(diagram_id: &DiagramId, ast: &crate::model::ErAst) -> Vec<SelectableObject> {
-    let cat = category_path(&["er", "entity"]);
-    ast.entities()
-        .iter()
-        .map(|(id, e)| SelectableObject {
+    let ent_cat = category_path(&["er", "entity"]);
+    let rel_cat = category_path(&["er", "relationship"]);
+    let mut out = Vec::new();
+    for (id, e) in ast.entities() {
+        out.push(SelectableObject {
             label: format!("entity {} ({})", id, e.name()),
             note: e.note().map(str::to_owned),
-            object_ref: ObjectRef::new(diagram_id.clone(), cat.clone(), id.clone()),
-        })
-        .collect()
+            object_ref: ObjectRef::new(diagram_id.clone(), ent_cat.clone(), id.clone()),
+        });
+    }
+    for (id, r) in ast.relationships() {
+        out.push(SelectableObject {
+            label: format!("relationship {} ({} -> {})", id, r.from_entity_id(), r.to_entity_id()),
+            note: r.label().map(str::to_owned),
+            object_ref: ObjectRef::new(diagram_id.clone(), rel_cat.clone(), id.clone()),
+        });
+    }
+    out
 }
 
 fn objects_from_gantt_ast(
