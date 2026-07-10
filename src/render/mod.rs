@@ -18,6 +18,7 @@ use crate::model::ObjectRef;
 
 pub mod diagram;
 pub mod flowchart;
+pub mod graph_paint;
 pub mod lower;
 pub mod pipeline;
 pub mod scene;
@@ -30,6 +31,10 @@ pub mod walkthrough;
 pub use diagram::{render_diagram_unicode, render_diagram_unicode_annotated, DiagramRenderError};
 pub use flowchart::{
     render_flowchart_unicode, render_flowchart_unicode_annotated, FlowchartRenderError,
+};
+pub use graph_paint::{
+    graph_cap_glyph, graph_node_attach_mid_y, graph_node_box_height, graph_node_inner_rows,
+    graph_node_preferred_inner_width, paint_graph_node_box,
 };
 pub use lower::{lower_diagram_ast, lower_flowchart, lower_sequence};
 pub use pipeline::{
