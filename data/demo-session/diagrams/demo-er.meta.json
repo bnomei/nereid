@@ -1,0 +1,9 @@
+{
+  "diagram_id": "demo-er",
+  "mmd_path": "diagrams/demo-er.mmd",
+  "er_entity_notes": {
+    "e:CUSTOMER": "billing party",
+    "e:ORDER": "purchase header",
+    "e:LINE-ITEM": "order line quantity + SKU"
+  }
+}

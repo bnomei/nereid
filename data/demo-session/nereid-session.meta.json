@@ -24,6 +24,27 @@
       "rev": 0
     },
     {
+      "diagram_id": "demo-class",
+      "name": "Class demo (compartments + UML caps)",
+      "kind": "class",
+      "mmd_path": "diagrams/demo-class.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "demo-er",
+      "name": "ER demo (cardinality ends)",
+      "kind": "er",
+      "mmd_path": "diagrams/demo-er.mmd",
+      "rev": 0
+    },
+    {
+      "diagram_id": "demo-gantt",
+      "name": "Gantt demo (multi-lane track boxes)",
+      "kind": "gantt",
+      "mmd_path": "diagrams/demo-gantt.mmd",
+      "rev": 0
+    },
+    {
       "diagram_id": "demo-t-flow-routing",
       "name": "Flowchart demo (routing + crossings)",
       "kind": "flowchart",
@@ -197,6 +218,30 @@
       "to": "d:demo-t-flow-routing/flow/node/n:start",
       "kind": "nav",
       "label": "open routing demo",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:nav:class",
+      "from": "d:demo-00-index/flow/node/n:class_demo",
+      "to": "d:demo-class/class/class/c:Class01",
+      "kind": "nav",
+      "label": "open class demo",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:nav:er",
+      "from": "d:demo-00-index/flow/node/n:er_demo",
+      "to": "d:demo-er/er/entity/e:CUSTOMER",
+      "kind": "nav",
+      "label": "open er demo",
+      "status": "ok"
+    },
+    {
+      "xref_id": "x:nav:gantt",
+      "from": "d:demo-00-index/flow/node/n:gantt_demo",
+      "to": "d:demo-gantt/gantt/task/t:0001",
+      "kind": "nav",
+      "label": "open gantt demo",
       "status": "ok"
     },
     {

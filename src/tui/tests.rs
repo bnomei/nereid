@@ -935,8 +935,18 @@ fn objects_focus_f_enters_hint_mode() {
 
 #[test]
 fn class_diagram_f_enters_hint_mode_with_class_targets() {
-    let mut app = App::new(demo_session());
-    app.set_active_diagram_id(DiagramId::new("demo-class").expect("diagram id"));
+    let mut session = Session::new(SessionId::new("s:class-hint").expect("session id"));
+    let class_id = DiagramId::new("d-class").expect("diagram id");
+    let class_ast =
+        crate::format::mermaid::parse_class_diagram("classDiagram\nA <|-- B : cool\nA : foo()\n")
+            .expect("class parse");
+    session.diagrams_mut().insert(
+        class_id.clone(),
+        Diagram::new(class_id.clone(), "Class", DiagramAst::Class(class_ast)),
+    );
+    session.set_active_diagram_id(Some(class_id));
+
+    let mut app = App::new(session);
     app.handle_key_code(KeyCode::Char('f'));
     let targets = match &app.hint_mode {
         HintMode::AwaitingFirst { kind: HintKind::Jump, targets } => targets,
@@ -956,8 +966,17 @@ fn class_diagram_f_enters_hint_mode_with_class_targets() {
 
 #[test]
 fn er_diagram_f_enters_hint_mode_with_entity_targets() {
-    let mut app = App::new(demo_session());
-    app.set_active_diagram_id(DiagramId::new("demo-er").expect("diagram id"));
+    let mut session = Session::new(SessionId::new("s:er-hint").expect("session id"));
+    let er_id = DiagramId::new("d-er").expect("diagram id");
+    let er_ast =
+        crate::format::mermaid::parse_er_diagram("erDiagram\nCUSTOMER ||--o{ ORDER : places\n")
+            .expect("er parse");
+    session
+        .diagrams_mut()
+        .insert(er_id.clone(), Diagram::new(er_id.clone(), "ER", DiagramAst::Er(er_ast)));
+    session.set_active_diagram_id(Some(er_id));
+
+    let mut app = App::new(session);
     app.handle_key_code(KeyCode::Char('f'));
     let targets = match &app.hint_mode {
         HintMode::AwaitingFirst { kind: HintKind::Jump, targets } => targets,
@@ -2768,4 +2787,47 @@ fn diagram_select_hints_selects_message_between_consecutive_sequence_participant
     app.handle_key_code(KeyCode::Char(bob_target.label[1].to_ascii_lowercase()));
     assert!(app.session.selected_object_refs().contains(&bob_ref));
     assert!(app.session.selected_object_refs().contains(&message_ref));
+}
+
+#[test]
+fn demo_session_includes_class_er_gantt() {
+    let session = demo_session();
+    for id in ["demo-class", "demo-er", "demo-gantt"] {
+        assert!(
+            session.diagrams().contains_key(&DiagramId::new(id).expect("id")),
+            "missing {id} in demo_session(); have: {:?}",
+            session.diagrams().keys().map(|k| k.to_string()).collect::<Vec<_>>()
+        );
+    }
+    match session.diagrams().get(&DiagramId::new("demo-class").unwrap()).unwrap().ast() {
+        DiagramAst::Class(ast) => {
+            assert!(!ast.classes().is_empty());
+            // notes from sidecar
+            let note = ast.classes().values().find_map(|c| c.note());
+            assert!(note.is_some(), "class notes should load from sidecar");
+        }
+        other => panic!("expected class, got {other:?}"),
+    }
+    match session.diagrams().get(&DiagramId::new("demo-er").unwrap()).unwrap().ast() {
+        DiagramAst::Er(ast) => {
+            assert!(!ast.entities().is_empty());
+            assert!(ast.entities().values().any(|e| e.note().is_some()), "er notes from sidecar");
+        }
+        other => panic!("expected er, got {other:?}"),
+    }
+    match session.diagrams().get(&DiagramId::new("demo-gantt").unwrap()).unwrap().ast() {
+        DiagramAst::Gantt(ast) => assert!(!ast.tasks().is_empty()),
+        other => panic!("expected gantt, got {other:?}"),
+    }
+    // index links
+    let index = session.diagrams().get(&DiagramId::new("demo-00-index").unwrap()).unwrap();
+    match index.ast() {
+        DiagramAst::Flowchart(ast) => {
+            let labels: Vec<_> = ast.nodes().values().map(|n| n.label().to_string()).collect();
+            assert!(labels.iter().any(|l| l.contains("Class")), "{labels:?}");
+            assert!(labels.iter().any(|l| l.contains("ER") || l.contains("Er")), "{labels:?}");
+            assert!(labels.iter().any(|l| l.contains("Gantt") || l.contains("gantt")), "{labels:?}");
+        }
+        other => panic!("expected flowchart index, got {other:?}"),
+    }
 }

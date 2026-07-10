@@ -8,6 +8,9 @@
     "n:flow_demo": "edges + shapes",
     "n:seq_demo": "sync/async/return",
     "n:seq_blocks": "alt/loop/par",
-    "n:flow_route": "routing + tees"
+    "n:flow_route": "routing + tees",
+    "n:class_demo": "compartments + UML caps",
+    "n:er_demo": "2→1 char cardinality",
+    "n:gantt_demo": "multi-col track boxes"
   }
 }

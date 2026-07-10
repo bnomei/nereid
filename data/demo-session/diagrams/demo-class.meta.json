@@ -1,0 +1,9 @@
+{
+  "diagram_id": "demo-class",
+  "mmd_path": "diagrams/demo-class.mmd",
+  "class_node_notes": {
+    "c:Class01": "root of the cool hierarchy",
+    "c:AveryLongClass": "wide title; note still paints as one row",
+    "c:Class07": "implements equals + element storage"
+  }
+}
