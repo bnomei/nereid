@@ -824,7 +824,7 @@ fn enabling_follow_ai_jumps_to_agent_highlight_diagram() {
 }
 
 #[test]
-fn follow_ai_publishes_followed_target_as_human_attention() {
+fn follow_ai_does_not_overwrite_human_attention_with_agent_target() {
     use crate::ui::UiState;
     use std::sync::Arc;
     use tokio::sync::Mutex;
@@ -833,21 +833,41 @@ fn follow_ai_publishes_followed_target_as_human_attention() {
     let mut app = App::new(demo_session());
     app.ui_state = Some(ui_state.clone());
 
-    let target: ObjectRef = "d:demo-seq/seq/participant/p:alice".parse().expect("object ref");
-    app.agent_highlights.blocking_lock().insert(target.clone());
+    let human_ref: ObjectRef =
+        "d:demo-00-index/flow/node/n:start".parse().expect("human object ref");
+    app.select_object_ref(&human_ref);
+    assert_eq!(app.focus_owner, FocusOwner::Human);
+
+    {
+        let ui = ui_state.blocking_lock();
+        assert_eq!(ui.human_active_object_ref(), Some(&human_ref));
+        assert_eq!(
+            ui.human_active_diagram_id().map(ToString::to_string).as_deref(),
+            Some("demo-00-index"),
+        );
+    }
+
+    let agent_target: ObjectRef =
+        "d:demo-seq/seq/participant/p:alice".parse().expect("agent object ref");
+    app.agent_highlights.blocking_lock().insert(agent_target.clone());
     app.follow_ai = true;
 
     app.sync_from_ui_state();
 
-    assert_eq!(app.selected_ref(), Some(&target), "viewport should follow the agent target");
+    assert_eq!(app.selected_ref(), Some(&agent_target), "viewport should follow the agent target");
+    assert_eq!(app.focus_owner, FocusOwner::Agent);
 
     let ui = ui_state.blocking_lock();
     assert_eq!(
         ui.human_active_object_ref(),
-        Some(&target),
-        "human attention must reflect the followed target during follow-AI",
+        Some(&human_ref),
+        "agent follow must not overwrite human_active_object_ref",
     );
-    assert_eq!(ui.human_active_diagram_id().map(ToString::to_string).as_deref(), Some("demo-seq"),);
+    assert_eq!(
+        ui.human_active_diagram_id().map(ToString::to_string).as_deref(),
+        Some("demo-00-index"),
+        "agent follow must not overwrite human_active_diagram_id",
+    );
 }
 
 #[test]

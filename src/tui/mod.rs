@@ -820,7 +820,7 @@ impl App {
 
         let mut ui_state = ui_state.blocking_lock();
         ui_state.set_follow_ai(self.follow_ai);
-        if self.focus_owner == FocusOwner::Human || self.follow_ai {
+        if self.focus_owner == FocusOwner::Human {
             let active_diagram_id = self.session.active_diagram_id().cloned();
             let active_object_ref = self.selected_ref().cloned();
             ui_state.set_human_selection(active_diagram_id, active_object_ref);
