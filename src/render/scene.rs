@@ -19,6 +19,7 @@
 use std::collections::BTreeMap;
 
 use crate::model::flow_ast::{FlowEdge, FlowNode, FlowchartAst};
+use crate::model::gantt_ast::GanttAst;
 use crate::model::ids::ObjectId;
 use crate::model::seq_ast::SequenceAst;
 use crate::model::symbol::SymbolAnchor;
@@ -420,17 +421,26 @@ pub enum TrackSpanStyle {
 /// - **Sequence**: each participant node is 1 lane wide (header box over a lifeline column).
 /// - **Gantt**: each task node spans multiple time-lane columns for its duration.
 ///
-/// Commit-1 still carries the full sequence AST so block frames and layout stay lossless. Gantt
-/// paints from domain AST via track paint until bar spans live fully on this model.
+/// Sequence keeps the full `SequenceAst` for block frames. Gantt carries domain `GanttAst` so
+/// scene paint can render without a separate domain special-case (sequence shell stays empty).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TrackModel {
     sequence: SequenceAst,
+    gantt: Option<GanttAst>,
     default_span_style: TrackSpanStyle,
 }
 
 impl TrackModel {
     pub fn from_sequence(sequence: SequenceAst) -> Self {
-        Self { sequence, default_span_style: TrackSpanStyle::Arrow }
+        Self { sequence, gantt: None, default_span_style: TrackSpanStyle::Arrow }
+    }
+
+    pub fn from_gantt(gantt: GanttAst) -> Self {
+        Self {
+            sequence: SequenceAst::default(),
+            gantt: Some(gantt),
+            default_span_style: TrackSpanStyle::Bar,
+        }
     }
 
     pub fn as_sequence_ast(&self) -> &SequenceAst {
@@ -439,6 +449,10 @@ impl TrackModel {
 
     pub fn into_sequence_ast(self) -> SequenceAst {
         self.sequence
+    }
+
+    pub fn as_gantt_ast(&self) -> Option<&GanttAst> {
+        self.gantt.as_ref()
     }
 
     pub fn default_span_style(&self) -> TrackSpanStyle {

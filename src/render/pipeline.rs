@@ -145,12 +145,13 @@ pub fn render_graph_unicode_annotated_with_categories(
 }
 
 /// Layout + paint a track-family scene (sequence / gantt).
-///
-/// Uses [`layout_track`] then the existing sequence painter (temporary bridge).
 pub fn render_track_unicode_with_options(
     model: &TrackModel,
     options: RenderOptions,
 ) -> Result<String, PipelineRenderError> {
+    if let Some(gantt) = model.as_gantt_ast() {
+        return Ok(crate::render::track_paint::render_gantt_unicode(gantt, options)?);
+    }
     let layout = layout_track(model)?;
     let ast = model.as_sequence_ast();
     Ok(render_sequence_unicode_with_options(ast, &layout, options)?)
@@ -162,6 +163,11 @@ pub fn render_track_unicode_annotated_with_options(
     model: &TrackModel,
     options: RenderOptions,
 ) -> Result<AnnotatedRender, PipelineRenderError> {
+    if let Some(gantt) = model.as_gantt_ast() {
+        return Ok(crate::render::track_paint::render_gantt_unicode_annotated(
+            diagram_id, gantt, options,
+        )?);
+    }
     let layout = layout_track(model)?;
     let ast = model.as_sequence_ast();
     Ok(render_sequence_unicode_annotated_with_options(diagram_id, ast, &layout, options)?)
@@ -199,10 +205,6 @@ pub fn render_ast_unicode_with_options(
     ast: &DiagramAst,
     options: RenderOptions,
 ) -> Result<String, PipelineRenderError> {
-    // Gantt keeps domain data that the track SequenceAst bridge cannot express yet.
-    if let DiagramAst::Gantt(gantt) = ast {
-        return Ok(crate::render::track_paint::render_gantt_unicode(gantt, options)?);
-    }
     let scene = lower_diagram_ast(ast);
     render_scene_unicode_with_options(&scene, options)
 }
@@ -216,9 +218,6 @@ pub fn render_ast_unicode_annotated_with_options(
     use crate::render::graph_paint::GraphHighlightCategories;
 
     match ast {
-        DiagramAst::Gantt(gantt) => Ok(crate::render::track_paint::render_gantt_unicode_annotated(
-            diagram_id, gantt, options,
-        )?),
         DiagramAst::Class(class) => {
             let model = crate::render::lower::lower_class(class);
             render_graph_unicode_annotated_with_categories(
