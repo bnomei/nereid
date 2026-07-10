@@ -702,7 +702,9 @@ fn prune_messages_from_block(block: &mut SequenceBlock, removed: &HashSet<Object
             None::<String>,
             message_ids,
         );
-    } else if !block.blocks().is_empty() {
+    } else if sections.is_empty() && !block.blocks().is_empty() {
+        // Synthetic Main is only valid when the parent lost all direct section membership
+        // but nested content remains. Do not append a second Main when Main still has messages.
         let mut nested_message_ids = Vec::new();
         collect_nested_block_message_ids(block.blocks(), &mut nested_message_ids);
         if !nested_message_ids.is_empty() {

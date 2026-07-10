@@ -1302,6 +1302,93 @@ fn remove_message_keeps_parent_block_when_nested_content_survives() {
 }
 
 #[test]
+fn remove_message_keeps_single_main_when_nested_and_main_remain() {
+    use crate::format::mermaid::sequence::export_sequence_diagram;
+    use crate::model::seq_ast::{
+        SequenceBlock, SequenceBlockKind, SequenceMessage, SequenceMessageKind, SequenceSection,
+        SequenceSectionKind,
+    };
+    use crate::model::Diagram;
+
+    // Outer alt Main holds M1 + nested M2 (ancestor membership). Nested opt holds M2.
+    // Removing M1 must leave a single non-empty Main — not synthesize a second Main.
+    let a = ObjectId::new("p:a").expect("id");
+    let b = ObjectId::new("p:b").expect("id");
+    let m1 = ObjectId::new("m:0001").expect("id");
+    let m2 = ObjectId::new("m:0002").expect("id");
+    let alt_main = ObjectId::new("sec:0001:00").expect("id");
+
+    let mut ast = SequenceAst::default();
+    ast.participants_mut().insert(a.clone(), SequenceParticipant::new("A"));
+    ast.participants_mut().insert(b.clone(), SequenceParticipant::new("B"));
+    ast.messages_mut().push(SequenceMessage::new(
+        m1.clone(),
+        a.clone(),
+        b.clone(),
+        SequenceMessageKind::Sync,
+        "outer",
+        1000,
+    ));
+    ast.messages_mut().push(SequenceMessage::new(
+        m2.clone(),
+        b.clone(),
+        a.clone(),
+        SequenceMessageKind::Sync,
+        "inner",
+        2000,
+    ));
+    ast.blocks_mut().push(SequenceBlock::new(
+        ObjectId::new("b:0001").expect("id"),
+        SequenceBlockKind::Alt,
+        Some("outer".to_owned()),
+        vec![SequenceSection::new(
+            alt_main.clone(),
+            SequenceSectionKind::Main,
+            None,
+            vec![m1.clone(), m2.clone()],
+        )],
+        vec![SequenceBlock::new(
+            ObjectId::new("b:0002").expect("id"),
+            SequenceBlockKind::Opt,
+            Some("inner".to_owned()),
+            vec![SequenceSection::new(
+                ObjectId::new("sec:0002:00").expect("id"),
+                SequenceSectionKind::Main,
+                None,
+                vec![m2.clone()],
+            )],
+            Vec::new(),
+        )],
+    ));
+
+    let mut diagram =
+        Diagram::new(DiagramId::new("d:1").expect("id"), "seq", DiagramAst::Sequence(ast));
+
+    export_sequence_diagram(match diagram.ast() {
+        DiagramAst::Sequence(ast) => ast,
+        _ => panic!("sequence"),
+    })
+    .expect("export before edit");
+
+    apply_ops(&mut diagram, 0, &[Op::Seq(SeqOp::RemoveMessage { message_id: m1 })])
+        .expect("remove message leaving non-empty Main with nested blocks");
+
+    let DiagramAst::Sequence(ast) = diagram.ast() else { panic!("sequence") };
+    let parent = &ast.blocks()[0];
+    let main_count = parent
+        .sections()
+        .iter()
+        .filter(|s| s.kind() == SequenceSectionKind::Main)
+        .count();
+    assert_eq!(main_count, 1, "must not synthesize a second Main when Main still has messages");
+    assert_eq!(parent.sections().len(), 1);
+    assert_eq!(parent.sections()[0].section_id(), &alt_main);
+    assert_eq!(parent.sections()[0].message_ids(), &[m2.clone()]);
+    assert_eq!(parent.blocks().len(), 1, "nested block should be preserved");
+    export_sequence_diagram(ast).expect("export after remove with nested + non-empty Main");
+}
+
+#[test]
 fn apply_seq_block_ops_update_remove_and_add_section() {
     use super::{SeqBlockPatch, SeqSectionPatch};
     use crate::format::mermaid::sequence::export_sequence_diagram;
