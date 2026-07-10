@@ -407,6 +407,104 @@ impl NereidMcp {
                         style: edge.style().map(|s| s.to_owned()),
                     }
                 }
+                // Class/ER/gantt project into FlowNode/FlowEdge shapes for v1 tooling parity.
+                ([left, right], DiagramAst::Class(ast)) if left == "class" && right == "class" => {
+                    let class = ast.classes().get(object_id).ok_or_else(|| {
+                        ErrorData::resource_not_found(
+                            "class not found",
+                            Some(serde_json::json!({ "object_ref": object_ref.as_str() })),
+                        )
+                    })?;
+                    McpObject::FlowNode {
+                        label: class.name().to_owned(),
+                        shape: "class".to_owned(),
+                        mermaid_id: Some(class.name().to_owned()),
+                        note: class.note().map(ToOwned::to_owned),
+                        symbol: None,
+                    }
+                }
+                ([left, right], DiagramAst::Class(ast))
+                    if left == "class" && right == "relation" =>
+                {
+                    let rel = ast.relations().get(object_id).ok_or_else(|| {
+                        ErrorData::resource_not_found(
+                            "class relation not found",
+                            Some(serde_json::json!({ "object_ref": object_ref.as_str() })),
+                        )
+                    })?;
+                    McpObject::FlowEdge {
+                        from_node_id: rel.from_class_id().to_string(),
+                        to_node_id: rel.to_class_id().to_string(),
+                        label: rel.label().map(ToOwned::to_owned),
+                        connector: rel.raw_connector().map(ToOwned::to_owned),
+                        style: None,
+                    }
+                }
+                ([left, right], DiagramAst::Er(ast)) if left == "er" && right == "entity" => {
+                    let entity = ast.entities().get(object_id).ok_or_else(|| {
+                        ErrorData::resource_not_found(
+                            "entity not found",
+                            Some(serde_json::json!({ "object_ref": object_ref.as_str() })),
+                        )
+                    })?;
+                    McpObject::FlowNode {
+                        label: entity.name().to_owned(),
+                        shape: "entity".to_owned(),
+                        mermaid_id: Some(entity.name().to_owned()),
+                        note: entity.note().map(ToOwned::to_owned),
+                        symbol: None,
+                    }
+                }
+                ([left, right], DiagramAst::Er(ast)) if left == "er" && right == "relationship" => {
+                    let rel = ast.relationships().get(object_id).ok_or_else(|| {
+                        ErrorData::resource_not_found(
+                            "relationship not found",
+                            Some(serde_json::json!({ "object_ref": object_ref.as_str() })),
+                        )
+                    })?;
+                    McpObject::FlowEdge {
+                        from_node_id: rel.from_entity_id().to_string(),
+                        to_node_id: rel.to_entity_id().to_string(),
+                        label: rel.label().map(ToOwned::to_owned),
+                        connector: rel.raw_connector().map(ToOwned::to_owned),
+                        style: None,
+                    }
+                }
+                ([left, right], DiagramAst::Gantt(ast)) if left == "gantt" && right == "task" => {
+                    let task = ast.tasks().get(object_id).ok_or_else(|| {
+                        ErrorData::resource_not_found(
+                            "gantt task not found",
+                            Some(serde_json::json!({ "object_ref": object_ref.as_str() })),
+                        )
+                    })?;
+                    McpObject::FlowNode {
+                        label: task.name().to_owned(),
+                        shape: "task".to_owned(),
+                        mermaid_id: task.mermaid_tag().map(ToOwned::to_owned),
+                        note: task.note().map(ToOwned::to_owned),
+                        symbol: None,
+                    }
+                }
+                ([left, right], DiagramAst::Gantt(ast)) if left == "gantt" && right == "lane" => {
+                    let note = ast.lane_note(object_id).map(ToOwned::to_owned);
+                    if note.is_none()
+                        && object_id.as_str().strip_prefix("lane:").is_none_or(|rest| {
+                            rest.len() != 4 || !rest.chars().all(|c| c.is_ascii_digit())
+                        })
+                    {
+                        return Err(ErrorData::resource_not_found(
+                            "gantt lane not found",
+                            Some(serde_json::json!({ "object_ref": object_ref.as_str() })),
+                        ));
+                    }
+                    McpObject::FlowNode {
+                        label: object_id.as_str().to_owned(),
+                        shape: "lane".to_owned(),
+                        mermaid_id: Some(object_id.as_str().to_owned()),
+                        note,
+                        symbol: None,
+                    }
+                }
                 _ => {
                     return Err(ErrorData::invalid_params(
                         "unsupported category for diagram kind",
