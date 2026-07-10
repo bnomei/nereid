@@ -223,15 +223,9 @@ fn split_name_card(part: &str, name_first: bool) -> Option<(&str, &str)> {
 /// Export ER diagram to Mermaid.
 pub fn export_er_diagram(ast: &ErAst) -> Result<String, MermaidErExportError> {
     let mut out = String::from("erDiagram\n");
-    for entity in ast.entities().values() {
+    for (entity_id, entity) in ast.entities() {
         if entity.name().is_empty() {
-            let id = ast
-                .entities()
-                .iter()
-                .find(|(_, e)| e.name().is_empty())
-                .map(|(id, _)| id.clone())
-                .unwrap_or_else(|| ObjectId::new("e:unknown").expect("id"));
-            return Err(MermaidErExportError::EmptyEntityName { entity_id: id });
+            return Err(MermaidErExportError::EmptyEntityName { entity_id: entity_id.clone() });
         }
     }
 
