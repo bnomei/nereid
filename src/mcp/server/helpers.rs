@@ -267,7 +267,7 @@ fn mcp_ast_for_diagram(diagram: &Diagram) -> McpDiagramAst {
                     label: class.name().to_owned(),
                     shape: "class".to_owned(),
                     mermaid_id: Some(class.name().to_owned()),
-                    note: None,
+                    note: class.note().map(str::to_owned),
                     symbol: None,
                 })
                 .collect::<Vec<_>>();
@@ -298,7 +298,7 @@ fn mcp_ast_for_diagram(diagram: &Diagram) -> McpDiagramAst {
                     label: e.name().to_owned(),
                     shape: "entity".to_owned(),
                     mermaid_id: Some(e.name().to_owned()),
-                    note: None,
+                    note: e.note().map(str::to_owned),
                     symbol: None,
                 })
                 .collect::<Vec<_>>();
@@ -327,7 +327,7 @@ fn mcp_ast_for_diagram(diagram: &Diagram) -> McpDiagramAst {
                     label: task.name().to_owned(),
                     shape: "task".to_owned(),
                     mermaid_id: task.mermaid_tag().map(ToOwned::to_owned),
-                    note: None,
+                    note: task.note().map(str::to_owned),
                     symbol: None,
                 })
                 .collect::<Vec<_>>();
