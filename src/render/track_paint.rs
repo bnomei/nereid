@@ -145,20 +145,33 @@ fn resolve_task_windows(ast: &GanttAst) -> (BTreeMap<ObjectId, TaskWindow>, BTre
         }
     }
 
-    let mut cursor = 0u32;
-    for tid in &ordered {
-        let Some(task) = ast.tasks().get(tid) else {
-            continue;
-        };
-        let start = match task.start() {
-            GanttTaskStart::Date(d) => date_to_day.get(d).copied().unwrap_or(cursor),
-            GanttTaskStart::After(dep) => tag_end.get(dep).copied().unwrap_or(cursor),
-            GanttTaskStart::Unspecified => cursor,
-        };
-        let end = start.saturating_add(task.duration_days().max(1));
-        windows.insert(tid.clone(), TaskWindow { start, end });
-        tag_end.insert(tid.clone(), end);
-        cursor = end;
+    // Multi-pass resolve so `after` works even when the dependency is declared later.
+    let max_passes = ordered.len().saturating_add(1).max(1);
+    for _ in 0..max_passes {
+        let mut changed = false;
+        let mut cursor = 0u32;
+        for tid in &ordered {
+            let Some(task) = ast.tasks().get(tid) else {
+                continue;
+            };
+            let start = match task.start() {
+                GanttTaskStart::Date(d) => date_to_day.get(d).copied().unwrap_or(cursor),
+                GanttTaskStart::After(dep) => tag_end.get(dep).copied().unwrap_or(cursor),
+                GanttTaskStart::Unspecified => cursor,
+            };
+            let end = start.saturating_add(task.duration_days().max(1));
+            let prev = windows.get(tid).copied();
+            let next = TaskWindow { start, end };
+            if prev != Some(next) {
+                windows.insert(tid.clone(), next);
+                changed = true;
+            }
+            tag_end.insert(tid.clone(), end);
+            cursor = end;
+        }
+        if !changed {
+            break;
+        }
     }
 
     // Weekly tick labels when no absolute date is present at that day.
