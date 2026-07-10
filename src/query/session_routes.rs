@@ -57,6 +57,47 @@ fn flow_edge_ref(diagram_id: &DiagramId, edge_id: &ObjectId) -> ObjectRef {
     ObjectRef::new(diagram_id.clone(), flow_edge_category(), edge_id.clone())
 }
 
+fn cat(segments: &[&str]) -> CategoryPath {
+    CategoryPath::new(segments.iter().map(|s| (*s).to_owned()).collect()).expect("static category")
+}
+
+fn class_node_ref(diagram_id: &DiagramId, class_id: &ObjectId) -> ObjectRef {
+    ObjectRef::new(diagram_id.clone(), cat(&["class", "class"]), class_id.clone())
+}
+
+fn class_relation_ref(diagram_id: &DiagramId, rel_id: &ObjectId) -> ObjectRef {
+    ObjectRef::new(diagram_id.clone(), cat(&["class", "relation"]), rel_id.clone())
+}
+
+fn er_entity_ref(diagram_id: &DiagramId, entity_id: &ObjectId) -> ObjectRef {
+    ObjectRef::new(diagram_id.clone(), cat(&["er", "entity"]), entity_id.clone())
+}
+
+fn er_relationship_ref(diagram_id: &DiagramId, rel_id: &ObjectId) -> ObjectRef {
+    ObjectRef::new(diagram_id.clone(), cat(&["er", "relationship"]), rel_id.clone())
+}
+
+fn gantt_task_ref(diagram_id: &DiagramId, task_id: &ObjectId) -> ObjectRef {
+    ObjectRef::new(diagram_id.clone(), cat(&["gantt", "task"]), task_id.clone())
+}
+
+/// Bidirectional node↔edge connectivity matching flowchart routes.
+fn wire_node_edge_pair(
+    adjacency: &mut BTreeMap<ObjectRef, BTreeSet<ObjectRef>>,
+    from: ObjectRef,
+    to: ObjectRef,
+    edge_ref: ObjectRef,
+) {
+    insert_node(adjacency, edge_ref.clone());
+    insert_node(adjacency, from.clone());
+    insert_node(adjacency, to.clone());
+    insert_edge(adjacency, from.clone(), to.clone());
+    insert_edge(adjacency, from.clone(), edge_ref.clone());
+    insert_edge(adjacency, to.clone(), edge_ref.clone());
+    insert_edge(adjacency, edge_ref.clone(), from);
+    insert_edge(adjacency, edge_ref, to);
+}
+
 fn seq_message_ref(diagram_id: &DiagramId, message_id: &ObjectId) -> ObjectRef {
     ObjectRef::new(diagram_id.clone(), seq_message_category(), message_id.clone())
 }
@@ -115,39 +156,33 @@ fn derive_adjacency(session: &Session) -> BTreeMap<ObjectRef, BTreeSet<ObjectRef
             }
             DiagramAst::Class(ast) => {
                 for class_id in ast.classes().keys() {
-                    insert_node(&mut adjacency, flow_node_ref(diagram_id, class_id));
+                    insert_node(&mut adjacency, class_node_ref(diagram_id, class_id));
                 }
                 for (rel_id, rel) in ast.relations() {
-                    let edge_ref = flow_edge_ref(diagram_id, rel_id);
-                    insert_node(&mut adjacency, edge_ref.clone());
-                    let from = flow_node_ref(diagram_id, rel.from_class_id());
-                    let to = flow_node_ref(diagram_id, rel.to_class_id());
-                    insert_node(&mut adjacency, from.clone());
-                    insert_node(&mut adjacency, to.clone());
-                    insert_edge(&mut adjacency, from.clone(), to.clone());
-                    insert_edge(&mut adjacency, from.clone(), edge_ref.clone());
-                    insert_edge(&mut adjacency, to.clone(), edge_ref.clone());
-                    insert_edge(&mut adjacency, edge_ref.clone(), from);
-                    insert_edge(&mut adjacency, edge_ref, to);
+                    wire_node_edge_pair(
+                        &mut adjacency,
+                        class_node_ref(diagram_id, rel.from_class_id()),
+                        class_node_ref(diagram_id, rel.to_class_id()),
+                        class_relation_ref(diagram_id, rel_id),
+                    );
                 }
             }
             DiagramAst::Er(ast) => {
                 for id in ast.entities().keys() {
-                    insert_node(&mut adjacency, flow_node_ref(diagram_id, id));
+                    insert_node(&mut adjacency, er_entity_ref(diagram_id, id));
                 }
                 for (rel_id, rel) in ast.relationships() {
-                    let edge_ref = flow_edge_ref(diagram_id, rel_id);
-                    insert_node(&mut adjacency, edge_ref.clone());
-                    let from = flow_node_ref(diagram_id, rel.from_entity_id());
-                    let to = flow_node_ref(diagram_id, rel.to_entity_id());
-                    insert_node(&mut adjacency, from.clone());
-                    insert_node(&mut adjacency, to.clone());
-                    insert_edge(&mut adjacency, from, to);
+                    wire_node_edge_pair(
+                        &mut adjacency,
+                        er_entity_ref(diagram_id, rel.from_entity_id()),
+                        er_entity_ref(diagram_id, rel.to_entity_id()),
+                        er_relationship_ref(diagram_id, rel_id),
+                    );
                 }
             }
             DiagramAst::Gantt(ast) => {
                 for id in ast.tasks().keys() {
-                    insert_node(&mut adjacency, flow_node_ref(diagram_id, id));
+                    insert_node(&mut adjacency, gantt_task_ref(diagram_id, id));
                 }
             }
             DiagramAst::Sequence(ast) => {
