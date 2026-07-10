@@ -134,8 +134,9 @@ pub fn render_graph_unicode_annotated_with_categories(
 ) -> Result<AnnotatedRender, PipelineRenderError> {
     let layout = layout_graph(model)?;
     if crate::render::graph_paint::graph_model_needs_scene_paint(model) {
+        // Never default to CLASS — that mis-tags flowcharts if they ever take the scene path.
         let categories = highlight_categories
-            .unwrap_or(crate::render::graph_paint::GraphHighlightCategories::CLASS);
+            .unwrap_or(crate::render::graph_paint::GraphHighlightCategories::FLOW);
         return Ok(crate::render::graph_paint::render_graph_model_with_compartments_annotated(
             diagram_id, model, &layout, options, categories,
         )?);

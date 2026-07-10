@@ -152,18 +152,21 @@ pub fn graph_model_has_compartments(model: &crate::render::scene::GraphModel) ->
     model.nodes().values().any(|n| !n.compartments().is_empty())
 }
 
-/// True when the scene-native graph painter must run (compartments, non-flow caps, or dashed stroke).
+fn is_flow_compatible_cap(cap: CapKind) -> bool {
+    matches!(cap, CapKind::None | CapKind::Arrow | CapKind::Circle | CapKind::Cross)
+}
+
+/// True when the scene-native graph painter must run.
+///
+/// Triggers on compartments or non-flow endpoint caps (diamonds, triangles, ER cards).
+/// Does **not** trigger on dashed stroke alone — ordinary flowcharts with `-.->` stay on the
+/// orthogonal flowchart painter (which already understands dotted connectors).
 pub fn graph_model_needs_scene_paint(model: &crate::render::scene::GraphModel) -> bool {
     if graph_model_has_compartments(model) {
         return true;
     }
     model.edges().values().any(|edge| {
-        edge.stroke() == EdgeStroke::Dashed
-            || !matches!(edge.start_cap(), CapKind::None | CapKind::Arrow)
-            || !matches!(
-                edge.end_cap(),
-                CapKind::None | CapKind::Arrow | CapKind::Circle | CapKind::Cross
-            )
+        !is_flow_compatible_cap(edge.start_cap()) || !is_flow_compatible_cap(edge.end_cap())
     })
 }
 
@@ -229,6 +232,11 @@ pub struct GraphHighlightCategories<'a> {
 }
 
 impl GraphHighlightCategories<'static> {
+    pub const FLOW: Self = Self {
+        node_segments: &["flow", "node"],
+        edge_segments: &["flow", "edge"],
+        note_segments: &["flow", "note"],
+    };
     pub const CLASS: Self = Self {
         node_segments: &["class", "class"],
         edge_segments: &["class", "relation"],
