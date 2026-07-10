@@ -1570,6 +1570,72 @@ fn rename_overwrite(from: &Path, to: &Path) -> io::Result<()> {
     }
 }
 
+/// Refuse if `path` exists and is a symlink. Missing paths are allowed.
+fn refuse_if_symlink(path: &Path) -> Result<(), StoreError> {
+    match fs::symlink_metadata(path) {
+        Ok(md) if md.file_type().is_symlink() => Err(StoreError::SymlinkRefused {
+            path: path.to_path_buf(),
+        }),
+        Ok(_) => Ok(()),
+        Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(source) => Err(StoreError::Io {
+            path: path.to_path_buf(),
+            source,
+        }),
+    }
+}
+
+/// Ensure every component of `relative` under `session_dir` is a real directory (not a symlink).
+///
+/// Call immediately before open/rename so a concurrent swap of a parent to a symlink after
+/// [`create_dir_all_safe`] cannot redirect session writes outside the session root.
+fn ensure_real_dirs_under_session(session_dir: &Path, relative: &Path) -> Result<(), StoreError> {
+    if relative.as_os_str().is_empty() {
+        return Ok(());
+    }
+
+    let mut current = session_dir.to_path_buf();
+    for component in relative.components() {
+        let Component::Normal(part) = component else {
+            continue;
+        };
+
+        current.push(part);
+
+        match fs::symlink_metadata(&current) {
+            Ok(md) => {
+                if md.file_type().is_symlink() {
+                    return Err(StoreError::SymlinkRefused { path: current });
+                }
+                if !md.is_dir() {
+                    return Err(StoreError::Io {
+                        path: current,
+                        source: io::Error::new(io::ErrorKind::AlreadyExists, "expected directory"),
+                    });
+                }
+            }
+            Err(source) => {
+                return Err(StoreError::Io {
+                    path: current,
+                    source,
+                });
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Re-check parents and leaf immediately before a filesystem mutation that could escape.
+fn revalidate_session_write_path(
+    session_dir: &Path,
+    parent_rel: &Path,
+    path: &Path,
+) -> Result<(), StoreError> {
+    ensure_real_dirs_under_session(session_dir, parent_rel)?;
+    refuse_if_symlink(path)
+}
+
 fn write_atomic_in_session(
     session_dir: &Path,
     path: &Path,
@@ -1618,22 +1684,6 @@ fn write_atomic_in_session_inner(
     let parent_rel = relative.parent().unwrap_or_else(|| Path::new(""));
     create_dir_all_safe(session_dir, parent_rel)?;
 
-    match fs::symlink_metadata(path) {
-        Ok(md) if md.file_type().is_symlink() => {
-            return Err(StoreError::SymlinkRefused {
-                path: path.to_path_buf(),
-            });
-        }
-        Ok(_) => {}
-        Err(err) if err.kind() == io::ErrorKind::NotFound => {}
-        Err(source) => {
-            return Err(StoreError::Io {
-                path: path.to_path_buf(),
-                source,
-            })
-        }
-    }
-
     let Some(parent) = path.parent() else {
         return Err(StoreError::Io {
             path: path.to_path_buf(),
@@ -1658,6 +1708,10 @@ fn write_atomic_in_session_inner(
         nanos
     ));
 
+    // Re-validate every parent component + leaf immediately before open so a concurrent
+    // writer cannot replace a parent directory with a symlink after create_dir_all_safe.
+    revalidate_session_write_path(session_dir, parent_rel, path)?;
+
     let mut file = fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -1679,6 +1733,12 @@ fn write_atomic_in_session_inner(
         })?;
     }
     drop(file);
+
+    // Re-validate again immediately before rename (same TOCTOU class as open).
+    if let Err(err) = revalidate_session_write_path(session_dir, parent_rel, path) {
+        let _ = fs::remove_file(&tmp_path);
+        return Err(err);
+    }
 
     if let Err(source) = rename_overwrite(&tmp_path, path) {
         let _ = fs::remove_file(&tmp_path);

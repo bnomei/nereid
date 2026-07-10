@@ -658,6 +658,114 @@ fn save_and_load_session_round_trips_symbol_anchors_without_changing_mmd(
 }
 
 #[cfg(unix)]
+#[test]
+fn ensure_real_dirs_under_session_refuses_parent_swapped_to_symlink() {
+    use std::os::unix::fs::symlink;
+    use std::path::Path;
+
+    let tmp = TempDir::new("parent-symlink-toctou");
+    let session_dir = tmp.path().join("session");
+    let diagrams_dir = session_dir.join("diagrams");
+    std::fs::create_dir_all(&diagrams_dir).unwrap();
+
+    // Parent is a real directory after create-style setup.
+    super::ensure_real_dirs_under_session(&session_dir, Path::new("diagrams")).unwrap();
+
+    // Concurrent-writer style swap: rename real parent, replace with symlink outside session.
+    let outside = tmp.path().join("outside");
+    std::fs::create_dir_all(&outside).unwrap();
+    let real_parent = tmp.path().join("diagrams.real");
+    std::fs::rename(&diagrams_dir, &real_parent).unwrap();
+    symlink(&outside, &diagrams_dir).unwrap();
+
+    let err = super::ensure_real_dirs_under_session(&session_dir, Path::new("diagrams")).unwrap_err();
+    match err {
+        StoreError::SymlinkRefused { path } => assert_eq!(path, diagrams_dir),
+        other => panic!("expected SymlinkRefused, got: {other:?}"),
+    }
+
+    // Nested intermediate component must also be refused.
+    let nested_session = tmp.path().join("nested-session");
+    let nested_mid = nested_session.join("a").join("b");
+    std::fs::create_dir_all(&nested_mid).unwrap();
+    let a_path = nested_session.join("a");
+    let a_real = tmp.path().join("a.real");
+    std::fs::rename(&a_path, &a_real).unwrap();
+    symlink(&outside, &a_path).unwrap();
+    let err = super::ensure_real_dirs_under_session(&nested_session, Path::new("a/b")).unwrap_err();
+    match err {
+        StoreError::SymlinkRefused { path } => assert_eq!(path, a_path),
+        other => panic!("expected SymlinkRefused for intermediate, got: {other:?}"),
+    }
+}
+
+#[cfg(unix)]
+#[rstest]
+fn save_session_refuses_after_diagrams_dir_swapped_to_symlink(ctx: SessionFolderTestCtx) {
+    use std::os::unix::fs::symlink;
+
+    let session_dir = &ctx.session_dir;
+    let folder = &ctx.folder;
+
+    let mut session = Session::new(SessionId::new("s1").unwrap());
+    let seq_id = DiagramId::new("d1").unwrap();
+    let mut seq_ast = SequenceAst::default();
+    let p_alice = ObjectId::new("p:alice").unwrap();
+    let p_bob = ObjectId::new("p:bob").unwrap();
+    seq_ast.participants_mut().insert(p_alice.clone(), SequenceParticipant::new("Alice"));
+    seq_ast.participants_mut().insert(p_bob.clone(), SequenceParticipant::new("Bob"));
+    seq_ast.messages_mut().push(SequenceMessage::new(
+        ObjectId::new("m:0001").unwrap(),
+        p_alice,
+        p_bob,
+        SequenceMessageKind::Sync,
+        "Hello",
+        1,
+    ));
+    session
+        .diagrams_mut()
+        .insert(seq_id.clone(), Diagram::new(seq_id.clone(), "Seq Example", DiagramAst::Sequence(seq_ast)));
+
+    // First save creates a real diagrams/ parent.
+    folder.save_session(&session).unwrap();
+    // Drain async ASCII exports so they cannot recreate diagrams/ after we swap it.
+    folder.flush_ascii_exports();
+    let diagrams_dir = session_dir.join("diagrams");
+    assert!(diagrams_dir.is_dir());
+    assert!(!diagrams_dir.symlink_metadata().unwrap().file_type().is_symlink());
+
+    // Swap parent to a symlink after it was previously validated/created as a real directory.
+    let outside = ctx.tmp.path().join("outside-exfil");
+    std::fs::create_dir_all(&outside).unwrap();
+    let real_parent = ctx.tmp.path().join("diagrams.real");
+    std::fs::rename(&diagrams_dir, &real_parent).unwrap();
+    symlink(&outside, &diagrams_dir).unwrap();
+
+    // Bump so save rewrites the diagram artifacts.
+    {
+        let diagram = session.diagrams_mut().get_mut(&seq_id).unwrap();
+        diagram.bump_rev();
+    }
+
+    let err = folder.save_session(&session).unwrap_err();
+    match err {
+        StoreError::SymlinkRefused { path } => assert_eq!(path, diagrams_dir),
+        other => panic!("expected SymlinkRefused after parent swap, got: {other:?}"),
+    }
+
+    // Must not materialize session content under the symlink target.
+    let leaked: Vec<_> = std::fs::read_dir(&outside)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .map(|e| e.file_name())
+        .collect();
+    assert!(
+        leaked.is_empty(),
+        "parent-dir symlink must not receive session writes, found: {leaked:?}"
+    );
+}
+
+#[cfg(unix)]
 #[rstest]
 fn save_session_refuses_writing_through_symlinked_diagrams_dir(ctx: SessionFolderTestCtx) {
     use std::os::unix::fs::symlink;
