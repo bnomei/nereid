@@ -11,11 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added graph compartment painting (variable-height multi-compartment boxes with full-width interior dividers) and an expanded single-cell endpoint cap alphabet for class/ER-style relations.
 - Added class diagrams end-to-end: `ClassAst`, limited Mermaid `classDiagram` parse/export, graph-family lowerer, compartment render path, and session/MCP/TUI kind wiring (`classDiagram` create/replace/export/render).
 - Added entity-relationship diagrams: `ErAst`, limited `erDiagram` parse/export with 2→1 char cardinality folding, graph lowerer, and session/MCP/TUI kind wiring.
-- Added gantt charts: `GanttAst`, limited `gantt` parse/export (sections, dates, durations, `after`), track bar paint, and session/MCP/TUI kind wiring.
-- Expanded the built-in demo session with class, ER, and gantt fixtures linked from the demo index.
-- Added top-level node notes for class and ER diagrams (AST + diagram sidecar + render/TUI), matching flowchart notes.
-- Polished gantt paint toward sequence-style track boxes: drop title/section chrome, put time labels on top, and draw multi-column content boxes (shared with sequence 1-lane headers) that can hold notes.
-- Gantt time lanes use sequence-style header boxes + lifelines; F/C hints work for `gantt/task` and `gantt/lane` (class/er/gantt notes dim via `*/note` highlight spans).
+- Added gantt charts: `GanttAst`, limited `gantt` parse/export (sections, dates, durations, `after`), track paint, and session/MCP/TUI kind wiring.
+- Gantt paint mirrors sequence track chrome: time-lane header boxes with optional notes and lifelines, multi-column task boxes spanning duration, no title/section side chrome; F/C hints for `gantt/task` and `gantt/lane`.
+- Added top-level notes for class nodes, ER entities, gantt tasks, and gantt lanes (AST + diagram sidecar + render/TUI dimming via `*/note` spans), matching flowchart/sequence notes.
+- Expanded the built-in `--demo` session with class, ER, and gantt fixtures (index links, nav xrefs, and demo notes).
+- Various Bugfixes.
 
 ## [0.8.0] - 2026-07-09
 - Added sequence structure ops for alt/opt/loop/par blocks, sections, and message membership (including nested ancestor membership).
