@@ -46,6 +46,7 @@ pub use lower::{
 };
 pub use pipeline::{
     render_ast_unicode_annotated_with_options, render_ast_unicode_with_options,
+    render_class_unicode_with_options, render_er_unicode_with_options,
     render_graph_unicode_annotated_with_options, render_graph_unicode_with_options,
     render_scene_unicode_annotated_with_options, render_scene_unicode_with_options,
     render_track_unicode_annotated_with_options, render_track_unicode_with_options,

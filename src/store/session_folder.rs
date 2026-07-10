@@ -192,17 +192,17 @@ impl AsciiExportManager {
                         },
                         DiagramAst::Class(ast) => {
                             use crate::render::{
-                                lower_class, render_graph_unicode_with_options, RenderOptions,
+                                lower_class, render_class_unicode_with_options, RenderOptions,
                             };
                             let model = lower_class(&ast);
-                            render_graph_unicode_with_options(&model, RenderOptions::default()).ok()
+                            render_class_unicode_with_options(&model, RenderOptions::default()).ok()
                         }
                         DiagramAst::Er(ast) => {
                             use crate::render::{
-                                lower_er, render_graph_unicode_with_options, RenderOptions,
+                                lower_er, render_er_unicode_with_options, RenderOptions,
                             };
                             let model = lower_er(&ast);
-                            render_graph_unicode_with_options(&model, RenderOptions::default()).ok()
+                            render_er_unicode_with_options(&model, RenderOptions::default()).ok()
                         }
                         DiagramAst::Gantt(ast) => crate::render::track_paint::render_gantt_unicode(
                             &ast,
