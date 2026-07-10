@@ -30,7 +30,7 @@ Nereid is source-available for noncommercial use only. Commercial use, product u
 - A terminal that supports alternate-screen TUI applications.
 - Optional: `VISUAL` or `EDITOR` for the in-app Mermaid editor. Nereid falls back to `vi`.
 
-Installing Nereid does not grant unrestricted rights. The same source-available noncommercial license applies to crates.io, Homebrew, GitHub Releases, and source builds.
+Installing Nereid does not grant unrestricted rights. The same source-available noncommercial license applies to crates.io, Homebrew, GitHub Releases, npm, Docker, and source builds.
 
 ### Cargo
 
@@ -44,6 +44,26 @@ nereid --version
 ```bash
 brew install bnomei/nereid/nereid
 nereid --version
+```
+
+### npm wrapper
+
+```bash
+npx @bnomei/nereid --version
+```
+
+The npm package is a thin wrapper. On first run it downloads the matching GitHub Release binary, verifies the published `.sha256`, caches it locally, and forwards argv to the binary.
+
+### Docker
+
+```bash
+docker run --rm ghcr.io/bnomei/nereid:0.9.0 --version
+```
+
+The image is built from published musl Linux release assets. Prefer binding a session directory for MCP or file-backed work:
+
+```bash
+docker run --rm -v "$PWD/my-session:/workspace/my-session" ghcr.io/bnomei/nereid:0.9.0 --mcp --session /workspace/my-session
 ```
 
 ### GitHub Releases
