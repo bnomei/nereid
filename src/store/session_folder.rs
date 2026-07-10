@@ -80,6 +80,14 @@ fn migrate_legacy_gantt_lane_ref(session: &Session, object_ref: ObjectRef) -> Ob
     };
     ObjectRef::new(object_ref.diagram_id().clone(), object_ref.category().clone(), lane_id)
 }
+
+fn migrate_legacy_gantt_lane_walkthrough_refs(session: &Session, walkthrough: &mut Walkthrough) {
+    for node in walkthrough.nodes_mut() {
+        for object_ref in node.refs_mut() {
+            *object_ref = migrate_legacy_gantt_lane_ref(session, object_ref.clone());
+        }
+    }
+}
 const SESSION_WRITE_LOCK_RETRY_DELAY: Duration = Duration::from_millis(10);
 const SESSION_WRITE_LOCK_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -1910,7 +1918,8 @@ impl SessionFolder {
         match walkthrough_ids {
             Some(walkthrough_ids) => {
                 for walkthrough_id in walkthrough_ids {
-                    let walkthrough = self.load_walkthrough(&walkthrough_id)?;
+                    let mut walkthrough = self.load_walkthrough(&walkthrough_id)?;
+                    migrate_legacy_gantt_lane_walkthrough_refs(&session, &mut walkthrough);
                     session.walkthroughs_mut().insert(walkthrough_id, walkthrough);
                 }
             }
@@ -1936,7 +1945,8 @@ impl SessionFolder {
                                     StoreError::Json { path: wt_path.clone(), source }
                                 })?;
 
-                            let walkthrough = walkthrough_from_json(wt_json)?;
+                            let mut walkthrough = walkthrough_from_json(wt_json)?;
+                            migrate_legacy_gantt_lane_walkthrough_refs(&session, &mut walkthrough);
                             session
                                 .walkthroughs_mut()
                                 .insert(walkthrough.walkthrough_id().clone(), walkthrough);

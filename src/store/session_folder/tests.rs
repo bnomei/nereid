@@ -1879,6 +1879,35 @@ fn replace_gantt_mermaid_preserves_identical_untagged_tasks_across_sections() {
 }
 
 #[test]
+fn replace_gantt_mermaid_disambiguates_identical_tasks_in_duplicate_named_sections() {
+    let mut ast = crate::format::mermaid::parse_gantt_diagram(
+        "gantt\ndateFormat YYYY-MM-DD\nsection Review\nCheck :2026-01-01, 2d\nsection Review\nCheck :2026-01-01, 2d\n",
+    )
+    .unwrap();
+    let first_id = ast.sections()[0].task_ids()[0].clone();
+    let second_id = ast.sections()[1].task_ids()[0].clone();
+    ast.tasks_mut().get_mut(&first_id).unwrap().set_note(Some("first check"));
+    ast.tasks_mut().get_mut(&second_id).unwrap().set_note(Some("second check"));
+    let mut diagram = Diagram::new(
+        DiagramId::new("d-gantt-duplicate-sections").unwrap(),
+        "Gantt",
+        DiagramAst::Gantt(ast),
+    );
+
+    replace_diagram_from_mermaid(
+        &mut diagram,
+        "gantt\ndateFormat YYYY-MM-DD\nsection Review\nPrep :2025-12-31, 1d\nCheck :2026-01-01, 2d\nsection Review\nCheck :2026-01-01, 2d\n",
+    )
+    .unwrap();
+
+    let DiagramAst::Gantt(ast) = diagram.ast() else { panic!("expected Gantt") };
+    assert_eq!(ast.tasks()[&first_id].note(), Some("first check"));
+    assert_eq!(ast.tasks()[&second_id].note(), Some("second check"));
+    assert_eq!(ast.sections()[0].task_ids()[1], first_id);
+    assert_eq!(ast.sections()[1].task_ids()[0], second_id);
+}
+
+#[test]
 fn replace_gantt_mermaid_preserves_section_id_when_task_is_inserted() {
     let section_id = ObjectId::new("section:build-stable").unwrap();
     let task_id = ObjectId::new("task:design-stable").unwrap();
@@ -1946,6 +1975,13 @@ fn load_migrates_legacy_gantt_lane_notes_xrefs_and_selection(ctx: SessionFolderT
         xref_id.clone(),
         XRef::new(lane_ref.clone(), task_ref, "anchors", ModelXRefStatus::Ok),
     );
+    let walkthrough_id = WalkthroughId::new("w:legacy-lane").unwrap();
+    let mut walkthrough = Walkthrough::new(walkthrough_id.clone(), "Legacy lane evidence");
+    let mut walkthrough_node =
+        WalkthroughNode::new(WalkthroughNodeId::new("n:lane").unwrap(), "Lane");
+    walkthrough_node.refs_mut().push(lane_ref.clone());
+    walkthrough.nodes_mut().push(walkthrough_node);
+    session.walkthroughs_mut().insert(walkthrough_id.clone(), walkthrough);
     folder.save_session(&session).unwrap();
 
     let meta_path = folder.meta_path();
@@ -1955,6 +1991,10 @@ fn load_migrates_legacy_gantt_lane_notes_xrefs_and_selection(ctx: SessionFolderT
     let sidecar_path = folder.diagram_meta_path(&mmd_path).unwrap();
     let sidecar = std::fs::read_to_string(&sidecar_path).unwrap();
     std::fs::write(&sidecar_path, sidecar.replace("lane:2026-01-01", "lane:0000")).unwrap();
+    let walkthrough_path = folder.walkthrough_json_path(&walkthrough_id);
+    let walkthrough_json = std::fs::read_to_string(&walkthrough_path).unwrap();
+    std::fs::write(&walkthrough_path, walkthrough_json.replace("lane:2026-01-01", "lane:0000"))
+        .unwrap();
 
     let loaded = folder.load_session().unwrap();
     let DiagramAst::Gantt(ast) = loaded.diagrams()[&diagram_id].ast() else {
@@ -1964,6 +2004,7 @@ fn load_migrates_legacy_gantt_lane_notes_xrefs_and_selection(ctx: SessionFolderT
     assert!(loaded.selected_object_refs().contains(&lane_ref));
     assert_eq!(loaded.xrefs()[&xref_id].from(), &lane_ref);
     assert_eq!(loaded.xrefs()[&xref_id].status(), ModelXRefStatus::Ok);
+    assert_eq!(loaded.walkthroughs()[&walkthrough_id].nodes()[0].refs(), &[lane_ref]);
 }
 
 #[rstest]

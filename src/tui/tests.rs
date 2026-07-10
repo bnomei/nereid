@@ -1779,6 +1779,31 @@ fn diagram_view_prefixes_xrefs_on_class_er_and_gantt_objects() {
 }
 
 #[test]
+fn diagram_view_prefixes_xrefs_on_gantt_lanes() {
+    let mut session = demo_session_fallback();
+    let diagram_id = DiagramId::new("demo-gantt").unwrap();
+    let (lane_id, task_id) = {
+        let DiagramAst::Gantt(ast) = session.diagrams()[&diagram_id].ast() else {
+            panic!("expected Gantt")
+        };
+        (ast.lanes().into_keys().next().unwrap(), ast.tasks().keys().next().unwrap().clone())
+    };
+    let lane_ref =
+        ObjectRef::new(diagram_id.clone(), super::category_path(&["gantt", "lane"]), lane_id);
+    let task_ref =
+        ObjectRef::new(diagram_id.clone(), super::category_path(&["gantt", "task"]), task_id);
+    session.xrefs_mut().insert(
+        XRefId::new("x:gantt-lane-marker").unwrap(),
+        XRef::new(lane_ref, task_ref, "anchors", XRefStatus::Ok),
+    );
+
+    let mut app = App::new(session);
+    app.set_active_diagram_id(diagram_id);
+    let rendered = text_to_string(&app.diagram_text());
+    assert!(rendered.contains("▴ 2014-01-01"), "{rendered}");
+}
+
+#[test]
 fn diagram_view_renders_direction_markers_in_cyan() {
     let mut app = App::new(demo_session());
     app.set_active_diagram_id(DiagramId::new("demo-00-index").expect("diagram id"));

@@ -31,6 +31,8 @@ pub struct GanttAst {
     /// Notes on time-lane headers (`lane:2026-01-01`, or relative `lane:0000` when the
     /// chart has no valid absolute dates); sidecar-only, not Mermaid.
     lane_notes: BTreeMap<ObjectId, String>,
+    /// Ephemeral TUI-only prefixes for rendered lane labels; never exported or persisted.
+    lane_label_prefixes: BTreeMap<ObjectId, String>,
 }
 
 impl GanttAst {
@@ -89,6 +91,21 @@ impl GanttAst {
         }
     }
 
+    pub(crate) fn set_lane_label_prefix(
+        &mut self,
+        lane_id: ObjectId,
+        prefix: Option<impl Into<String>>,
+    ) {
+        match prefix {
+            Some(prefix) => {
+                self.lane_label_prefixes.insert(lane_id, prefix.into());
+            }
+            None => {
+                self.lane_label_prefixes.remove(&lane_id);
+            }
+        }
+    }
+
     /// Render-visible time lanes keyed by stable object ids.
     ///
     /// Lanes are derived from the same resolved task windows as the text renderer. Keeping the
@@ -115,6 +132,11 @@ impl GanttAst {
                     .map(format_ymd_ordinal)
                     .unwrap_or_else(|| format!("{day:04}"));
                 let lane_id = ObjectId::new(format!("lane:{suffix}")).expect("derived lane id");
+                let label = self
+                    .lane_label_prefixes
+                    .get(&lane_id)
+                    .map(|prefix| format!("{prefix}{label}"))
+                    .unwrap_or(label);
                 (lane_id, day, label)
             })
             .collect::<Vec<_>>();

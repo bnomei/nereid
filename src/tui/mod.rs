@@ -3202,6 +3202,22 @@ fn prefix_xref_direction_labels_for_tui(diagram: &mut Diagram, session: &Session
                     outgoing_refs.contains(&object_ref),
                 ));
             }
+            let lane_category = category_path(&["gantt", "lane"]);
+            for lane_id in gantt_ast.lanes().into_keys() {
+                let object_ref = ObjectRef::new(
+                    diagram.diagram_id().clone(),
+                    lane_category.clone(),
+                    lane_id.clone(),
+                );
+                let prefix = xref_direction_prefix_for_flags(
+                    outgoing_refs.contains(&object_ref),
+                    incoming_refs.contains(&object_ref),
+                );
+                gantt_ast.set_lane_label_prefix(
+                    lane_id,
+                    (!prefix.is_empty()).then(|| prefix.to_owned()),
+                );
+            }
         }
         DiagramAst::Flowchart(flow_ast) => {
             let node_category = category_path(&["flow", "node"]);

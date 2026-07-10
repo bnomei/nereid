@@ -140,8 +140,13 @@ fn gantt_task_fingerprint(ast: &GanttAst, task_id: &ObjectId, task: &GanttTask) 
     let section_context = ast
         .sections()
         .iter()
-        .find(|section| section.task_ids().contains(task_id))
-        .map(|section| {
+        .enumerate()
+        .find(|(_, section)| section.task_ids().contains(task_id))
+        .map(|(section_index, section)| {
+            let section_occurrence = ast.sections()[..section_index]
+                .iter()
+                .filter(|candidate| candidate.name() == section.name())
+                .count();
             let occurrence = section
                 .task_ids()
                 .iter()
@@ -152,9 +157,12 @@ fn gantt_task_fingerprint(ast: &GanttAst, task_id: &ObjectId, task: &GanttTask) 
                     })
                 })
                 .count();
-            format!("section={:?};occurrence={occurrence}", section.name())
+            format!(
+                "section={:?};section_occurrence={section_occurrence};occurrence={occurrence}",
+                section.name()
+            )
         })
-        .unwrap_or_else(|| "section=<unsectioned>;occurrence=0".to_owned());
+        .unwrap_or_else(|| "section=<unsectioned>;section_occurrence=0;occurrence=0".to_owned());
     format!("{base};{section_context}")
 }
 

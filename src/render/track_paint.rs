@@ -196,7 +196,7 @@ fn render_gantt_inner(
     ast: &GanttAst,
     options: RenderOptions,
 ) -> Result<(String, Vec<GanttBoxPlacement>), CanvasError> {
-    let (windows, axis_labels) = ast.resolved_task_windows();
+    let (windows, _) = ast.resolved_task_windows();
     let max_end = windows.values().map(|w| w.end).max().unwrap_or(1).max(1);
 
     // Chart geometry: each day is one lane unit of GANTT_UNIT_WIDTH chars.
@@ -228,10 +228,7 @@ fn render_gantt_inner(
         let next = lanes.get(i + 1).map(|(_, day, _)| *day).unwrap_or(max_end);
         let (x0, x1) =
             gantt_box_x_range(GanttTaskWindow { start: *day, end: next.max(day + 1) }, width);
-        let label = axis_labels
-            .get(day)
-            .map(|s| shorten_axis_label(s))
-            .unwrap_or_else(|| shorten_axis_label(lane_label));
+        let label = shorten_axis_label(lane_label);
         let mid_x = x0.saturating_add(x1.saturating_sub(x0) / 2);
         let lane_note =
             if options.show_notes { ast.lane_note(lane_id).map(str::to_owned) } else { None };
