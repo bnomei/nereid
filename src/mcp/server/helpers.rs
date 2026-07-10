@@ -200,7 +200,16 @@ fn digest_for_walkthrough(walkthrough: &crate::model::Walkthrough) -> Walkthroug
     }
 }
 
-fn mermaid_for_diagram(diagram: &Diagram) -> String {
+fn mermaid_export_error(kind: &str, err: impl std::fmt::Display) -> ErrorData {
+    ErrorData::internal_error(
+        format!("failed to export {kind} diagram as Mermaid: {err}"),
+        Some(serde_json::json!({ "kind": kind, "export_error": err.to_string() })),
+    )
+}
+
+/// Canonical Mermaid for `diagram_read`. Fail closed on export errors so agents never
+/// treat an empty skeleton as a successful snapshot of a non-exportable AST.
+fn mermaid_for_diagram(diagram: &Diagram) -> Result<String, ErrorData> {
     match diagram.ast() {
         DiagramAst::Sequence(ast) => mermaid_for_sequence(ast),
         DiagramAst::Flowchart(ast) => mermaid_for_flowchart(ast),
@@ -210,17 +219,18 @@ fn mermaid_for_diagram(diagram: &Diagram) -> String {
     }
 }
 
-fn mermaid_for_er(ast: &crate::model::ErAst) -> String {
-    crate::format::mermaid::export_er_diagram(ast).unwrap_or_else(|_| "erDiagram\n".to_owned())
+fn mermaid_for_er(ast: &crate::model::ErAst) -> Result<String, ErrorData> {
+    crate::format::mermaid::export_er_diagram(ast).map_err(|err| mermaid_export_error("ER", err))
 }
 
-fn mermaid_for_gantt(ast: &crate::model::GanttAst) -> String {
-    crate::format::mermaid::export_gantt_diagram(ast).unwrap_or_else(|_| "gantt\n".to_owned())
+fn mermaid_for_gantt(ast: &crate::model::GanttAst) -> Result<String, ErrorData> {
+    crate::format::mermaid::export_gantt_diagram(ast)
+        .map_err(|err| mermaid_export_error("Gantt", err))
 }
 
-fn mermaid_for_class(ast: &crate::model::ClassAst) -> String {
+fn mermaid_for_class(ast: &crate::model::ClassAst) -> Result<String, ErrorData> {
     crate::format::mermaid::export_class_diagram(ast)
-        .unwrap_or_else(|_| "classDiagram\n".to_owned())
+        .map_err(|err| mermaid_export_error("Class", err))
 }
 
 fn mcp_ast_for_diagram(diagram: &Diagram) -> McpDiagramAst {
@@ -515,58 +525,17 @@ fn map_seq_block_to_mcp(block: &crate::model::seq_ast::SequenceBlock) -> McpSeqB
     }
 }
 
-fn mermaid_for_sequence(ast: &crate::model::SequenceAst) -> String {
-    if let Ok(exported) = crate::format::mermaid::export_sequence_diagram(ast) {
-        return exported;
-    }
-
-    let mut out = String::new();
-    out.push_str("sequenceDiagram\n");
-
-    for participant in ast.participants().values() {
-        out.push_str("    participant ");
-        out.push_str(participant.mermaid_name());
-        out.push('\n');
-    }
-
-    let mut messages = ast.messages().iter().collect::<Vec<_>>();
-    messages.sort_by(|a, b| crate::model::SequenceMessage::cmp_in_order(a, b));
-
-    for msg in messages {
-        let from_name = ast
-            .participants()
-            .get(msg.from_participant_id())
-            .map(|p| p.mermaid_name())
-            .unwrap_or("<missing>");
-        let to_name = ast
-            .participants()
-            .get(msg.to_participant_id())
-            .map(|p| p.mermaid_name())
-            .unwrap_or("<missing>");
-
-        let arrow = match msg.kind() {
-            crate::model::SequenceMessageKind::Sync => "->>",
-            crate::model::SequenceMessageKind::Async => "-)",
-            crate::model::SequenceMessageKind::Return => "-->>",
-        };
-        let arrow = msg.raw_arrow().filter(|raw| !raw.is_empty()).unwrap_or(arrow);
-
-        out.push_str("    ");
-        out.push_str(from_name);
-        out.push_str(arrow);
-        out.push_str(to_name);
-        out.push_str(": ");
-        out.push_str(msg.text());
-        out.push('\n');
-    }
-
-    out
+fn mermaid_for_sequence(ast: &crate::model::SequenceAst) -> Result<String, ErrorData> {
+    // Same exporter as store/TUI; no messages-only reconstruction that drops blocks.
+    crate::format::mermaid::export_sequence_diagram(ast)
+        .map_err(|err| mermaid_export_error("Sequence", err))
 }
 
-fn mermaid_for_flowchart(ast: &crate::model::FlowchartAst) -> String {
+fn mermaid_for_flowchart(ast: &crate::model::FlowchartAst) -> Result<String, ErrorData> {
     // Prefer the same exporter as store/TUI so mermaid_id (not object id) is used.
-    // Fail closed on export error rather than emitting wrong identities.
-    crate::format::mermaid::export_flowchart(ast).unwrap_or_else(|_| "flowchart\n".to_owned())
+    // Fail closed on export error rather than emitting a skeleton or wrong identities.
+    crate::format::mermaid::export_flowchart(ast)
+        .map_err(|err| mermaid_export_error("Flowchart", err))
 }
 
 fn delta_response_from_history(

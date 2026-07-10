@@ -13,9 +13,10 @@ use rmcp::handler::server::wrapper::{Json, Parameters};
 
 use crate::model::{
     seq_ast::{SequenceBlock, SequenceBlockKind, SequenceSection, SequenceSectionKind},
-    Diagram, DiagramAst, FlowEdge, FlowNode, FlowchartAst, ObjectRef, SequenceAst, SequenceMessage,
-    SequenceMessageKind, SequenceParticipant, SessionId, Walkthrough, WalkthroughEdge,
-    WalkthroughId, WalkthroughNode, WalkthroughNodeId, XRef, XRefId, XRefStatus,
+    ClassAst, ClassNode, ClassRelation, ClassRelationKind, Diagram, DiagramAst, FlowEdge, FlowNode,
+    FlowchartAst, ObjectRef, SequenceAst, SequenceMessage, SequenceMessageKind, SequenceParticipant,
+    SessionId, Walkthrough, WalkthroughEdge, WalkthroughId, WalkthroughNode, WalkthroughNodeId,
+    XRef, XRefId, XRefStatus,
 };
 use crate::render::render_diagram_unicode;
 use std::str::FromStr;
@@ -3081,6 +3082,88 @@ async fn diagram_read_flowchart_uses_mermaid_id_not_object_id() {
         !snapshot.mermaid.contains("n_A") && !snapshot.mermaid.contains("n_B"),
         "must not emit object-id mermaid tokens, got:\n{}",
         snapshot.mermaid
+    );
+}
+
+#[tokio::test]
+async fn diagram_read_fails_closed_when_class_export_rejects_ast() {
+    let mut session = Session::new(SessionId::new("s:mcp-read-class-export").expect("session id"));
+    let diagram_id = DiagramId::new("d-class-bad").expect("diagram id");
+
+    let mut ast = ClassAst::default();
+    let class_a = oid("c:A");
+    ast.classes_mut().insert(class_a.clone(), ClassNode::new("A"));
+    // Relation points at a missing class — export must reject; read must not return skeleton.
+    ast.relations_mut().insert(
+        oid("r:1"),
+        ClassRelation::new(class_a, oid("c:missing"), ClassRelationKind::Association),
+    );
+
+    session.diagrams_mut().insert(
+        diagram_id.clone(),
+        Diagram::new(diagram_id.clone(), "Bad Class", DiagramAst::Class(ast)),
+    );
+    session.set_active_diagram_id(Some(diagram_id));
+
+    let server = NereidMcp::new(session);
+    let err = match server
+        .diagram_read(Parameters(DiagramTargetParams { diagram_id: None }))
+        .await
+    {
+        Ok(_) => panic!("export failure must fail closed"),
+        Err(err) => err,
+    };
+    assert!(
+        err.message.contains("failed to export Class diagram as Mermaid"),
+        "unexpected error message: {}",
+        err.message
+    );
+    assert!(
+        err.message.to_lowercase().contains("missing"),
+        "error should describe export failure; got: {}",
+        err.message
+    );
+}
+
+#[tokio::test]
+async fn diagram_read_fails_closed_when_sequence_export_rejects_ast() {
+    let mut session = Session::new(SessionId::new("s:mcp-read-seq-export").expect("session id"));
+    let diagram_id = DiagramId::new("d-seq-bad").expect("diagram id");
+
+    let mut ast = SequenceAst::default();
+    let p_a = oid("p:a");
+    let mut participant = SequenceParticipant::new("A");
+    // Reserved role keyword makes canonical sequence export fail.
+    participant.set_role(Some("activate"));
+    ast.participants_mut().insert(p_a, participant);
+    // Also add a message with a missing participant so a messages-only fallback would be incomplete.
+    ast.messages_mut().push(SequenceMessage::new(
+        oid("m:1"),
+        oid("p:a"),
+        oid("p:missing"),
+        SequenceMessageKind::Sync,
+        "Hi",
+        1000,
+    ));
+
+    session.diagrams_mut().insert(
+        diagram_id.clone(),
+        Diagram::new(diagram_id.clone(), "Bad Seq", DiagramAst::Sequence(ast)),
+    );
+    session.set_active_diagram_id(Some(diagram_id));
+
+    let server = NereidMcp::new(session);
+    let err = match server
+        .diagram_read(Parameters(DiagramTargetParams { diagram_id: None }))
+        .await
+    {
+        Ok(_) => panic!("sequence export failure must fail closed (no messages-only rebuild)"),
+        Err(err) => err,
+    };
+    assert!(
+        err.message.contains("failed to export Sequence diagram as Mermaid"),
+        "unexpected error message: {}",
+        err.message
     );
 }
 

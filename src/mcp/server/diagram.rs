@@ -875,7 +875,7 @@ impl NereidMcp {
         let response = DiagramSnapshot {
             rev: diagram.rev(),
             kind: diagram_kind_label(diagram.kind()).to_owned(),
-            mermaid: mermaid_for_diagram(diagram),
+            mermaid: mermaid_for_diagram(diagram)?,
             context: ReadContext::default(),
         };
         drop(state);
