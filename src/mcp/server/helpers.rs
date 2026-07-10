@@ -12,6 +12,7 @@ fn diagram_kind_label(kind: DiagramKind) -> &'static str {
     match kind {
         DiagramKind::Sequence => "Sequence",
         DiagramKind::Flowchart => "Flowchart",
+        DiagramKind::Class => "Class",
     }
 }
 
@@ -27,6 +28,9 @@ fn detect_mermaid_kind(input: &str) -> Option<DiagramKind> {
         if trimmed.starts_with("flowchart") || trimmed.starts_with("graph") {
             return Some(DiagramKind::Flowchart);
         }
+        if trimmed.starts_with("classDiagram") {
+            return Some(DiagramKind::Class);
+        }
         return None;
     }
     None
@@ -36,6 +40,7 @@ fn allocate_diagram_id(session: &Session, kind: DiagramKind) -> DiagramId {
     let base = match kind {
         DiagramKind::Sequence => "seq",
         DiagramKind::Flowchart => "flow",
+        DiagramKind::Class => "class",
     };
 
     if !session.diagrams().contains_key(base) {
@@ -95,6 +100,17 @@ fn digest_for_diagram(diagram: &Diagram) -> DiagramDigest {
             key_names: ast.nodes().values().map(|n| n.label().to_owned()).collect(),
             context: ReadContext::default(),
         },
+        DiagramAst::Class(ast) => DiagramDigest {
+            rev: diagram.rev(),
+            counts: DiagramCounts {
+                participants: 0,
+                messages: 0,
+                nodes: ast.classes().len() as u64,
+                edges: ast.relations().len() as u64,
+            },
+            key_names: ast.classes().values().map(|c| c.name().to_owned()).collect(),
+            context: ReadContext::default(),
+        },
     }
 }
 
@@ -112,7 +128,12 @@ fn mermaid_for_diagram(diagram: &Diagram) -> String {
     match diagram.ast() {
         DiagramAst::Sequence(ast) => mermaid_for_sequence(ast),
         DiagramAst::Flowchart(ast) => mermaid_for_flowchart(ast),
+        DiagramAst::Class(ast) => mermaid_for_class(ast),
     }
+}
+
+fn mermaid_for_class(ast: &crate::model::ClassAst) -> String {
+    crate::format::mermaid::export_class_diagram(ast).unwrap_or_else(|_| "classDiagram\n".to_owned())
 }
 
 fn mcp_ast_for_diagram(diagram: &Diagram) -> McpDiagramAst {
@@ -188,6 +209,38 @@ fn mcp_ast_for_diagram(diagram: &Diagram) -> McpDiagramAst {
                     label: edge.label().map(ToOwned::to_owned),
                     connector: edge.connector().map(ToOwned::to_owned),
                     style: edge.style().map(ToOwned::to_owned),
+                })
+                .collect::<Vec<_>>();
+            edges.sort_by(|a, b| a.edge_id.cmp(&b.edge_id));
+
+            McpDiagramAst::Flowchart { nodes, edges }
+        }
+        DiagramAst::Class(ast) => {
+            // Project class diagrams into the flowchart MCP shape (nodes/edges) for v1 tooling.
+            let mut nodes = ast
+                .classes()
+                .iter()
+                .map(|(class_id, class)| McpFlowNodeAst {
+                    node_id: class_id.to_string(),
+                    label: class.name().to_owned(),
+                    shape: "class".to_owned(),
+                    mermaid_id: Some(class.name().to_owned()),
+                    note: None,
+                    symbol: None,
+                })
+                .collect::<Vec<_>>();
+            nodes.sort_by(|a, b| a.node_id.cmp(&b.node_id));
+
+            let mut edges = ast
+                .relations()
+                .iter()
+                .map(|(rel_id, rel)| McpFlowEdgeAst {
+                    edge_id: rel_id.to_string(),
+                    from_node_id: rel.from_class_id().to_string(),
+                    to_node_id: rel.to_class_id().to_string(),
+                    label: rel.label().map(ToOwned::to_owned),
+                    connector: rel.raw_connector().map(ToOwned::to_owned),
+                    style: None,
                 })
                 .collect::<Vec<_>>();
             edges.sort_by(|a, b| a.edge_id.cmp(&b.edge_id));
@@ -972,6 +1025,10 @@ fn map_replace_error(err: crate::store::DiagramMermaidReplaceError) -> ErrorData
         ),
         DiagramMermaidReplaceError::ParseSequence(err) => ErrorData::invalid_params(
             format!("cannot parse Mermaid sequence diagram: {err}"),
+            None,
+        ),
+        DiagramMermaidReplaceError::ParseClass(err) => ErrorData::invalid_params(
+            format!("cannot parse Mermaid class diagram: {err}"),
             None,
         ),
         DiagramMermaidReplaceError::ParseFlowchart(err) => ErrorData::invalid_params(

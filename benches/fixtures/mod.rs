@@ -128,6 +128,7 @@ pub fn checksum_session(session: &Session) -> u64 {
             DiagramAst::Flowchart(ast) => {
                 acc.wrapping_mul(131).wrapping_add(checksum_flowchart(ast))
             }
+            DiagramAst::Class(_) => acc.wrapping_mul(131),
             DiagramAst::Sequence(ast) => acc.wrapping_mul(131).wrapping_add(checksum_sequence(ast)),
         };
     }
@@ -721,6 +722,7 @@ pub mod session {
                         _ => None,
                     };
                     let to = match seq_diagram.ast() {
+                        DiagramAst::Class(_) => None,
                         DiagramAst::Sequence(ast) => first_seq_participant_ref(seq_id, ast),
                         _ => None,
                     };

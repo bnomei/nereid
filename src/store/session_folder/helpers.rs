@@ -28,6 +28,13 @@ fn export_diagram_mmd(
                 source: Box::new(source),
             })?
         }
+        DiagramAst::Class(ast) => {
+            export_class_diagram(ast).map_err(|source| StoreError::MermaidClassExport {
+                diagram_id: diagram.diagram_id().clone(),
+                path: mmd_path.to_path_buf(),
+                source: Box::new(source),
+            })?
+        }
     };
 
     write_atomic_in_session(folder.root(), mmd_path, mmd.as_bytes(), folder.durability)?;
@@ -217,6 +224,7 @@ struct SessionXRefJson {
 enum DiagramKindJson {
     Sequence,
     Flowchart,
+    Class,
 }
 
 impl From<DiagramKind> for DiagramKindJson {
@@ -224,6 +232,7 @@ impl From<DiagramKind> for DiagramKindJson {
         match kind {
             DiagramKind::Sequence => Self::Sequence,
             DiagramKind::Flowchart => Self::Flowchart,
+            DiagramKind::Class => Self::Class,
         }
     }
 }
@@ -233,6 +242,7 @@ impl From<DiagramKindJson> for DiagramKind {
         match kind {
             DiagramKindJson::Sequence => Self::Sequence,
             DiagramKindJson::Flowchart => Self::Flowchart,
+            DiagramKindJson::Class => Self::Class,
         }
     }
 }

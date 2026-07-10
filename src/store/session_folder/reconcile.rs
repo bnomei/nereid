@@ -49,6 +49,16 @@ pub(crate) fn stable_id_map_from_ast(ast: &DiagramAst) -> DiagramStableIdMap {
 
             DiagramStableIdMap { by_mermaid_id, by_name: BTreeMap::new() }
         }
+        DiagramAst::Class(class_ast) => {
+            let mut by_name = BTreeMap::new();
+            for (class_id, class) in class_ast.classes() {
+                if class.name().is_empty() {
+                    continue;
+                }
+                by_name.entry(class.name().to_owned()).or_insert_with(|| class_id.to_string());
+            }
+            DiagramStableIdMap { by_mermaid_id: BTreeMap::new(), by_name }
+        }
     }
 }
 
@@ -738,6 +748,9 @@ pub(crate) fn reconcile_diagram_ast(ast: &mut DiagramAst, sidecar: &DiagramMeta)
             reconcile_sequence_participant_notes(seq_ast, sidecar);
             reconcile_sequence_participant_symbols(seq_ast, sidecar);
         }
+        DiagramAst::Class(_) => {
+            // Class identity reconciliation is name-based via stable_id_map; no sidecar fields yet.
+        }
     }
 }
 
@@ -810,6 +823,15 @@ pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> 
                     participant.symbol().map(|symbol| (participant_id.clone(), symbol.clone()))
                 })
                 .collect(),
+        ),
+        DiagramAst::Class(_) => (
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
         ),
     };
 

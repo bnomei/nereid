@@ -83,6 +83,9 @@ impl From<PipelineRenderError> for DiagramRenderError {
             PipelineRenderError::FlowchartLayout(err) => Self::FlowchartLayout(err),
             PipelineRenderError::SequenceRender(err) => Self::SequenceRender(err),
             PipelineRenderError::FlowchartRender(err) => Self::FlowchartRender(err),
+            PipelineRenderError::Canvas(err) => {
+                Self::FlowchartRender(crate::render::flowchart::FlowchartRenderError::Canvas(err))
+            }
         }
     }
 }

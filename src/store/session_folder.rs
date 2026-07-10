@@ -29,7 +29,8 @@ use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 
 use crate::format::mermaid::{
-    export_flowchart, export_sequence_diagram, parse_flowchart, parse_sequence_diagram,
+    export_class_diagram, export_flowchart, export_sequence_diagram, parse_class_diagram,
+    parse_flowchart, parse_sequence_diagram, MermaidClassExportError, MermaidClassParseError,
     MermaidFlowchartExportError, MermaidFlowchartParseError, MermaidSequenceExportError,
     MermaidSequenceParseError,
 };
@@ -187,6 +188,13 @@ impl AsciiExportManager {
                             Ok(layout) => render_flowchart_unicode(&ast, &layout).ok(),
                             Err(_) => None,
                         },
+                        DiagramAst::Class(ast) => {
+                            use crate::render::{
+                                lower_class, render_graph_unicode_with_options, RenderOptions,
+                            };
+                            let model = lower_class(&ast);
+                            render_graph_unicode_with_options(&model, RenderOptions::default()).ok()
+                        }
                     } {
                         if !text.ends_with('\n') {
                             text.push('\n');
@@ -265,6 +273,16 @@ pub enum StoreError {
         diagram_id: DiagramId,
         path: PathBuf,
         source: Box<MermaidFlowchartExportError>,
+    },
+    MermaidClassParse {
+        diagram_id: DiagramId,
+        path: PathBuf,
+        source: Box<MermaidClassParseError>,
+    },
+    MermaidClassExport {
+        diagram_id: DiagramId,
+        path: PathBuf,
+        source: Box<MermaidClassExportError>,
     },
     SequenceLayout {
         diagram_id: DiagramId,
@@ -363,6 +381,22 @@ impl fmt::Display for StoreError {
                 f,
                 "cannot export Mermaid flowchart diagram {diagram_id} to {path:?}: {source}"
             ),
+            Self::MermaidClassParse {
+                diagram_id,
+                path,
+                source,
+            } => write!(
+                f,
+                "cannot parse Mermaid class diagram {diagram_id} from {path:?}: {source}"
+            ),
+            Self::MermaidClassExport {
+                diagram_id,
+                path,
+                source,
+            } => write!(
+                f,
+                "cannot export Mermaid class diagram {diagram_id} to {path:?}: {source}"
+            ),
             Self::SequenceLayout {
                 diagram_id,
                 path,
@@ -449,6 +483,8 @@ impl std::error::Error for StoreError {
             Self::MermaidFlowchartParse { source, .. } => Some(source),
             Self::MermaidSequenceExport { source, .. } => Some(source),
             Self::MermaidFlowchartExport { source, .. } => Some(source),
+            Self::MermaidClassParse { source, .. } => Some(source),
+            Self::MermaidClassExport { source, .. } => Some(source),
             Self::SequenceLayout { source, .. } => Some(source),
             Self::SequenceRender { source, .. } => Some(source),
             Self::FlowchartLayout { source, .. } => Some(source),
@@ -1217,7 +1253,7 @@ impl SessionFolder {
                             style: edge.style().map(ToOwned::to_owned),
                         })
                         .collect(),
-                    DiagramAst::Sequence(_) => Vec::new(),
+                    DiagramAst::Sequence(_) | DiagramAst::Class(_) => Vec::new(),
                 };
 
                 let sequence_messages = match diagram.ast() {
@@ -1232,12 +1268,12 @@ impl SessionFolder {
                             text: msg.text().to_owned(),
                         })
                         .collect(),
-                    DiagramAst::Flowchart(_) => Vec::new(),
+                    DiagramAst::Flowchart(_) | DiagramAst::Class(_) => Vec::new(),
                 };
 
                 let sequence_blocks = match diagram.ast() {
                     DiagramAst::Sequence(ast) => sequence_blocks_meta_from_ast(ast),
-                    DiagramAst::Flowchart(_) => Vec::new(),
+                    DiagramAst::Flowchart(_) | DiagramAst::Class(_) => Vec::new(),
                 };
 
                 let flow_node_notes = match diagram.ast() {
@@ -1248,7 +1284,7 @@ impl SessionFolder {
                             node.note().map(|note| (node_id.clone(), note.to_owned()))
                         })
                         .collect(),
-                    DiagramAst::Sequence(_) => BTreeMap::new(),
+                    DiagramAst::Sequence(_) | DiagramAst::Class(_) => BTreeMap::new(),
                 };
 
                 let sequence_participant_notes = match diagram.ast() {
@@ -1259,7 +1295,7 @@ impl SessionFolder {
                             participant.note().map(|note| (participant_id.clone(), note.to_owned()))
                         })
                         .collect(),
-                    DiagramAst::Flowchart(_) => BTreeMap::new(),
+                    DiagramAst::Flowchart(_) | DiagramAst::Class(_) => BTreeMap::new(),
                 };
 
                 let flow_node_symbols = match diagram.ast() {
@@ -1270,7 +1306,7 @@ impl SessionFolder {
                             node.symbol().map(|symbol| (node_id.clone(), symbol.clone()))
                         })
                         .collect(),
-                    DiagramAst::Sequence(_) => BTreeMap::new(),
+                    DiagramAst::Sequence(_) | DiagramAst::Class(_) => BTreeMap::new(),
                 };
 
                 let sequence_participant_symbols = match diagram.ast() {
@@ -1283,7 +1319,7 @@ impl SessionFolder {
                                 .map(|symbol| (participant_id.clone(), symbol.clone()))
                         })
                         .collect(),
-                    DiagramAst::Flowchart(_) => BTreeMap::new(),
+                    DiagramAst::Flowchart(_) | DiagramAst::Class(_) => BTreeMap::new(),
                 };
 
                 let diagram_meta = DiagramMeta {
@@ -1529,6 +1565,15 @@ impl SessionFolder {
                 DiagramKind::Flowchart => {
                     DiagramAst::Flowchart(parse_flowchart(&mmd).map_err(|source| {
                         StoreError::MermaidFlowchartParse {
+                            diagram_id: diagram_id.clone(),
+                            path: mmd_path.clone(),
+                            source: Box::new(source),
+                        }
+                    })?)
+                }
+                DiagramKind::Class => {
+                    DiagramAst::Class(parse_class_diagram(&mmd).map_err(|source| {
+                        StoreError::MermaidClassParse {
                             diagram_id: diagram_id.clone(),
                             path: mmd_path.clone(),
                             source: Box::new(source),
@@ -1823,6 +1868,7 @@ pub enum DiagramMermaidReplaceError {
     MissingOrUnknownKind { first_line: Option<String> },
     ParseSequence(Box<MermaidSequenceParseError>),
     ParseFlowchart(Box<MermaidFlowchartParseError>),
+    ParseClass(Box<MermaidClassParseError>),
     AstKindMismatch(DiagramAstKindMismatch),
 }
 
@@ -1833,16 +1879,17 @@ impl fmt::Display for DiagramMermaidReplaceError {
                 write!(f, "mermaid kind mismatch (expected {expected:?}, found {found:?})")
             }
             Self::MissingOrUnknownKind { first_line: None } => f.write_str(
-                "expected 'flowchart'/'graph' or 'sequenceDiagram' as the first non-empty line",
+                "expected 'flowchart'/'graph', 'sequenceDiagram', or 'classDiagram' as the first non-empty line",
             ),
             Self::MissingOrUnknownKind {
                 first_line: Some(line),
             } => write!(
                 f,
-                "expected 'flowchart'/'graph' or 'sequenceDiagram' as the first non-empty line, found: {line}"
+                "expected 'flowchart'/'graph', 'sequenceDiagram', or 'classDiagram' as the first non-empty line, found: {line}"
             ),
             Self::ParseSequence(err) => write!(f, "cannot parse Mermaid sequence diagram: {err}"),
             Self::ParseFlowchart(err) => write!(f, "cannot parse Mermaid flowchart diagram: {err}"),
+            Self::ParseClass(err) => write!(f, "cannot parse Mermaid class diagram: {err}"),
             Self::AstKindMismatch(err) => write!(f, "{err}"),
         }
     }
@@ -1875,6 +1922,14 @@ fn collect_stable_object_ids(ast: &DiagramAst) -> BTreeSet<String> {
                 ids.insert(id.to_string());
             }
         }
+        DiagramAst::Class(class) => {
+            for id in class.classes().keys() {
+                ids.insert(id.to_string());
+            }
+            for id in class.relations().keys() {
+                ids.insert(id.to_string());
+            }
+        }
     }
     ids
 }
@@ -1899,6 +1954,8 @@ pub fn replace_diagram_from_mermaid(
                 found = Some(DiagramKind::Sequence);
             } else if trimmed.starts_with("flowchart") || trimmed.starts_with("graph") {
                 found = Some(DiagramKind::Flowchart);
+            } else if trimmed.starts_with("classDiagram") {
+                found = Some(DiagramKind::Class);
             }
             break;
         }
@@ -1928,6 +1985,10 @@ pub fn replace_diagram_from_mermaid(
         DiagramKind::Flowchart => DiagramAst::Flowchart(
             parse_flowchart(mermaid)
                 .map_err(|err| DiagramMermaidReplaceError::ParseFlowchart(Box::new(err)))?,
+        ),
+        DiagramKind::Class => DiagramAst::Class(
+            parse_class_diagram(mermaid)
+                .map_err(|err| DiagramMermaidReplaceError::ParseClass(Box::new(err)))?,
         ),
     };
 

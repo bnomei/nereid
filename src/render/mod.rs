@@ -36,7 +36,7 @@ pub use graph_paint::{
     graph_cap_glyph, graph_node_attach_mid_y, graph_node_box_height, graph_node_inner_rows,
     graph_node_preferred_inner_width, paint_graph_node_box,
 };
-pub use lower::{lower_diagram_ast, lower_flowchart, lower_sequence};
+pub use lower::{lower_class, lower_diagram_ast, lower_flowchart, lower_sequence};
 pub use pipeline::{
     render_ast_unicode_annotated_with_options, render_ast_unicode_with_options,
     render_graph_unicode_annotated_with_options, render_graph_unicode_with_options,

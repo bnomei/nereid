@@ -12,6 +12,7 @@
 //! links. Mermaid text and Unicode renders are projections; stable ids live here and in store
 //! sidecars, not solely in positional Mermaid parse order.
 
+pub mod class_ast;
 pub mod diagram;
 pub(crate) mod fixtures;
 pub mod flow_ast;
@@ -23,6 +24,7 @@ pub mod symbol;
 pub mod walkthrough;
 pub mod xref;
 
+pub use class_ast::{ClassAst, ClassNode, ClassRelation, ClassRelationKind};
 pub use diagram::{Diagram, DiagramAst, DiagramAstKindMismatch, DiagramKind};
 pub use flow_ast::{FlowEdge, FlowNode, FlowchartAst};
 pub use ids::{

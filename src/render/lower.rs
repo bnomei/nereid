@@ -8,11 +8,15 @@
 
 //! Kind-specific lowerers: domain AST → graph/track scene models.
 
+use crate::model::class_ast::{ClassAst, ClassRelationKind};
 use crate::model::diagram::DiagramAst;
 use crate::model::flow_ast::FlowchartAst;
 use crate::model::seq_ast::SequenceAst;
 
-use super::scene::{CapKind, GraphEdge, GraphModel, GraphNode, RenderScene, TrackModel};
+use super::scene::{
+    CapKind, EdgeStroke, GraphCompartment, GraphEdge, GraphModel, GraphNode, RenderScene,
+    TrackModel,
+};
 
 /// Lower a flowchart AST into the shared graph scene.
 pub fn lower_flowchart(ast: &FlowchartAst) -> GraphModel {
@@ -50,11 +54,116 @@ pub fn lower_sequence(ast: &SequenceAst) -> TrackModel {
     TrackModel::from_sequence(ast.clone())
 }
 
+fn class_relation_caps(kind: ClassRelationKind, raw: Option<&str>) -> (CapKind, CapKind) {
+    let token = raw.unwrap_or("");
+    match kind {
+        ClassRelationKind::Inheritance | ClassRelationKind::Realization => {
+            if token.starts_with("<|") {
+                (CapKind::TriangleHollow, CapKind::None)
+            } else {
+                (CapKind::None, CapKind::TriangleHollow)
+            }
+        }
+        ClassRelationKind::Composition => {
+            if token.starts_with('*') {
+                (CapKind::DiamondFilled, CapKind::None)
+            } else {
+                // `--*` or default: filled diamond at the "to" end.
+                (CapKind::None, CapKind::DiamondFilled)
+            }
+        }
+        ClassRelationKind::Aggregation => {
+            if token.starts_with('o') {
+                (CapKind::DiamondHollow, CapKind::None)
+            } else {
+                // `--o` or default: hollow diamond at the "to" end.
+                (CapKind::None, CapKind::DiamondHollow)
+            }
+        }
+        ClassRelationKind::Association => {
+            if token.starts_with('<') && !token.starts_with("<|") {
+                (CapKind::Arrow, CapKind::None)
+            } else {
+                (CapKind::None, CapKind::Arrow)
+            }
+        }
+        ClassRelationKind::Dependency => {
+            if token.contains('>') {
+                (CapKind::None, CapKind::Arrow)
+            } else if token.starts_with('<') {
+                (CapKind::Arrow, CapKind::None)
+            } else {
+                (CapKind::None, CapKind::None)
+            }
+        }
+        ClassRelationKind::Link => {
+            if token.contains("<-->") || token == "<-->" {
+                (CapKind::Arrow, CapKind::Arrow)
+            } else {
+                (CapKind::None, CapKind::None)
+            }
+        }
+    }
+}
+
+fn class_relation_stroke(kind: ClassRelationKind, raw: Option<&str>) -> EdgeStroke {
+    let token = raw.unwrap_or("");
+    match kind {
+        ClassRelationKind::Dependency | ClassRelationKind::Realization => EdgeStroke::Dashed,
+        _ if token.contains('.') => EdgeStroke::Dashed,
+        _ => EdgeStroke::Solid,
+    }
+}
+
+/// Lower a class diagram into the shared graph scene (compartments + relation caps).
+pub fn lower_class(ast: &ClassAst) -> GraphModel {
+    let mut model = GraphModel::default();
+
+    for (id, class) in ast.classes() {
+        let mut compartments = Vec::new();
+        // Always emit attribute then method compartments when either has content, matching UML.
+        if !class.attributes().is_empty() || !class.methods().is_empty() {
+            compartments.push(GraphCompartment::new(class.attributes().iter().cloned()));
+            compartments.push(GraphCompartment::new(class.methods().iter().cloned()));
+        }
+        let node = GraphNode::new(class.name()).with_compartments(compartments);
+        model.nodes_mut().insert(id.clone(), node);
+    }
+
+    for (id, rel) in ast.relations() {
+        let (start_cap, end_cap) = class_relation_caps(rel.kind(), rel.raw_connector());
+        let stroke = class_relation_stroke(rel.kind(), rel.raw_connector());
+        // Bridge connector: use a flow-compatible token so existing paint shows arrows when
+        // CapKind is not yet fully wired; store semantic caps on the edge for future paint.
+        let bridge_connector = match (start_cap, end_cap) {
+            (CapKind::Arrow, CapKind::Arrow) => Some("<-->".to_owned()),
+            (CapKind::Arrow, _) => Some("<--".to_owned()),
+            (_, CapKind::Arrow) => Some("-->".to_owned()),
+            (CapKind::Circle | CapKind::DiamondHollow | CapKind::ZeroOrOne, _) => {
+                Some("o--".to_owned())
+            }
+            (_, CapKind::Circle | CapKind::DiamondHollow | CapKind::ZeroOrOne) => {
+                Some("--o".to_owned())
+            }
+            _ => Some("-->".to_owned()),
+        };
+        let edge = GraphEdge::new(rel.from_class_id().clone(), rel.to_class_id().clone())
+            .with_label(rel.label().map(str::to_owned))
+            .with_connector(bridge_connector)
+            .with_caps(start_cap, end_cap)
+            .with_stroke(stroke);
+        model.edges_mut().insert(id.clone(), edge);
+    }
+
+    model
+}
+
 /// Lower any supported diagram AST into a render scene.
 pub fn lower_diagram_ast(ast: &DiagramAst) -> RenderScene {
     match ast {
         DiagramAst::Flowchart(flow) => RenderScene::Graph(lower_flowchart(flow)),
         DiagramAst::Sequence(seq) => RenderScene::Track(lower_sequence(seq)),
+        DiagramAst::Class(class) => RenderScene::Graph(lower_class(class)),
     }
 }
 

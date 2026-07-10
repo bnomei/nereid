@@ -27,7 +27,7 @@ use super::sequence::{
     render_sequence_unicode_annotated_with_options, render_sequence_unicode_with_options,
     SequenceRenderError,
 };
-use super::{AnnotatedRender, RenderOptions};
+use super::{AnnotatedRender, CanvasError, RenderOptions};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PipelineRenderError {
@@ -35,6 +35,7 @@ pub enum PipelineRenderError {
     FlowchartLayout(FlowchartLayoutError),
     SequenceRender(SequenceRenderError),
     FlowchartRender(FlowchartRenderError),
+    Canvas(CanvasError),
 }
 
 impl fmt::Display for PipelineRenderError {
@@ -44,6 +45,7 @@ impl fmt::Display for PipelineRenderError {
             Self::FlowchartLayout(err) => write!(f, "flowchart layout error: {err}"),
             Self::SequenceRender(err) => write!(f, "sequence render error: {err}"),
             Self::FlowchartRender(err) => write!(f, "flowchart render error: {err}"),
+            Self::Canvas(err) => write!(f, "canvas error: {err}"),
         }
     }
 }
@@ -55,7 +57,14 @@ impl std::error::Error for PipelineRenderError {
             Self::FlowchartLayout(err) => Some(err),
             Self::SequenceRender(err) => Some(err),
             Self::FlowchartRender(err) => Some(err),
+            Self::Canvas(err) => Some(err),
         }
+    }
+}
+
+impl From<CanvasError> for PipelineRenderError {
+    fn from(value: CanvasError) -> Self {
+        Self::Canvas(value)
     }
 }
 
@@ -95,6 +104,11 @@ pub fn render_graph_unicode_with_options(
     options: RenderOptions,
 ) -> Result<String, PipelineRenderError> {
     let layout = layout_graph(model)?;
+    if crate::render::graph_paint::graph_model_has_compartments(model) {
+        return Ok(crate::render::graph_paint::render_graph_model_with_compartments(
+            model, &layout, options,
+        )?);
+    }
     let ast = model.to_flowchart_ast();
     Ok(render_flowchart_unicode_with_options(&ast, &layout, options)?)
 }
@@ -106,6 +120,14 @@ pub fn render_graph_unicode_annotated_with_options(
     options: RenderOptions,
 ) -> Result<AnnotatedRender, PipelineRenderError> {
     let layout = layout_graph(model)?;
+    if crate::render::graph_paint::graph_model_has_compartments(model) {
+        let text = crate::render::graph_paint::render_graph_model_with_compartments(
+            model, &layout, options,
+        )?;
+        // Highlight index for compartment graphs lands with scene-native paint; empty for now.
+        let _ = diagram_id;
+        return Ok(AnnotatedRender { text, highlight_index: Default::default() });
+    }
     let ast = model.to_flowchart_ast();
     Ok(render_flowchart_unicode_annotated_with_options(diagram_id, &ast, &layout, options)?)
 }
@@ -309,6 +331,24 @@ mod tests {
                 .expect("pipeline");
         assert_eq!(via, direct);
         assert!(via.contains('◀') || via.contains('▶'), "expected dual caps:\n{via}");
+    }
+
+    #[test]
+    fn class_diagram_renders_compartments_via_pipeline() {
+        let input = r#"
+classDiagram
+Class01 <|-- AveryLongClass : Cool
+Class01 : size()
+Class01 : int chimp
+Class03 *-- Class04
+"#;
+        let ast = crate::format::mermaid::parse_class_diagram(input).expect("parse");
+        let text =
+            render_ast_unicode_with_options(&DiagramAst::Class(ast), RenderOptions::default())
+                .expect("render");
+        assert!(text.contains("Class01"), "{text}");
+        assert!(text.contains("int chimp") || text.contains("size()"), "{text}");
+        assert!(text.contains('├') || text.contains('─'), "expected class box:\n{text}");
     }
 
     #[test]

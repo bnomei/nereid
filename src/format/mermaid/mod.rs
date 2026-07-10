@@ -8,10 +8,14 @@
 
 //! Mermaid-ish parsing and exporting for supported diagram kinds.
 
+pub mod class;
 pub mod flowchart;
 mod ident;
 pub mod sequence;
 
+pub use class::{
+    export_class_diagram, parse_class_diagram, MermaidClassExportError, MermaidClassParseError,
+};
 pub use sequence::{
     export_sequence_diagram, parse_sequence_diagram, MermaidSequenceExportError,
     MermaidSequenceParseError,

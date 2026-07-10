@@ -35,7 +35,8 @@ use ratatui::{
 use tokio::sync::Mutex;
 
 use crate::format::mermaid::{
-    export_flowchart, export_sequence_diagram, parse_flowchart, parse_sequence_diagram,
+    export_class_diagram, export_flowchart, export_sequence_diagram, parse_class_diagram,
+    parse_flowchart, parse_sequence_diagram,
 };
 use crate::model::{
     CategoryPath, Diagram, DiagramAst, DiagramId, DiagramKind, FlowchartAst, ObjectId, ObjectRef,
@@ -554,6 +555,7 @@ fn diagram_kind_tag(kind: DiagramKind) -> &'static str {
     match kind {
         DiagramKind::Sequence => "SEQ",
         DiagramKind::Flowchart => "FLO",
+        DiagramKind::Class => "CLS",
     }
 }
 
@@ -2102,6 +2104,26 @@ impl App {
 
                 refs
             }
+            DiagramAst::Class(ast) => {
+                let mut refs = Vec::new();
+                let class_category = category_path(&["class", "class"]);
+                let relation_category = category_path(&["class", "relation"]);
+                for class_id in ast.classes().keys() {
+                    refs.push(ObjectRef::new(
+                        diagram_id.clone(),
+                        class_category.clone(),
+                        class_id.clone(),
+                    ));
+                }
+                for rel_id in ast.relations().keys() {
+                    refs.push(ObjectRef::new(
+                        diagram_id.clone(),
+                        relation_category.clone(),
+                        rel_id.clone(),
+                    ));
+                }
+                refs
+            }
             DiagramAst::Sequence(ast) => {
                 let mut refs = Vec::new();
                 let participant_category = category_path(&["seq", "participant"]);
@@ -2310,6 +2332,7 @@ impl App {
                     )
                 })
             }
+            DiagramAst::Class(_) => None,
             DiagramAst::Sequence(ast) => {
                 let is_seq_participant = |r: &ObjectRef| matches!(r.category().segments(), [a, b] if a == "seq" && b == "participant");
                 if !is_seq_participant(current) || !is_seq_participant(previous) {
@@ -2878,6 +2901,8 @@ fn export_diagram_mermaid(diagram: &Diagram) -> Result<String, String> {
             .map_err(|err| format!("failed to export sequence Mermaid: {err}")),
         DiagramAst::Flowchart(ast) => export_flowchart(ast)
             .map_err(|err| format!("failed to export flowchart Mermaid: {err}")),
+        DiagramAst::Class(ast) => export_class_diagram(ast)
+            .map_err(|err| format!("failed to export class Mermaid: {err}")),
     }
 }
 
@@ -2889,6 +2914,9 @@ fn parse_mermaid_for_kind(kind: DiagramKind, source: &str) -> Result<DiagramAst,
         DiagramKind::Flowchart => parse_flowchart(source)
             .map(DiagramAst::Flowchart)
             .map_err(|err| format!("flowchart parse failed: {err}")),
+        DiagramKind::Class => parse_class_diagram(source)
+            .map(DiagramAst::Class)
+            .map_err(|err| format!("class parse failed: {err}")),
     }
 }
 
@@ -2950,6 +2978,9 @@ fn prefix_xref_direction_labels_for_tui(diagram: &mut Diagram, session: &Session
 
     let mut ast = diagram.ast().clone();
     match &mut ast {
+        DiagramAst::Class(_) => {
+            // Class name labels stay as authored Mermaid; xref direction prefixes are flow/seq only for now.
+        }
         DiagramAst::Flowchart(flow_ast) => {
             let node_category = category_path(&["flow", "node"]);
             for (node_id, node) in flow_ast.nodes_mut() {
@@ -3778,10 +3809,48 @@ fn objects_from_diagram(diagram: &Diagram) -> Vec<SelectableObject> {
     let mut objects = match diagram.ast() {
         DiagramAst::Sequence(ast) => objects_from_sequence_ast(&diagram_id, ast),
         DiagramAst::Flowchart(ast) => objects_from_flowchart_ast(&diagram_id, ast),
+        DiagramAst::Class(ast) => objects_from_class_ast(&diagram_id, ast),
     };
 
     objects.sort_by_cached_key(|obj| obj.object_ref.to_string());
     objects
+}
+
+fn objects_from_class_ast(
+    diagram_id: &DiagramId,
+    ast: &crate::model::ClassAst,
+) -> Vec<SelectableObject> {
+    let class_category = category_path(&["class", "class"]);
+    let relation_category = category_path(&["class", "relation"]);
+    let mut out = Vec::new();
+    for (class_id, class) in ast.classes() {
+        out.push(SelectableObject {
+            label: format!("class {} ({})", class_id, class.name()),
+            note: None,
+            object_ref: ObjectRef::new(
+                diagram_id.clone(),
+                class_category.clone(),
+                class_id.clone(),
+            ),
+        });
+    }
+    for (rel_id, rel) in ast.relations() {
+        out.push(SelectableObject {
+            label: format!(
+                "relation {} ({} -> {})",
+                rel_id,
+                rel.from_class_id(),
+                rel.to_class_id()
+            ),
+            note: rel.label().map(str::to_owned),
+            object_ref: ObjectRef::new(
+                diagram_id.clone(),
+                relation_category.clone(),
+                rel_id.clone(),
+            ),
+        });
+    }
+    out
 }
 
 fn objects_from_sequence_ast(diagram_id: &DiagramId, ast: &SequenceAst) -> Vec<SelectableObject> {

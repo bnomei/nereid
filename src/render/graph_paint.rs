@@ -137,6 +137,136 @@ pub fn graph_cap_glyph(kind: CapKind, outward_dx: i32, outward_dy: i32) -> Optio
     kind.glyph(outward_dx, outward_dy)
 }
 
+/// True when any node carries class-style compartments (variable-height paint path).
+pub fn graph_model_has_compartments(model: &crate::render::scene::GraphModel) -> bool {
+    model.nodes().values().any(|n| !n.compartments().is_empty())
+}
+
+/// Place and paint a graph model with per-node compartment heights.
+///
+/// Uses flowchart layer order for columns; stacks nodes within a layer by content height.
+/// Edges are straight mid-y stubs with endpoint caps (orthogonal routing deferred for class/ER).
+pub fn render_graph_model_with_compartments(
+    model: &crate::render::scene::GraphModel,
+    layout: &crate::layout::FlowchartLayout,
+    options: RenderOptions,
+) -> Result<String, CanvasError> {
+    use crate::render::text::canvas_to_string_trimmed;
+    use std::collections::BTreeMap;
+
+    let col_gap = 3usize;
+    let row_gap = 1usize;
+
+    // Layer widths and per-node metrics.
+    let mut layer_inner_widths = Vec::<usize>::new();
+    for layer in layout.layers() {
+        let mut w = GRAPH_MIN_INNER_WIDTH;
+        for node_id in layer {
+            if let Some(node) = model.nodes().get(node_id) {
+                w = w.max(graph_node_preferred_inner_width(node, options));
+            }
+        }
+        layer_inner_widths.push(w);
+    }
+
+    // Cursor x per layer.
+    let mut layer_x0 = Vec::<usize>::with_capacity(layout.layers().len());
+    let mut x = 0usize;
+    for (i, inner) in layer_inner_widths.iter().enumerate() {
+        layer_x0.push(x);
+        x = x.saturating_add(inner.saturating_add(2));
+        if i + 1 < layer_inner_widths.len() {
+            x = x.saturating_add(col_gap);
+        }
+    }
+    let width = x.max(1);
+
+    // Place nodes: y stack within each layer independently; take global max height.
+    struct Placed {
+        x0: usize,
+        y0: usize,
+        x1: usize,
+        mid_y: usize,
+        mid_x_left: usize,
+        mid_x_right: usize,
+    }
+    let mut placed: BTreeMap<crate::model::ids::ObjectId, Placed> = BTreeMap::new();
+    let mut height = 1usize;
+
+    for (layer_idx, layer) in layout.layers().iter().enumerate() {
+        let mut y = 0usize;
+        let x0 = layer_x0.get(layer_idx).copied().unwrap_or(0);
+        let inner = layer_inner_widths.get(layer_idx).copied().unwrap_or(GRAPH_MIN_INNER_WIDTH);
+        for node_id in layer {
+            let Some(node) = model.nodes().get(node_id) else {
+                continue;
+            };
+            let box_h = graph_node_box_height(node, options);
+            let x1 = x0.saturating_add(inner).saturating_add(1);
+            let y1 = y.saturating_add(box_h.saturating_sub(1));
+            let mid_y = graph_node_attach_mid_y(y, box_h);
+            placed.insert(
+                node_id.clone(),
+                Placed { x0, y0: y, x1, mid_y, mid_x_left: x0, mid_x_right: x1 },
+            );
+            height = height.max(y1.saturating_add(1));
+            y = y1.saturating_add(1).saturating_add(row_gap);
+        }
+    }
+
+    let mut canvas = Canvas::new(width, height.max(1))?;
+    for (node_id, node) in model.nodes() {
+        let Some(p) = placed.get(node_id) else {
+            continue;
+        };
+        let inner = p.x1.saturating_sub(p.x0).saturating_sub(1);
+        paint_graph_node_box(&mut canvas, node, p.x0, p.y0, inner, options)?;
+    }
+
+    for edge in model.edges().values() {
+        let Some(from) = placed.get(edge.from_node_id()) else {
+            continue;
+        };
+        let Some(to) = placed.get(edge.to_node_id()) else {
+            continue;
+        };
+        let y = from.mid_y;
+        let y2 = to.mid_y;
+        let (x_start, x_end) = if from.x1 < to.x0 {
+            (from.mid_x_right, to.mid_x_left)
+        } else if to.x1 < from.x0 {
+            (from.mid_x_left, to.mid_x_right)
+        } else {
+            // same column-ish: vertical-ish stub
+            continue;
+        };
+        let left = x_start.min(x_end);
+        let right = x_start.max(x_end);
+        if left + 1 < right {
+            canvas.draw_hline(left.saturating_add(1), right.saturating_sub(1), y)?;
+        }
+        if y != y2 {
+            let bend_x = (left + right) / 2;
+            canvas.draw_vline(bend_x, y.min(y2), y.max(y2))?;
+        }
+        // Caps at ends (outward from target/source boxes).
+        if let Some(ch) = edge.end_cap().glyph(if to.x0 > from.x1 { -1 } else { 1 }, 0) {
+            let cap_x = if to.x0 > from.x1 { to.mid_x_left } else { to.mid_x_right };
+            let _ = canvas.set(cap_x, y2, ch);
+        }
+        if let Some(ch) = edge.start_cap().glyph(if from.x1 < to.x0 { 1 } else { -1 }, 0) {
+            let cap_x = if from.x1 < to.x0 { from.mid_x_right } else { from.mid_x_left };
+            let _ = canvas.set(cap_x, y, ch);
+        }
+        if let Some(label) = edge.label() {
+            let lx = (left + right) / 2;
+            let _ = canvas.write_str(lx.saturating_sub(text_len(label) / 2), y, label);
+        }
+    }
+
+    Ok(canvas_to_string_trimmed(&canvas))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -171,10 +301,7 @@ mod tests {
     fn preferred_width_includes_side_padding_and_long_members() {
         let node =
             GraphNode::new("C").with_compartments(vec![GraphCompartment::new(["abcdefghij"])]);
-        assert_eq!(
-            graph_node_preferred_inner_width(&node, RenderOptions::default()),
-            12
-        );
+        assert_eq!(graph_node_preferred_inner_width(&node, RenderOptions::default()), 12);
     }
 
     #[test]

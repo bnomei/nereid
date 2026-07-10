@@ -13,7 +13,7 @@
 use rmcp::handler::server::wrapper::{Json, Parameters};
 use rmcp::{tool, tool_router};
 
-use crate::format::mermaid::{parse_flowchart, parse_sequence_diagram};
+use crate::format::mermaid::{parse_class_diagram, parse_flowchart, parse_sequence_diagram};
 use crate::model::{CategoryPath, DiagramAst, DiagramId, ObjectId, ObjectRef};
 use crate::ops::apply_ops;
 use crate::render::render_diagram_unicode;
@@ -36,6 +36,28 @@ fn stable_object_snapshots(
     let mut snapshots = std::collections::BTreeMap::new();
 
     match ast {
+        DiagramAst::Class(class_ast) => {
+            let class_category = category(&["class", "class"]);
+            let relation_category = category(&["class", "relation"]);
+            for (class_id, node) in class_ast.classes() {
+                snapshots.insert(
+                    object_ref(diagram_id, class_category.clone(), class_id),
+                    format!("name={:?}", node.name()),
+                );
+            }
+            for (rel_id, rel) in class_ast.relations() {
+                snapshots.insert(
+                    object_ref(diagram_id, relation_category.clone(), rel_id),
+                    format!(
+                        "from={:?};to={:?};kind={:?};label={:?}",
+                        rel.from_class_id(),
+                        rel.to_class_id(),
+                        rel.kind(),
+                        rel.label()
+                    ),
+                );
+            }
+        }
         DiagramAst::Sequence(seq) => {
             let participant_category = category(&["seq", "participant"]);
             let message_category = category(&["seq", "message"]);
@@ -410,7 +432,7 @@ impl NereidMcp {
 
         let Some(kind) = detect_mermaid_kind(&mermaid) else {
             return Err(ErrorData::invalid_params(
-                "expected 'flowchart'/'graph' or 'sequenceDiagram' as the first non-empty line",
+                "expected 'flowchart'/'graph', 'sequenceDiagram', or 'classDiagram' as the first non-empty line",
                 None,
             ));
         };
@@ -428,6 +450,14 @@ impl NereidMcp {
                 DiagramAst::Flowchart(parse_flowchart(&mermaid).map_err(|err| {
                     ErrorData::invalid_params(
                         format!("cannot parse Mermaid flowchart diagram: {err}"),
+                        None,
+                    )
+                })?)
+            }
+            DiagramKind::Class => {
+                DiagramAst::Class(parse_class_diagram(&mermaid).map_err(|err| {
+                    ErrorData::invalid_params(
+                        format!("cannot parse Mermaid class diagram: {err}"),
                         None,
                     )
                 })?)
@@ -888,6 +918,10 @@ impl NereidMcp {
             )
         })?;
         let (mut objects, mut edges) = match diagram.ast() {
+            DiagramAst::Class(_ast) => {
+                // Class slice neighborhood lands with dedicated category paths; empty for v1.
+                (Vec::new(), Vec::new())
+            }
             DiagramAst::Flowchart(ast) => {
                 let segments = center_ref_parsed.category().segments();
                 let mut adjacency: BTreeMap<ObjectId, BTreeSet<ObjectId>> = BTreeMap::new();

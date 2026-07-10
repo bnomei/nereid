@@ -113,6 +113,24 @@ fn derive_adjacency(session: &Session) -> BTreeMap<ObjectRef, BTreeSet<ObjectRef
                     insert_edge(&mut adjacency, edge_ref, to);
                 }
             }
+            DiagramAst::Class(ast) => {
+                for class_id in ast.classes().keys() {
+                    insert_node(&mut adjacency, flow_node_ref(diagram_id, class_id));
+                }
+                for (rel_id, rel) in ast.relations() {
+                    let edge_ref = flow_edge_ref(diagram_id, rel_id);
+                    insert_node(&mut adjacency, edge_ref.clone());
+                    let from = flow_node_ref(diagram_id, rel.from_class_id());
+                    let to = flow_node_ref(diagram_id, rel.to_class_id());
+                    insert_node(&mut adjacency, from.clone());
+                    insert_node(&mut adjacency, to.clone());
+                    insert_edge(&mut adjacency, from.clone(), to.clone());
+                    insert_edge(&mut adjacency, from.clone(), edge_ref.clone());
+                    insert_edge(&mut adjacency, to.clone(), edge_ref.clone());
+                    insert_edge(&mut adjacency, edge_ref.clone(), from);
+                    insert_edge(&mut adjacency, edge_ref, to);
+                }
+            }
             DiagramAst::Sequence(ast) => {
                 for participant_id in ast.participants().keys() {
                     insert_node(&mut adjacency, seq_participant_ref(diagram_id, participant_id));
