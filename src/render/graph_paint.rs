@@ -174,18 +174,26 @@ fn cell_on_box_border_or_interior(
     placed.iter().any(|&(x0, y0, x1, y1)| x >= x0 && x <= x1 && y >= y0 && y <= y1)
 }
 
-/// Category pair for annotated scene-graph paint (`node` / `edge` object refs).
+/// Category segments for annotated scene-graph paint (`node` / `edge` / `note` object refs).
 #[derive(Debug, Clone, Copy)]
 pub struct GraphHighlightCategories<'a> {
     pub node_segments: &'a [&'a str],
     pub edge_segments: &'a [&'a str],
+    /// Note row spans (TUI paints these DarkGray, same as flow/seq notes).
+    pub note_segments: &'a [&'a str],
 }
 
 impl GraphHighlightCategories<'static> {
-    pub const CLASS: Self =
-        Self { node_segments: &["class", "class"], edge_segments: &["class", "relation"] };
-    pub const ER: Self =
-        Self { node_segments: &["er", "entity"], edge_segments: &["er", "relationship"] };
+    pub const CLASS: Self = Self {
+        node_segments: &["class", "class"],
+        edge_segments: &["class", "relation"],
+        note_segments: &["class", "note"],
+    };
+    pub const ER: Self = Self {
+        node_segments: &["er", "entity"],
+        edge_segments: &["er", "relationship"],
+        note_segments: &["er", "note"],
+    };
 }
 
 /// Place and paint a graph model with per-node compartment heights.
@@ -221,15 +229,41 @@ pub fn render_graph_model_with_compartments_annotated(
     let edge_cat =
         CategoryPath::new(categories.edge_segments.iter().map(|s| (*s).to_owned()).collect())
             .expect("valid edge category");
+    let note_cat =
+        CategoryPath::new(categories.note_segments.iter().map(|s| (*s).to_owned()).collect())
+            .expect("valid note category");
 
     let mut highlight_index = HighlightIndex::new();
-    for (node_id, (x0, y0, x1, y1)) in node_boxes {
-        let object_ref = ObjectRef::new(diagram_id.clone(), node_cat.clone(), node_id);
+    for (node_id, (x0, y0, x1, y1)) in &node_boxes {
+        let object_ref = ObjectRef::new(diagram_id.clone(), node_cat.clone(), node_id.clone());
         let mut spans = Vec::<LineSpan>::new();
-        for y in y0..=y1 {
-            spans.push((y, x0, x1));
+        for y in *y0..=*y1 {
+            spans.push((y, *x0, *x1));
         }
         highlight_index.insert(object_ref, spans);
+
+        // Separate note spans so the TUI can dim note text like flow/sequence.
+        if options.show_notes {
+            if let Some(node) = model.nodes().get(node_id) {
+                if let Some(note) = node.note() {
+                    let inner_width = x1.saturating_sub(*x0).saturating_sub(1);
+                    let clipped = truncate_with_ellipsis(note, inner_width);
+                    let clipped_len = text_len(&clipped);
+                    if clipped_len > 0 {
+                        let pad = (inner_width.saturating_sub(clipped_len)) / 2;
+                        let note_x = x0.saturating_add(1).saturating_add(pad);
+                        // Title at y0+1; note row immediately under title.
+                        let note_y = y0.saturating_add(2);
+                        let note_ref =
+                            ObjectRef::new(diagram_id.clone(), note_cat.clone(), node_id.clone());
+                        highlight_index.insert(
+                            note_ref,
+                            vec![(note_y, note_x, note_x + clipped_len.saturating_sub(1))],
+                        );
+                    }
+                }
+            }
+        }
     }
     for (edge_id, spans) in edge_spans {
         if spans.is_empty() {
@@ -980,6 +1014,36 @@ mod tests {
             .count();
         assert!(class_refs >= 2, "expected class node refs, got {class_refs}");
         assert!(rel_refs >= 1, "expected relation refs, got {rel_refs}");
+    }
+
+    #[test]
+    fn class_annotated_index_includes_note_refs_when_notes_shown() {
+        use crate::model::ids::{DiagramId, ObjectId};
+        use crate::model::{ClassAst, ClassNode};
+
+        let mut ast = ClassAst::default();
+        let id = ObjectId::new("c:Service").unwrap();
+        let mut node = ClassNode::new("Service");
+        node.set_note(Some("entry facade"));
+        ast.classes_mut().insert(id.clone(), node);
+        let model = crate::render::lower::lower_class(&ast);
+        let layout = crate::layout::layout_graph(&model).expect("layout");
+        let diagram_id = DiagramId::new("d-class").expect("id");
+        let annotated = render_graph_model_with_compartments_annotated(
+            &diagram_id,
+            &model,
+            &layout,
+            RenderOptions { show_notes: true, ..Default::default() },
+            GraphHighlightCategories::CLASS,
+        )
+        .expect("annotated");
+
+        let note_refs = annotated
+            .highlight_index
+            .keys()
+            .filter(|r| matches!(r.category().segments(), [a, b] if a == "class" && b == "note"))
+            .count();
+        assert!(note_refs >= 1, "expected class/note highlight refs, got {note_refs}");
     }
 
     #[test]

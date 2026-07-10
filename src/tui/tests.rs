@@ -2826,7 +2826,10 @@ fn demo_session_includes_class_er_gantt() {
             let labels: Vec<_> = ast.nodes().values().map(|n| n.label().to_string()).collect();
             assert!(labels.iter().any(|l| l.contains("Class")), "{labels:?}");
             assert!(labels.iter().any(|l| l.contains("ER") || l.contains("Er")), "{labels:?}");
-            assert!(labels.iter().any(|l| l.contains("Gantt") || l.contains("gantt")), "{labels:?}");
+            assert!(
+                labels.iter().any(|l| l.contains("Gantt") || l.contains("gantt")),
+                "{labels:?}"
+            );
         }
         other => panic!("expected flowchart index, got {other:?}"),
     }

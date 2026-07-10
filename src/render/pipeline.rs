@@ -216,10 +216,9 @@ pub fn render_ast_unicode_annotated_with_options(
     use crate::render::graph_paint::GraphHighlightCategories;
 
     match ast {
-        DiagramAst::Gantt(gantt) => {
-            let text = crate::render::track_paint::render_gantt_unicode(gantt, options)?;
-            Ok(AnnotatedRender { text, highlight_index: Default::default() })
-        }
+        DiagramAst::Gantt(gantt) => Ok(crate::render::track_paint::render_gantt_unicode_annotated(
+            diagram_id, gantt, options,
+        )?),
         DiagramAst::Class(class) => {
             let model = crate::render::lower::lower_class(class);
             render_graph_unicode_annotated_with_categories(

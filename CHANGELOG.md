@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added gantt charts: `GanttAst`, limited `gantt` parse/export (sections, dates, durations, `after`), track bar paint, and session/MCP/TUI kind wiring.
 - Expanded the built-in demo session with class, ER, and gantt fixtures linked from the demo index.
 - Added top-level node notes for class and ER diagrams (AST + diagram sidecar + render/TUI), matching flowchart notes.
+- Polished gantt paint toward sequence-style track boxes: drop title/section chrome, put time labels on top, and draw multi-column content boxes (shared with sequence 1-lane headers) that can hold notes.
 
 ## [0.8.0] - 2026-07-09
 - Added sequence structure ops for alt/opt/loop/par blocks, sections, and message membership (including nested ancestor membership).

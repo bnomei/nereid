@@ -410,14 +410,18 @@ pub enum TrackSpanStyle {
     /// Sequence message arrow.
     #[default]
     Arrow,
-    /// Gantt (or similar) filled duration bar.
+    /// Gantt (or similar) multi-column content box spanning time lanes.
     Bar,
 }
 
 /// Track-family scene: multi-column spans (sequence / gantt).
 ///
-/// Commit-1 carries the full sequence AST so block frames and layout stay lossless. Gantt will
-/// populate the same family with bar spans without lifelines.
+/// Sequence and gantt share content-box paint (`paint_track_content_box`):
+/// - **Sequence**: each participant node is 1 lane wide (header box over a lifeline column).
+/// - **Gantt**: each task node spans multiple time-lane columns for its duration.
+///
+/// Commit-1 still carries the full sequence AST so block frames and layout stay lossless. Gantt
+/// paints from domain AST via track paint until bar spans live fully on this model.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TrackModel {
     sequence: SequenceAst,

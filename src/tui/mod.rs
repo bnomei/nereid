@@ -3272,7 +3272,7 @@ fn is_sequence_section_ref(object_ref: &ObjectRef) -> bool {
 fn is_note_ref(object_ref: &ObjectRef) -> bool {
     matches!(
         object_ref.category().segments(),
-        [a, b] if (a == "seq" || a == "flow") && b == "note"
+        [a, b] if matches!(a.as_str(), "seq" | "flow" | "class" | "er" | "gantt") && b == "note"
     )
 }
 
@@ -3925,7 +3925,7 @@ fn objects_from_gantt_ast(
         .iter()
         .map(|(id, task)| SelectableObject {
             label: format!("task {} ({})", id, task.name()),
-            note: None,
+            note: task.note().map(str::to_owned),
             object_ref: ObjectRef::new(diagram_id.clone(), cat.clone(), id.clone()),
         })
         .collect()

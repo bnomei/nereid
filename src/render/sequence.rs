@@ -143,23 +143,18 @@ pub fn render_sequence_unicode_with_options(
     let next_lifeline_x_by_col = next_lifeline_x_by_col(&participant_renders);
 
     for p in &participant_renders {
-        connector_layer.draw_box(p.box_x0, 0, p.box_x1, box_height - 1)?;
-
+        // 1-lane content box (gantt reuses the same painter for multi-column spans).
         let display_name = prefixed_object_label(p.name, options);
-        let name_len = text_len(&display_name);
-        let left_pad = (p.box_inner_width.saturating_sub(name_len)) / 2;
-        let name_x = p.box_x0 + 1 + left_pad;
-        connector_layer.write_str(name_x, 1, &display_name)?;
-
-        if options.show_notes {
-            if let Some(note) = p.note {
-                let clipped = truncate_with_ellipsis(note, p.box_inner_width);
-                let clipped_len = text_len(&clipped);
-                let left_pad = (p.box_inner_width.saturating_sub(clipped_len)) / 2;
-                let note_x = p.box_x0 + 1 + left_pad;
-                connector_layer.write_str(note_x, 2, &clipped)?;
-            }
-        }
+        let note = if options.show_notes { p.note } else { None };
+        crate::render::track_paint::paint_track_content_box(
+            &mut connector_layer,
+            p.box_x0,
+            0,
+            p.box_x1,
+            &display_name,
+            note,
+            options,
+        )?;
 
         connector_layer.draw_vline(p.lifeline_x, box_height, bottom_y)?;
         lifeline_x_by_col.insert(p.col, p.lifeline_x);

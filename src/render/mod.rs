@@ -27,6 +27,10 @@ pub mod sequence;
 mod test_utils;
 mod text;
 pub mod track_paint;
+pub use track_paint::{
+    paint_track_content_box, track_content_box_height, TRACK_BOX_HEIGHT_NO_NOTES,
+    TRACK_BOX_HEIGHT_WITH_NOTES, TRACK_MIN_BOX_INNER_WIDTH,
+};
 pub mod walkthrough;
 
 pub use diagram::{render_diagram_unicode, render_diagram_unicode_annotated, DiagramRenderError};

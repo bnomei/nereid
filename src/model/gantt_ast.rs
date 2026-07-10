@@ -108,6 +108,8 @@ pub struct GanttTask {
     duration_days: u32,
     /// Raw duration token for export (e.g. `30d`).
     raw_duration: String,
+    /// Top-level note (sidecar / UI); not part of Mermaid export.
+    note: Option<String>,
 }
 
 impl GanttTask {
@@ -125,12 +127,17 @@ impl GanttTask {
             start,
             duration_days,
             raw_duration: raw_duration.into(),
+            note: None,
         }
     }
 
     pub fn with_mermaid_tag(mut self, tag: Option<impl Into<String>>) -> Self {
         self.mermaid_tag = tag.map(Into::into);
         self
+    }
+
+    pub fn set_note<T: Into<String>>(&mut self, note: Option<T>) {
+        self.note = note.map(Into::into);
     }
 
     pub fn task_id(&self) -> &ObjectId {
@@ -155,5 +162,9 @@ impl GanttTask {
 
     pub fn raw_duration(&self) -> &str {
         &self.raw_duration
+    }
+
+    pub fn note(&self) -> Option<&str> {
+        self.note.as_deref()
     }
 }
