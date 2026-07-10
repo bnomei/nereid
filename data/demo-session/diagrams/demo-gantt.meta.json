@@ -1,4 +1,21 @@
 {
   "diagram_id": "demo-gantt",
-  "mmd_path": "diagrams/demo-gantt.mmd"
+  "mmd_path": "diagrams/demo-gantt.mmd",
+  "gantt_task_notes": {
+    "t:0001": "critical path; 30-day stretch",
+    "t:0002": "starts after A task",
+    "t:0003": "parallel workstream",
+    "t:0004": "unspecified start → after previous"
+  },
+  "gantt_lane_notes": {
+    "lane:0000": "kickoff week",
+    "lane:0007": "week +1",
+    "lane:0011": "Task in Another starts",
+    "lane:0014": "mid-run checkpoint",
+    "lane:0021": "second half begins",
+    "lane:0028": "A task winds down",
+    "lane:0035": "Another task active",
+    "lane:0042": "closing weeks",
+    "lane:0049": "schedule tail"
+  }
 }

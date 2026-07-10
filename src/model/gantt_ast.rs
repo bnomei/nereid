@@ -19,6 +19,8 @@ pub struct GanttAst {
     date_format: Option<String>,
     sections: Vec<GanttSection>,
     tasks: BTreeMap<ObjectId, GanttTask>,
+    /// Notes on time-lane headers (`lane:0000`, …); sidecar-only, not Mermaid.
+    lane_notes: BTreeMap<ObjectId, String>,
 }
 
 impl GanttAst {
@@ -52,6 +54,29 @@ impl GanttAst {
 
     pub fn tasks_mut(&mut self) -> &mut BTreeMap<ObjectId, GanttTask> {
         &mut self.tasks
+    }
+
+    pub fn lane_notes(&self) -> &BTreeMap<ObjectId, String> {
+        &self.lane_notes
+    }
+
+    pub fn lane_notes_mut(&mut self) -> &mut BTreeMap<ObjectId, String> {
+        &mut self.lane_notes
+    }
+
+    pub fn lane_note(&self, lane_id: &ObjectId) -> Option<&str> {
+        self.lane_notes.get(lane_id).map(String::as_str)
+    }
+
+    pub fn set_lane_note(&mut self, lane_id: ObjectId, note: Option<impl Into<String>>) {
+        match note {
+            Some(n) => {
+                self.lane_notes.insert(lane_id, n.into());
+            }
+            None => {
+                self.lane_notes.remove(&lane_id);
+            }
+        }
     }
 }
 

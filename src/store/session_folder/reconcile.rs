@@ -526,6 +526,17 @@ pub(crate) fn reconcile_er_notes(ast: &mut crate::model::ErAst, sidecar: &Diagra
     }
 }
 
+pub(crate) fn reconcile_gantt_notes(ast: &mut crate::model::GanttAst, sidecar: &DiagramMeta) {
+    for (task_id, note) in &sidecar.gantt_task_notes {
+        if let Some(task) = ast.tasks_mut().get_mut(task_id) {
+            task.set_note(Some(note.clone()));
+        }
+    }
+    for (lane_id, note) in &sidecar.gantt_lane_notes {
+        ast.set_lane_note(lane_id.clone(), Some(note.clone()));
+    }
+}
+
 pub(crate) fn reconcile_sequence_participant_symbols(ast: &mut SequenceAst, sidecar: &DiagramMeta) {
     if sidecar.sequence_participant_symbols.is_empty() {
         return;
@@ -791,8 +802,8 @@ pub(crate) fn reconcile_diagram_ast(ast: &mut DiagramAst, sidecar: &DiagramMeta)
         DiagramAst::Er(er_ast) => {
             reconcile_er_notes(er_ast, sidecar);
         }
-        DiagramAst::Gantt(_) => {
-            // Name-based identity via stable_id_map; no extra sidecar fields yet.
+        DiagramAst::Gantt(gantt_ast) => {
+            reconcile_gantt_notes(gantt_ast, sidecar);
         }
     }
 }
@@ -810,6 +821,8 @@ pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> 
         sequence_participant_notes,
         class_node_notes,
         er_entity_notes,
+        gantt_task_notes,
+        gantt_lane_notes,
         flow_node_symbols,
         sequence_participant_symbols,
     ) = match diagram.ast() {
@@ -832,6 +845,8 @@ pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> 
                     node.note().map(|note| (node_id.clone(), note.to_owned()))
                 })
                 .collect(),
+            BTreeMap::new(),
+            BTreeMap::new(),
             BTreeMap::new(),
             BTreeMap::new(),
             BTreeMap::new(),
@@ -866,6 +881,8 @@ pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> 
             BTreeMap::new(),
             BTreeMap::new(),
             BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
             ast.participants()
                 .iter()
                 .filter_map(|(participant_id, participant)| {
@@ -888,6 +905,8 @@ pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> 
             BTreeMap::new(),
             BTreeMap::new(),
             BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
         ),
         DiagramAst::Er(ast) => (
             Vec::new(),
@@ -904,8 +923,10 @@ pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> 
                 .collect(),
             BTreeMap::new(),
             BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
         ),
-        DiagramAst::Gantt(_) => (
+        DiagramAst::Gantt(ast) => (
             Vec::new(),
             Vec::new(),
             Vec::new(),
@@ -913,6 +934,13 @@ pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> 
             BTreeMap::new(),
             BTreeMap::new(),
             BTreeMap::new(),
+            ast.tasks()
+                .iter()
+                .filter_map(|(task_id, task)| {
+                    task.note().map(|note| (task_id.clone(), note.to_owned()))
+                })
+                .collect(),
+            ast.lane_notes().clone(),
             BTreeMap::new(),
             BTreeMap::new(),
         ),
@@ -931,6 +959,8 @@ pub(crate) fn identity_sidecar_from_diagram(diagram: &crate::model::Diagram) -> 
         sequence_participant_notes,
         class_node_notes,
         er_entity_notes,
+        gantt_task_notes,
+        gantt_lane_notes,
         flow_node_symbols,
         sequence_participant_symbols,
     }

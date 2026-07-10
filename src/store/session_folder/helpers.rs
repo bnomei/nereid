@@ -479,6 +479,10 @@ struct DiagramMetaJson {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     er_entity_notes: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    gantt_task_notes: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    gantt_lane_notes: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     flow_node_symbols: BTreeMap<String, DiagramSymbolAnchorJson>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     sequence_participant_symbols: BTreeMap<String, DiagramSymbolAnchorJson>,
@@ -789,6 +793,18 @@ fn diagram_meta_to_json(
         .map(|(entity_id, note)| (entity_id.to_string(), note.clone()))
         .collect();
 
+    let gantt_task_notes: BTreeMap<String, String> = meta
+        .gantt_task_notes
+        .iter()
+        .map(|(task_id, note)| (task_id.to_string(), note.clone()))
+        .collect();
+
+    let gantt_lane_notes: BTreeMap<String, String> = meta
+        .gantt_lane_notes
+        .iter()
+        .map(|(lane_id, note)| (lane_id.to_string(), note.clone()))
+        .collect();
+
     let flow_node_symbols: BTreeMap<String, DiagramSymbolAnchorJson> = meta
         .flow_node_symbols
         .iter()
@@ -830,6 +846,8 @@ fn diagram_meta_to_json(
         sequence_participant_notes,
         class_node_notes,
         er_entity_notes,
+        gantt_task_notes,
+        gantt_lane_notes,
         flow_node_symbols,
         sequence_participant_symbols,
     })
@@ -1059,6 +1077,34 @@ fn diagram_meta_from_json(
         })
         .collect::<Result<BTreeMap<_, _>, StoreError>>()?;
 
+    let gantt_task_notes = meta_json
+        .gantt_task_notes
+        .into_iter()
+        .map(|(task_id, note)| {
+            let task_id =
+                ObjectId::new(task_id.clone()).map_err(|source| StoreError::InvalidId {
+                    field: "gantt_task_notes keys",
+                    value: task_id,
+                    source: Box::new(source),
+                })?;
+            Ok((task_id, note))
+        })
+        .collect::<Result<BTreeMap<_, _>, StoreError>>()?;
+
+    let gantt_lane_notes = meta_json
+        .gantt_lane_notes
+        .into_iter()
+        .map(|(lane_id, note)| {
+            let lane_id =
+                ObjectId::new(lane_id.clone()).map_err(|source| StoreError::InvalidId {
+                    field: "gantt_lane_notes keys",
+                    value: lane_id,
+                    source: Box::new(source),
+                })?;
+            Ok((lane_id, note))
+        })
+        .collect::<Result<BTreeMap<_, _>, StoreError>>()?;
+
     let flow_node_symbols = meta_json
         .flow_node_symbols
         .into_iter()
@@ -1114,6 +1160,8 @@ fn diagram_meta_from_json(
         sequence_participant_notes,
         class_node_notes,
         er_entity_notes,
+        gantt_task_notes,
+        gantt_lane_notes,
         flow_node_symbols,
         sequence_participant_symbols,
     })

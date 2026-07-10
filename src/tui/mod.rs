@@ -2137,9 +2137,20 @@ impl App {
             }
             DiagramAst::Gantt(ast) => {
                 let mut refs = Vec::new();
-                let cat = category_path(&["gantt", "task"]);
+                let task_cat = category_path(&["gantt", "task"]);
                 for id in ast.tasks().keys() {
-                    refs.push(ObjectRef::new(diagram_id.clone(), cat.clone(), id.clone()));
+                    refs.push(ObjectRef::new(diagram_id.clone(), task_cat.clone(), id.clone()));
+                }
+                // Time-lane headers live only in the render highlight index (not the AST).
+                for object_ref in self.base_highlight_index.keys() {
+                    if object_ref.diagram_id() == &diagram_id
+                        && matches!(
+                            object_ref.category().segments(),
+                            [a, b] if a == "gantt" && b == "lane"
+                        )
+                    {
+                        refs.push(object_ref.clone());
+                    }
                 }
                 refs
             }
@@ -2217,6 +2228,25 @@ impl App {
                     let inner_x0 = x0.saturating_add(1);
                     let inner_x1 = x1.saturating_sub(1);
                     (y0, inner_x0, inner_x1, '─')
+                }
+                // Gantt tasks: same title-row interior geometry as sequence participant boxes
+                // (multi-col content boxes that span time lanes).
+                [a, b] if a == "gantt" && b == "task" => {
+                    let Some((y0, x0, x1)) = hint_bounds_from_spans(spans) else {
+                        continue;
+                    };
+                    let inner_x0 = x0.saturating_add(1);
+                    let inner_x1 = x1.saturating_sub(1);
+                    (y0.saturating_add(1), inner_x0, inner_x1, ' ')
+                }
+                // Gantt time-lane headers (sequence-style column labels).
+                [a, b] if a == "gantt" && b == "lane" => {
+                    let Some((y0, x0, x1)) = hint_bounds_from_spans(spans) else {
+                        continue;
+                    };
+                    let inner_x0 = x0.saturating_add(1);
+                    let inner_x1 = x1.saturating_sub(1);
+                    (y0.saturating_add(1), inner_x0, inner_x1, ' ')
                 }
                 _ => continue,
             };
@@ -3920,15 +3950,24 @@ fn objects_from_gantt_ast(
     diagram_id: &DiagramId,
     ast: &crate::model::GanttAst,
 ) -> Vec<SelectableObject> {
-    let cat = category_path(&["gantt", "task"]);
-    ast.tasks()
-        .iter()
-        .map(|(id, task)| SelectableObject {
+    let task_cat = category_path(&["gantt", "task"]);
+    let lane_cat = category_path(&["gantt", "lane"]);
+    let mut out = Vec::new();
+    for (id, task) in ast.tasks() {
+        out.push(SelectableObject {
             label: format!("task {} ({})", id, task.name()),
             note: task.note().map(str::to_owned),
-            object_ref: ObjectRef::new(diagram_id.clone(), cat.clone(), id.clone()),
-        })
-        .collect()
+            object_ref: ObjectRef::new(diagram_id.clone(), task_cat.clone(), id.clone()),
+        });
+    }
+    for (id, note) in ast.lane_notes() {
+        out.push(SelectableObject {
+            label: format!("lane {id}"),
+            note: Some(note.clone()),
+            object_ref: ObjectRef::new(diagram_id.clone(), lane_cat.clone(), id.clone()),
+        });
+    }
+    out
 }
 
 fn objects_from_sequence_ast(diagram_id: &DiagramId, ast: &SequenceAst) -> Vec<SelectableObject> {

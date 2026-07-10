@@ -995,6 +995,43 @@ fn er_diagram_f_enters_hint_mode_with_entity_targets() {
 }
 
 #[test]
+fn gantt_diagram_f_enters_hint_mode_with_task_and_lane_targets() {
+    let mut session = Session::new(SessionId::new("s:gantt-hint").expect("session id"));
+    let gantt_id = DiagramId::new("d-gantt").expect("diagram id");
+    let gantt_ast = crate::format::mermaid::parse_gantt_diagram(
+        "gantt\ndateFormat YYYY-MM-DD\nsection S\nA task :a1, 2014-01-01, 14d\n",
+    )
+    .expect("gantt parse");
+    session.diagrams_mut().insert(
+        gantt_id.clone(),
+        Diagram::new(gantt_id.clone(), "Gantt", DiagramAst::Gantt(gantt_ast)),
+    );
+    session.set_active_diagram_id(Some(gantt_id));
+
+    let mut app = App::new(session);
+    app.handle_key_code(KeyCode::Char('f'));
+    let targets = match &app.hint_mode {
+        HintMode::AwaitingFirst { kind: HintKind::Jump, targets } => targets,
+        other => panic!("expected AwaitingFirst Jump on gantt diagram, got {other:?}"),
+    };
+    assert!(!targets.is_empty(), "gantt diagram should expose hint targets");
+    assert!(
+        targets.iter().any(|t| {
+            matches!(t.object_ref.category().segments(), [a, b] if a == "gantt" && b == "task")
+        }),
+        "expected gantt/task targets: {:?}",
+        targets.iter().map(|t| t.object_ref.to_string()).collect::<Vec<_>>()
+    );
+    assert!(
+        targets.iter().any(|t| {
+            matches!(t.object_ref.category().segments(), [a, b] if a == "gantt" && b == "lane")
+        }),
+        "expected gantt/lane targets: {:?}",
+        targets.iter().map(|t| t.object_ref.to_string()).collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn diagram_y_yanks_ref() {
     let mut app = App::new(demo_session_fallback());
     app.handle_key_code(KeyCode::Char('y'));
@@ -2816,7 +2853,17 @@ fn demo_session_includes_class_er_gantt() {
         other => panic!("expected er, got {other:?}"),
     }
     match session.diagrams().get(&DiagramId::new("demo-gantt").unwrap()).unwrap().ast() {
-        DiagramAst::Gantt(ast) => assert!(!ast.tasks().is_empty()),
+        DiagramAst::Gantt(ast) => {
+            assert!(!ast.tasks().is_empty());
+            assert!(
+                ast.tasks().values().any(|t| t.note().is_some()),
+                "gantt demo should load task notes from sidecar"
+            );
+            assert!(
+                !ast.lane_notes().is_empty(),
+                "gantt demo should load lane header notes from sidecar"
+            );
+        }
         other => panic!("expected gantt, got {other:?}"),
     }
     // index links

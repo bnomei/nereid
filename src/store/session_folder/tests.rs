@@ -440,6 +440,8 @@ fn save_diagram_meta_stores_relative_paths_and_load_resolves_them(ctx: SessionFo
         sequence_participant_notes: Default::default(),
         class_node_notes: Default::default(),
         er_entity_notes: Default::default(),
+        gantt_task_notes: Default::default(),
+        gantt_lane_notes: Default::default(),
         flow_node_symbols: Default::default(),
         sequence_participant_symbols: Default::default(),
     };
@@ -476,6 +478,8 @@ fn save_diagram_meta_rejects_paths_outside_session(ctx: SessionFolderTestCtx) {
         sequence_participant_notes: Default::default(),
         class_node_notes: Default::default(),
         er_entity_notes: Default::default(),
+        gantt_task_notes: Default::default(),
+        gantt_lane_notes: Default::default(),
         flow_node_symbols: Default::default(),
         sequence_participant_symbols: Default::default(),
     };

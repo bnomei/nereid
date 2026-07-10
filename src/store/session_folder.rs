@@ -617,6 +617,8 @@ pub struct DiagramMeta {
     pub sequence_participant_notes: BTreeMap<ObjectId, String>,
     pub class_node_notes: BTreeMap<ObjectId, String>,
     pub er_entity_notes: BTreeMap<ObjectId, String>,
+    pub gantt_task_notes: BTreeMap<ObjectId, String>,
+    pub gantt_lane_notes: BTreeMap<ObjectId, String>,
     pub flow_node_symbols: BTreeMap<ObjectId, SymbolAnchor>,
     pub sequence_participant_symbols: BTreeMap<ObjectId, SymbolAnchor>,
 }
@@ -1413,6 +1415,28 @@ impl SessionFolder {
                     | DiagramAst::Gantt(_) => BTreeMap::new(),
                 };
 
+                let gantt_task_notes = match diagram.ast() {
+                    DiagramAst::Gantt(ast) => ast
+                        .tasks()
+                        .iter()
+                        .filter_map(|(task_id, task)| {
+                            task.note().map(|note| (task_id.clone(), note.to_owned()))
+                        })
+                        .collect(),
+                    DiagramAst::Sequence(_)
+                    | DiagramAst::Flowchart(_)
+                    | DiagramAst::Class(_)
+                    | DiagramAst::Er(_) => BTreeMap::new(),
+                };
+
+                let gantt_lane_notes = match diagram.ast() {
+                    DiagramAst::Gantt(ast) => ast.lane_notes().clone(),
+                    DiagramAst::Sequence(_)
+                    | DiagramAst::Flowchart(_)
+                    | DiagramAst::Class(_)
+                    | DiagramAst::Er(_) => BTreeMap::new(),
+                };
+
                 let flow_node_symbols = match diagram.ast() {
                     DiagramAst::Flowchart(ast) => ast
                         .nodes()
@@ -1458,6 +1482,8 @@ impl SessionFolder {
                     sequence_participant_notes,
                     class_node_notes,
                     er_entity_notes,
+                    gantt_task_notes,
+                    gantt_lane_notes,
                     flow_node_symbols,
                     sequence_participant_symbols,
                 };

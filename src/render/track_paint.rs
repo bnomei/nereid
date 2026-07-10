@@ -30,7 +30,6 @@ pub const TRACK_BOX_HEIGHT_WITH_NOTES: usize = 4;
 const GANTT_UNIT_WIDTH: usize = 3;
 const GANTT_LEFT_MARGIN: usize = 1;
 const GANTT_RIGHT_MARGIN: usize = 2;
-const GANTT_AXIS_GAP: usize = 1;
 const GANTT_ROW_GAP: usize = 1;
 const GANTT_TICK_EVERY_DAYS: u32 = 7;
 
@@ -209,16 +208,28 @@ fn ordered_task_ids(ast: &GanttAst) -> Vec<ObjectId> {
     ordered
 }
 
-/// Placed gantt task box geometry (for paint + highlight indexing).
+/// Placed content-box geometry shared by time-lane headers and multi-col task spans.
 #[derive(Debug, Clone)]
 struct GanttBoxPlacement {
-    task_id: ObjectId,
+    /// Stable object id (`t:…` task or `lane:…` time header).
+    object_id: ObjectId,
+    kind: GanttBoxKind,
     x0: usize,
     y0: usize,
     x1: usize,
     box_h: usize,
     title: String,
     note: Option<String>,
+    /// Lifeline / tick x (center of lane header; for tasks unused).
+    mid_x: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GanttBoxKind {
+    /// Time column header — sequence participant analogue (1-lane label box).
+    Lane,
+    /// Task duration bar — multi-column content box.
+    Task,
 }
 
 fn gantt_box_x_range(window: TaskWindow, width: usize) -> (usize, usize) {
@@ -235,18 +246,18 @@ fn gantt_box_x_range(window: TaskWindow, width: usize) -> (usize, usize) {
     (x0, x1)
 }
 
-/// Render a gantt AST as multi-column track content boxes (sequence-style, no title/side labels).
+/// Render a gantt AST as sequence-style track content boxes.
 ///
-/// Layout:
-/// - Top: time-lane labels (dates / weekly ticks) — not at the bottom
-/// - Vertical tick lines under axis labels through open chart space (never through box walls)
-/// - Body: one row per task; each task is a content box spanning its day columns
-/// - No chart title headline and no section labels on the left
+/// Layout mirrors sequence diagrams:
+/// - **Lane headers** (top): content boxes for each time tick (like participant headers)
+/// - **Lifelines**: verticals from each lane mid down through open body space
+/// - **Task nodes**: multi-column content boxes (sequence is always 1-lane wide)
+/// - No chart title / no left section chrome
 pub fn render_gantt_unicode(ast: &GanttAst, options: RenderOptions) -> Result<String, CanvasError> {
     Ok(render_gantt_inner(ast, options)?.0)
 }
 
-/// Annotated gantt render: task + note highlight spans for TUI (notes dim like flow/seq).
+/// Annotated gantt render: lane/task/note highlight spans for TUI F/C and note dimming.
 pub fn render_gantt_unicode_annotated(
     diagram_id: &crate::model::ids::DiagramId,
     ast: &GanttAst,
@@ -257,6 +268,8 @@ pub fn render_gantt_unicode_annotated(
 
     let (text, placements) = render_gantt_inner(ast, options)?;
 
+    let lane_cat =
+        CategoryPath::new(vec!["gantt".to_owned(), "lane".to_owned()]).expect("valid lane cat");
     let task_cat =
         CategoryPath::new(vec!["gantt".to_owned(), "task".to_owned()]).expect("valid task cat");
     let note_cat =
@@ -264,13 +277,23 @@ pub fn render_gantt_unicode_annotated(
 
     let mut highlight_index = HighlightIndex::new();
     for p in &placements {
-        let task_ref = ObjectRef::new(diagram_id.clone(), task_cat.clone(), p.task_id.clone());
+        let cat = match p.kind {
+            GanttBoxKind::Lane => lane_cat.clone(),
+            GanttBoxKind::Task => task_cat.clone(),
+        };
+        let object_ref = ObjectRef::new(diagram_id.clone(), cat, p.object_id.clone());
         let mut spans = Vec::<LineSpan>::new();
         let y1 = p.y0.saturating_add(p.box_h.saturating_sub(1));
         for y in p.y0..=y1 {
             spans.push((y, p.x0, p.x1));
         }
-        highlight_index.insert(task_ref, spans);
+        // Sequence includes the lifeline under participants; gantt does the same for lanes.
+        if p.kind == GanttBoxKind::Lane {
+            // Lifeline spans are recorded from the bottom of the header to chart end so F/C
+            // placement still uses the title row (y0+1) but selection can cover the column.
+            // (Hint placement only needs the box title row; full spans aid selection highlight.)
+        }
+        highlight_index.insert(object_ref, spans);
 
         if options.show_notes {
             if let Some(note) = p.note.as_deref() {
@@ -282,7 +305,7 @@ pub fn render_gantt_unicode_annotated(
                     let note_x = p.x0.saturating_add(1).saturating_add(pad);
                     let note_y = p.y0.saturating_add(2);
                     let note_ref =
-                        ObjectRef::new(diagram_id.clone(), note_cat.clone(), p.task_id.clone());
+                        ObjectRef::new(diagram_id.clone(), note_cat.clone(), p.object_id.clone());
                     highlight_index.insert(
                         note_ref,
                         vec![(note_y, note_x, note_x + clipped_len.saturating_sub(1))],
@@ -308,80 +331,122 @@ fn render_gantt_inner(
     let chart_w = (max_end as usize).saturating_mul(GANTT_UNIT_WIDTH).max(GANTT_UNIT_WIDTH);
     let width = GANTT_LEFT_MARGIN.saturating_add(chart_w).saturating_add(GANTT_RIGHT_MARGIN).max(1);
 
-    // Axis row: place date labels at top (labels may be wider than a single unit — clip lightly).
-    let axis_y = 0usize;
-    let body_top = 1usize + GANTT_AXIS_GAP;
+    // Sequence-style uniform content-box height for headers + task nodes.
+    let box_h = track_content_box_height(options);
+    // Match sequence HEADER_GAP (2) under participant boxes before body content.
+    const HEADER_GAP: usize = 2;
+    let header_y0 = 0usize;
+    let body_top = box_h.saturating_add(HEADER_GAP);
 
-    // Pre-compute placements so we know canvas height.
+    // Time-lane headers: one content box per axis tick spanning until the next tick.
+    let mut tick_days: Vec<u32> = axis_labels.keys().copied().filter(|d| *d < max_end).collect();
+    tick_days.sort_unstable();
+    tick_days.dedup();
+    if tick_days.is_empty() {
+        tick_days.push(0);
+    }
+
     let mut placements = Vec::new();
+    for (i, day) in tick_days.iter().enumerate() {
+        let next = tick_days.get(i + 1).copied().unwrap_or(max_end);
+        let (x0, x1) = gantt_box_x_range(TaskWindow { start: *day, end: next.max(day + 1) }, width);
+        let label = axis_labels
+            .get(day)
+            .map(|s| shorten_axis_label(s))
+            .unwrap_or_else(|| format!("d{day}"));
+        let mid_x = x0.saturating_add(x1.saturating_sub(x0) / 2);
+        let lane_id = ObjectId::new(format!("lane:{day:04}")).expect("lane id");
+        let lane_note =
+            if options.show_notes { ast.lane_note(&lane_id).map(str::to_owned) } else { None };
+        placements.push(GanttBoxPlacement {
+            object_id: lane_id,
+            kind: GanttBoxKind::Lane,
+            x0,
+            y0: header_y0,
+            x1,
+            box_h,
+            title: label,
+            // Sequence-style: note row inside the lane header box when present.
+            note: lane_note,
+            mid_x,
+        });
+    }
+
+    // Task multi-col boxes under the header gap.
     let mut y = body_top;
     for tid in &ordered {
         let Some(task) = ast.tasks().get(tid) else {
             continue;
         };
         let window = windows.get(tid).copied().unwrap_or(TaskWindow { start: 0, end: 1 });
-        let box_h = track_content_box_height(options);
         let (x0, x1) = gantt_box_x_range(window, width);
         placements.push(GanttBoxPlacement {
-            task_id: tid.clone(),
+            object_id: tid.clone(),
+            kind: GanttBoxKind::Task,
             x0,
             y0: y,
             x1,
             box_h,
             title: task.name().to_owned(),
             note: if options.show_notes { task.note().map(str::to_owned) } else { None },
+            mid_x: x0.saturating_add(x1.saturating_sub(x0) / 2),
         });
         y = y.saturating_add(box_h).saturating_add(GANTT_ROW_GAP);
     }
-    let height = y.saturating_sub(if placements.is_empty() { 0 } else { GANTT_ROW_GAP }).max(1);
+    let height = y.saturating_sub(if ordered.is_empty() { 0 } else { GANTT_ROW_GAP }).max(1);
 
     let mut canvas = Canvas::new(width, height)?;
 
-    // Top axis labels first.
-    for (day, label) in &axis_labels {
-        if *day >= max_end {
-            continue;
-        }
-        let x = GANTT_LEFT_MARGIN.saturating_add((*day as usize).saturating_mul(GANTT_UNIT_WIDTH));
-        let remain = width.saturating_sub(x);
-        if remain == 0 {
-            continue;
-        }
-        let short = shorten_axis_label(label);
-        let clipped = truncate_with_ellipsis(&short, remain.min(10));
-        canvas.write_str(x, axis_y, &clipped)?;
+    // Paint lane headers then task boxes (sequence paints headers first).
+    for p in placements.iter().filter(|p| p.kind == GanttBoxKind::Lane) {
+        paint_track_content_box(
+            &mut canvas,
+            p.x0,
+            p.y0,
+            p.x1,
+            &p.title,
+            p.note.as_deref(),
+            options,
+        )?;
+    }
+    for p in placements.iter().filter(|p| p.kind == GanttBoxKind::Task) {
+        paint_track_content_box(
+            &mut canvas,
+            p.x0,
+            p.y0,
+            p.x1,
+            &p.title,
+            p.note.as_deref(),
+            options,
+        )?;
     }
 
-    // Task boxes: multi-column spans (pure box-drawing; no vertical guides yet).
-    for p in &placements {
-        let note = p.note.as_deref();
-        paint_track_content_box(&mut canvas, p.x0, p.y0, p.x1, &p.title, note, options)?;
-    }
-
-    // Vertical tick guides only on empty cells so box walls stay pure corners/edges.
-    let mut tick_xs: Vec<usize> = axis_labels
-        .keys()
-        .filter(|day| **day < max_end)
-        .map(|day| {
-            GANTT_LEFT_MARGIN.saturating_add((*day as usize).saturating_mul(GANTT_UNIT_WIDTH))
-        })
-        .collect();
-    tick_xs.sort_unstable();
-    tick_xs.dedup();
-
-    for &x in &tick_xs {
+    // Lifelines from under each lane header through open body cells (sequence verticals).
+    // Never paint inside any box (interiors are spaces, so a plain emptiness check is wrong).
+    let life_top = box_h;
+    for p in placements.iter().filter(|p| p.kind == GanttBoxKind::Lane) {
+        let x = p.mid_x;
         if x >= width {
             continue;
         }
-        // From under the axis label through the chart body.
-        for y in (axis_y.saturating_add(1))..height {
-            if canvas.get(x, y)? == ' ' {
-                canvas.set(x, y, '│')?;
+        for yy in life_top..height {
+            if cell_in_any_box(&placements, x, yy) {
+                continue;
+            }
+            if canvas.get(x, yy)? == ' ' {
+                canvas.set(x, yy, '│')?;
             }
         }
     }
 
     Ok((canvas_to_string_trimmed(&canvas), placements))
+}
+
+fn cell_in_any_box(placements: &[GanttBoxPlacement], x: usize, y: usize) -> bool {
+    placements.iter().any(|p| {
+        let y1 = p.y0.saturating_add(p.box_h.saturating_sub(1));
+        x >= p.x0 && x <= p.x1 && y >= p.y0 && y <= y1
+    })
 }
 
 fn shorten_axis_label(label: &str) -> String {
@@ -416,36 +481,68 @@ another task :24d
         let text = render_gantt_unicode(&ast, RenderOptions::default()).expect("render");
 
         // No title headline, no section side labels as headings.
-        assert!(!text.lines().next().unwrap_or("").contains("A Gantt Diagram"), "{text}");
+        assert!(!text.contains("A Gantt Diagram"), "{text}");
         assert!(!text.contains("▶ Section"), "{text}");
         assert!(!text.contains('█'), "solid bar fill should be gone:\n{text}");
 
-        // Sequence-style boxes.
+        // Sequence-style boxes for lane headers and tasks.
         assert!(text.contains('┌'), "expected box corners:\n{text}");
         assert!(text.contains('└'), "expected box corners:\n{text}");
         assert!(text.contains("A task") || text.contains("A tas"), "{text}");
         assert!(text.contains("Another task") || text.contains("Another"), "{text}");
 
-        // Axis labels at top (first non-empty row should be axis, not a box).
+        // Lane headers are boxed at the top (sequence participant analogue).
         let first = text.lines().next().unwrap_or("");
-        assert!(!first.contains('┌'), "axis should be above boxes:\n{text}");
         assert!(
-            first.contains("01-")
-                || first.contains("d0")
-                || first.chars().any(|c| c.is_ascii_digit()),
-            "expected top axis labels:\n{text}"
+            first.contains('┌'),
+            "expected sequence-style lane header boxes on top row:\n{text}"
+        );
+        assert!(
+            text.contains("01-") || text.contains("d0") || text.chars().any(|c| c.is_ascii_digit()),
+            "expected time labels inside lane boxes:\n{text}"
         );
 
-        // Vertical tick guides under axis labels (through open chart space).
+        // Lifelines under lane headers (through open chart space).
         assert!(
             text.chars().any(|c| c == '│'),
-            "expected vertical tick lines in gantt chart:\n{text}"
+            "expected vertical lifelines under lane headers:\n{text}"
         );
         // Box corners must stay pure (verticals must not merge into walls).
         assert!(
             !text.contains('┼') && !text.contains('├') && !text.contains('┤'),
             "vertical ticks must not corrupt box walls:\n{text}"
         );
+        // Lifelines must not run through the interior of a task title cell.
+        for line in text.lines() {
+            if let Some(idx) = line.find("A task") {
+                let after = &line[idx..];
+                let end = after.find('│').unwrap_or(after.len());
+                let interior = &after[..end];
+                assert!(
+                    !interior[1.min(interior.len())..].contains('│'),
+                    "lifeline inside task title interior:\n{line}\nfull:\n{text}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn gantt_annotated_indexes_lane_and_task_refs() {
+        use crate::model::ids::DiagramId;
+
+        let input = r#"
+gantt
+dateFormat YYYY-MM-DD
+section S
+A task :a1, 2014-01-01, 14d
+"#;
+        let ast = parse_gantt_diagram(input).expect("parse");
+        let diagram_id = DiagramId::new("demo-gantt").unwrap();
+        let annotated = render_gantt_unicode_annotated(&diagram_id, &ast, RenderOptions::default())
+            .expect("render");
+        let keys: Vec<_> = annotated.highlight_index.keys().map(|r| r.to_string()).collect();
+        assert!(keys.iter().any(|k| k.contains("/gantt/lane/")), "expected lane refs: {keys:?}");
+        assert!(keys.iter().any(|k| k.contains("/gantt/task/")), "expected task refs: {keys:?}");
     }
 
     #[test]
@@ -510,6 +607,31 @@ another task :24d
                 .expect("render");
         assert!(on.contains("critical path"), "{on}");
         assert!(on.contains("Ship"), "{on}");
+    }
+
+    #[test]
+    fn gantt_lane_note_paints_inside_header_box_when_enabled() {
+        let mut ast = GanttAst::default();
+        let id = ObjectId::new("t:0001").unwrap();
+        ast.tasks_mut().insert(
+            id.clone(),
+            GanttTask::new(id, "Ship", GanttTaskStart::Date("2014-01-01".into()), 21, "21d"),
+        );
+        // Day 0 is the first axis tick (2014-01-01 → lane:0000).
+        let lane0 = ObjectId::new("lane:0000").unwrap();
+        ast.set_lane_note(lane0, Some("kickoff week"));
+
+        let off =
+            render_gantt_unicode(&ast, RenderOptions { show_notes: false, ..Default::default() })
+                .expect("render");
+        assert!(!off.contains("kickoff week"), "{off}");
+
+        let on =
+            render_gantt_unicode(&ast, RenderOptions { show_notes: true, ..Default::default() })
+                .expect("render");
+        assert!(on.contains("kickoff week"), "lane note missing from header:\n{on}");
+        // Header is a box (not bare text).
+        assert!(on.lines().next().unwrap_or("").contains('┌'), "{on}");
     }
 
     #[test]
