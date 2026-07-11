@@ -21,6 +21,7 @@ pub enum MermaidGanttParseError {
     UnsupportedLine { line_no: usize, line: String },
     InvalidTask { line_no: usize, line: String },
     UnknownAfterTag { line_no: usize, tag: String },
+    DuplicateMermaidTag { line_no: usize, tag: String },
 }
 
 impl fmt::Display for MermaidGanttParseError {
@@ -36,6 +37,9 @@ impl fmt::Display for MermaidGanttParseError {
             }
             Self::UnknownAfterTag { line_no, tag } => {
                 write!(f, "unknown after tag '{tag}' on line {line_no}")
+            }
+            Self::DuplicateMermaidTag { line_no, tag } => {
+                write!(f, "gantt Mermaid task tag is not unique: {tag} (line {line_no})")
             }
         }
     }
@@ -233,6 +237,12 @@ pub fn parse_gantt_diagram(input: &str) -> Result<GanttAst, MermaidGanttParseErr
         }
 
         if let Some(tag) = mermaid_tag.as_ref() {
+            if tag_to_id.contains_key(tag) {
+                return Err(MermaidGanttParseError::DuplicateMermaidTag {
+                    line_no,
+                    tag: tag.clone(),
+                });
+            }
             tag_to_id.insert(tag.clone(), task_id.clone());
         }
 
@@ -468,5 +478,66 @@ another task     :24d
             export_gantt_diagram(&ast),
             Err(MermaidGanttExportError::DuplicateTaskMembership { .. })
         ));
+    }
+
+    #[test]
+    fn parse_rejects_duplicate_mermaid_tags() {
+        let input = r#"
+gantt
+section S
+T1 :a, 2026-01-01, 1d
+T2 :a, 2026-01-02, 1d
+T3 :after a, 1d
+"#;
+        let err = parse_gantt_diagram(input).expect_err("duplicate tags must fail parse");
+        assert_eq!(
+            err,
+            MermaidGanttParseError::DuplicateMermaidTag {
+                line_no: 5,
+                tag: "a".to_owned(),
+            }
+        );
+        assert_eq!(
+            err.to_string(),
+            "gantt Mermaid task tag is not unique: a (line 5)"
+        );
+    }
+
+    #[test]
+    fn export_rejects_duplicate_mermaid_tags() {
+        let first_id = ObjectId::new("t:1").unwrap();
+        let second_id = ObjectId::new("t:2").unwrap();
+        let mut ast = GanttAst::default();
+        let mut section = GanttSection::new(ObjectId::new("sec:1").unwrap(), "S");
+        section.task_ids_mut().extend([first_id.clone(), second_id.clone()]);
+        ast.sections_mut().push(section);
+        ast.tasks_mut().insert(
+            first_id.clone(),
+            GanttTask::new(
+                first_id.clone(),
+                "T1",
+                GanttTaskStart::Date("2026-01-01".to_owned()),
+                1,
+                "1d",
+            )
+            .with_mermaid_tag(Some("a")),
+        );
+        ast.tasks_mut().insert(
+            second_id.clone(),
+            GanttTask::new(
+                second_id,
+                "T2",
+                GanttTaskStart::Date("2026-01-02".to_owned()),
+                1,
+                "1d",
+            )
+            .with_mermaid_tag(Some("a")),
+        );
+        assert_eq!(
+            export_gantt_diagram(&ast),
+            Err(MermaidGanttExportError::DuplicateMermaidTag {
+                tag: "a".to_owned()
+            })
+        );
     }
 }
