@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+- Upgraded the MCP server runtime from `rmcp` 1.8 to 2.2, retaining the stdio and streamable HTTP server surface and refreshing the generated tool schema snapshot.
+
 ## [0.9.0] - 2026-07-10
 - Introduced a shared graph/track render pipeline: domain ASTs lower into `GraphModel` / `TrackModel`, then family layout and paint, so new diagram kinds add lowerers instead of private layout/render stacks.
 - Rehomed flowchart and sequence diagram rendering through that pipeline with a temporary domain-AST bridge; existing Unicode snapshots stay bit-identical.

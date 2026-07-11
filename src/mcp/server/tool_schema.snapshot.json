@@ -18,7 +18,6 @@
       "required": [
         "cleared"
       ],
-      "title": "AttentionClearResponse",
       "type": "object"
     }
   },
@@ -32,6 +31,7 @@
     "outputSchema": {
       "$defs": {
         "ReadContext": {
+          "description": "Optional co-presence fields attached to many read responses (TUI/MCP shared state).",
           "properties": {
             "follow_ai": {
               "type": [
@@ -98,7 +98,6 @@
       "required": [
         "context"
       ],
-      "title": "AttentionReadResponse",
       "type": "object"
     }
   },
@@ -115,7 +114,6 @@
       "required": [
         "object_ref"
       ],
-      "title": "AttentionAgentSetParams",
       "type": "object"
     },
     "outputSchema": {
@@ -132,7 +130,6 @@
         "object_ref",
         "diagram_id"
       ],
-      "title": "AttentionSetResponse",
       "type": "object"
     }
   },
@@ -146,6 +143,7 @@
     "outputSchema": {
       "$defs": {
         "ReadContext": {
+          "description": "Optional co-presence fields attached to many read responses (TUI/MCP shared state).",
           "properties": {
             "follow_ai": {
               "type": [
@@ -212,7 +210,6 @@
       "required": [
         "context"
       ],
-      "title": "AttentionReadResponse",
       "type": "object"
     }
   },
@@ -222,7 +219,7 @@
     "inputSchema": {
       "$defs": {
         "McpOp": {
-          "description": "Tagged diagram mutation op for `diagram_apply_ops` / `diagram_propose_ops`.",
+          "description": "Tagged diagram mutation op for `diagram_apply_ops` / `diagram_propose_ops`.\nCovers sequence (participants/messages/blocks) and flowchart (nodes/edges) structure.",
           "oneOf": [
             {
               "properties": {
@@ -874,6 +871,7 @@
           ]
         },
         "McpSeqBlockKind": {
+          "description": "Sequence fragment block kind.",
           "enum": [
             "alt",
             "opt",
@@ -891,6 +889,7 @@
           "type": "string"
         },
         "McpSymbolAnchor": {
+          "description": "Frigg symbol anchor on sequence participants / flow nodes.",
           "properties": {
             "repository_id": {
               "type": [
@@ -908,6 +907,7 @@
           "type": "object"
         },
         "MessageKind": {
+          "description": "Sequence message arrow kind (sync/async/return).",
           "enum": [
             "sync",
             "async",
@@ -940,12 +940,12 @@
         "base_rev",
         "ops"
       ],
-      "title": "ApplyOpsParams",
       "type": "object"
     },
     "outputSchema": {
       "$defs": {
         "DeltaSummary": {
+          "description": "Compact added/removed/updated object refs after apply.",
           "properties": {
             "added": {
               "items": {
@@ -995,7 +995,6 @@
         "applied",
         "delta"
       ],
-      "title": "ApplyOpsResponse",
       "type": "object"
     }
   },
@@ -1034,7 +1033,6 @@
       "required": [
         "mermaid"
       ],
-      "title": "DiagramCreateFromMermaidParams",
       "type": "object"
     },
     "outputSchema": {
@@ -1081,7 +1079,6 @@
       "required": [
         "diagram"
       ],
-      "title": "DiagramCreateFromMermaidResponse",
       "type": "object"
     }
   },
@@ -1095,6 +1092,7 @@
     "outputSchema": {
       "$defs": {
         "ReadContext": {
+          "description": "Optional co-presence fields attached to many read responses (TUI/MCP shared state).",
           "properties": {
             "follow_ai": {
               "type": [
@@ -1155,7 +1153,6 @@
       "required": [
         "context"
       ],
-      "title": "DiagramCurrentResponse",
       "type": "object"
     }
   },
@@ -1172,7 +1169,6 @@
       "required": [
         "diagram_id"
       ],
-      "title": "DiagramDeleteParams",
       "type": "object"
     },
     "outputSchema": {
@@ -1191,7 +1187,6 @@
       "required": [
         "deleted_diagram_id"
       ],
-      "title": "DiagramDeleteResponse",
       "type": "object"
     }
   },
@@ -1216,12 +1211,12 @@
       "required": [
         "since_rev"
       ],
-      "title": "GetDeltaParams",
       "type": "object"
     },
     "outputSchema": {
       "$defs": {
         "DeltaChange": {
+          "description": "One grouped change of object refs between revs.",
           "properties": {
             "kind": {
               "$ref": "#/$defs/DeltaChangeKind"
@@ -1240,6 +1235,7 @@
           "type": "object"
         },
         "DeltaChangeKind": {
+          "description": "Kind of object-ref change inside a diagram delta.",
           "enum": [
             "added",
             "removed",
@@ -1272,7 +1268,6 @@
         "to_rev",
         "changes"
       ],
-      "title": "DiagramDeltaResponse",
       "type": "object"
     }
   },
@@ -1289,12 +1284,12 @@
           ]
         }
       },
-      "title": "DiagramTargetParams",
       "type": "object"
     },
     "outputSchema": {
       "$defs": {
         "McpClassNodeAst": {
+          "description": "Class node in MCP AST / object reads.",
           "properties": {
             "attributes": {
               "items": {
@@ -1330,6 +1325,7 @@
           "type": "object"
         },
         "McpClassRelationAst": {
+          "description": "Class relation edge in MCP AST.",
           "properties": {
             "from_class_id": {
               "type": "string"
@@ -1365,6 +1361,7 @@
           "type": "object"
         },
         "McpClassRelationKind": {
+          "description": "UML-ish class relation kind on the wire.",
           "enum": [
             "inheritance",
             "composition",
@@ -1377,6 +1374,7 @@
           "type": "string"
         },
         "McpDiagramAst": {
+          "description": "Kind-tagged diagram AST for MCP (structure ops and get_ast).",
           "oneOf": [
             {
               "properties": {
@@ -1537,6 +1535,7 @@
           ]
         },
         "McpErCardinality": {
+          "description": "ER endpoint cardinality on the wire.",
           "enum": [
             "exactly_one",
             "zero_or_one",
@@ -1546,6 +1545,7 @@
           "type": "string"
         },
         "McpErEntityAst": {
+          "description": "ER entity node in MCP AST.",
           "properties": {
             "entity_id": {
               "type": "string"
@@ -1567,6 +1567,7 @@
           "type": "object"
         },
         "McpErRelationshipAst": {
+          "description": "ER relationship edge in MCP AST.",
           "properties": {
             "from_cardinality": {
               "$ref": "#/$defs/McpErCardinality"
@@ -1610,6 +1611,7 @@
           "type": "object"
         },
         "McpErStroke": {
+          "description": "Identifying vs non-identifying ER relationship stroke.",
           "enum": [
             "identifying",
             "non_identifying"
@@ -1617,6 +1619,7 @@
           "type": "string"
         },
         "McpFlowEdgeAst": {
+          "description": "Flowchart edge in MCP AST.",
           "properties": {
             "connector": {
               "type": [
@@ -1654,6 +1657,7 @@
           "type": "object"
         },
         "McpFlowNodeAst": {
+          "description": "Flowchart node in MCP AST.",
           "properties": {
             "label": {
               "type": "string"
@@ -1695,6 +1699,7 @@
           "type": "object"
         },
         "McpGanttLaneAst": {
+          "description": "Gantt time-lane header in MCP AST.",
           "properties": {
             "label": {
               "type": "string"
@@ -1716,6 +1721,7 @@
           "type": "object"
         },
         "McpGanttSectionAst": {
+          "description": "Gantt section grouping task ids.",
           "properties": {
             "name": {
               "type": "string"
@@ -1738,6 +1744,7 @@
           "type": "object"
         },
         "McpGanttTaskAst": {
+          "description": "Gantt task row in MCP AST.",
           "properties": {
             "duration_days": {
               "format": "uint32",
@@ -1779,6 +1786,7 @@
           "type": "object"
         },
         "McpGanttTaskStart": {
+          "description": "Gantt task start: absolute date, after another task, or unspecified.",
           "oneOf": [
             {
               "properties": {
@@ -1827,6 +1835,7 @@
           ]
         },
         "McpSeqBlockAst": {
+          "description": "Nested alt/opt/loop/par block with sections and child blocks.",
           "properties": {
             "block_id": {
               "type": "string"
@@ -1862,6 +1871,7 @@
           "type": "object"
         },
         "McpSeqBlockKind": {
+          "description": "Sequence fragment block kind.",
           "enum": [
             "alt",
             "opt",
@@ -1871,6 +1881,7 @@
           "type": "string"
         },
         "McpSeqMessageAst": {
+          "description": "Sequence message in MCP AST.",
           "properties": {
             "arrow": {
               "type": [
@@ -1909,6 +1920,7 @@
           "type": "object"
         },
         "McpSeqParticipantAst": {
+          "description": "Sequence participant in MCP AST.",
           "properties": {
             "mermaid_name": {
               "type": "string"
@@ -1946,6 +1958,7 @@
           "type": "object"
         },
         "McpSeqSectionAst": {
+          "description": "One section inside a sequence block (main/else/and) owning message ids.",
           "properties": {
             "header": {
               "type": [
@@ -1974,6 +1987,7 @@
           "type": "object"
         },
         "McpSeqSectionKind": {
+          "description": "Section role within a sequence block.",
           "enum": [
             "main",
             "else",
@@ -1982,6 +1996,7 @@
           "type": "string"
         },
         "McpSymbolAnchor": {
+          "description": "Frigg symbol anchor on sequence participants / flow nodes.",
           "properties": {
             "repository_id": {
               "type": [
@@ -1999,6 +2014,7 @@
           "type": "object"
         },
         "MessageKind": {
+          "description": "Sequence message arrow kind (sync/async/return).",
           "enum": [
             "sync",
             "async",
@@ -2036,7 +2052,6 @@
         "rev",
         "ast"
       ],
-      "title": "DiagramGetAstResponse",
       "type": "object"
     }
   },
@@ -2046,6 +2061,7 @@
     "inputSchema": {
       "$defs": {
         "DiagramSliceFilters": {
+          "description": "Category include/exclude filters for diagram slices.",
           "properties": {
             "exclude_categories": {
               "items": {
@@ -2110,7 +2126,6 @@
       "required": [
         "center_ref"
       ],
-      "title": "DiagramGetSliceParams",
       "type": "object"
     },
     "outputSchema": {
@@ -2133,7 +2148,6 @@
         "objects",
         "edges"
       ],
-      "title": "DiagramGetSliceResponse",
       "type": "object"
     }
   },
@@ -2173,6 +2187,7 @@
           "type": "object"
         },
         "ReadContext": {
+          "description": "Optional co-presence fields attached to many read responses (TUI/MCP shared state).",
           "properties": {
             "follow_ai": {
               "type": [
@@ -2234,7 +2249,6 @@
         "diagrams",
         "context"
       ],
-      "title": "ListDiagramsResponse",
       "type": "object"
     }
   },
@@ -2251,7 +2265,6 @@
       "required": [
         "diagram_id"
       ],
-      "title": "DiagramOpenParams",
       "type": "object"
     },
     "outputSchema": {
@@ -2264,7 +2277,6 @@
       "required": [
         "active_diagram_id"
       ],
-      "title": "DiagramOpenResponse",
       "type": "object"
     }
   },
@@ -2274,7 +2286,7 @@
     "inputSchema": {
       "$defs": {
         "McpOp": {
-          "description": "Tagged diagram mutation op for `diagram_apply_ops` / `diagram_propose_ops`.",
+          "description": "Tagged diagram mutation op for `diagram_apply_ops` / `diagram_propose_ops`.\nCovers sequence (participants/messages/blocks) and flowchart (nodes/edges) structure.",
           "oneOf": [
             {
               "properties": {
@@ -2926,6 +2938,7 @@
           ]
         },
         "McpSeqBlockKind": {
+          "description": "Sequence fragment block kind.",
           "enum": [
             "alt",
             "opt",
@@ -2943,6 +2956,7 @@
           "type": "string"
         },
         "McpSymbolAnchor": {
+          "description": "Frigg symbol anchor on sequence participants / flow nodes.",
           "properties": {
             "repository_id": {
               "type": [
@@ -2960,6 +2974,7 @@
           "type": "object"
         },
         "MessageKind": {
+          "description": "Sequence message arrow kind (sync/async/return).",
           "enum": [
             "sync",
             "async",
@@ -2992,12 +3007,12 @@
         "base_rev",
         "ops"
       ],
-      "title": "DiagramProposeOpsParams",
       "type": "object"
     },
     "outputSchema": {
       "$defs": {
         "DeltaSummary": {
+          "description": "Compact added/removed/updated object refs after apply.",
           "properties": {
             "added": {
               "items": {
@@ -3047,7 +3062,6 @@
         "applied",
         "delta"
       ],
-      "title": "DiagramProposeOpsResponse",
       "type": "object"
     }
   },
@@ -3064,12 +3078,12 @@
           ]
         }
       },
-      "title": "DiagramTargetParams",
       "type": "object"
     },
     "outputSchema": {
       "$defs": {
         "ReadContext": {
+          "description": "Optional co-presence fields attached to many read responses (TUI/MCP shared state).",
           "properties": {
             "follow_ai": {
               "type": [
@@ -3138,7 +3152,6 @@
         "mermaid",
         "context"
       ],
-      "title": "DiagramSnapshot",
       "type": "object"
     }
   },
@@ -3155,12 +3168,12 @@
           ]
         }
       },
-      "title": "DiagramTargetParams",
       "type": "object"
     },
     "outputSchema": {
       "$defs": {
         "ReadContext": {
+          "description": "Optional co-presence fields attached to many read responses (TUI/MCP shared state).",
           "properties": {
             "follow_ai": {
               "type": [
@@ -3219,7 +3232,6 @@
         "text",
         "context"
       ],
-      "title": "DiagramRenderTextResponse",
       "type": "object"
     }
   },
@@ -3249,12 +3261,12 @@
         "base_rev",
         "mermaid"
       ],
-      "title": "DiagramReplaceFromMermaidParams",
       "type": "object"
     },
     "outputSchema": {
       "$defs": {
         "DiagramIdentityReport": {
+          "description": "Stable-id reconciliation report after Mermaid replace.",
           "properties": {
             "dropped": {
               "description": "Object ids present before replace but not after (dropped/unmatched).",
@@ -3317,7 +3329,6 @@
         "identity",
         "dangling_xref_ids"
       ],
-      "title": "DiagramReplaceFromMermaidResponse",
       "type": "object"
     }
   },
@@ -3334,12 +3345,12 @@
           ]
         }
       },
-      "title": "DiagramTargetParams",
       "type": "object"
     },
     "outputSchema": {
       "$defs": {
         "DiagramCounts": {
+          "description": "Per-kind object counts for digests (unused kinds stay 0).",
           "properties": {
             "classes": {
               "format": "uint64",
@@ -3419,6 +3430,7 @@
           "type": "object"
         },
         "ReadContext": {
+          "description": "Optional co-presence fields attached to many read responses (TUI/MCP shared state).",
           "properties": {
             "follow_ai": {
               "type": [
@@ -3490,7 +3502,6 @@
         "key_names",
         "context"
       ],
-      "title": "DiagramDigest",
       "type": "object"
     }
   },
@@ -3507,7 +3518,6 @@
           ]
         }
       },
-      "title": "DiagramTargetParams",
       "type": "object"
     },
     "outputSchema": {
@@ -3526,7 +3536,6 @@
       "required": [
         "cycles"
       ],
-      "title": "FlowCyclesResponse",
       "type": "object"
     }
   },
@@ -3543,7 +3552,6 @@
           ]
         }
       },
-      "title": "DiagramTargetParams",
       "type": "object"
     },
     "outputSchema": {
@@ -3559,7 +3567,6 @@
       "required": [
         "nodes"
       ],
-      "title": "FlowDeadEndsResponse",
       "type": "object"
     }
   },
@@ -3590,12 +3597,12 @@
           ]
         }
       },
-      "title": "FlowDegreesParams",
       "type": "object"
     },
     "outputSchema": {
       "$defs": {
         "FlowDegreeNode": {
+          "description": "One flow node's in/out degree ranking row.",
           "properties": {
             "in_degree": {
               "format": "uint64",
@@ -3635,7 +3642,6 @@
       "required": [
         "nodes"
       ],
-      "title": "FlowDegreesResponse",
       "type": "object"
     }
   },
@@ -3678,7 +3684,6 @@
         "from_node_id",
         "to_node_id"
       ],
-      "title": "FlowPathsParams",
       "type": "object"
     },
     "outputSchema": {
@@ -3697,7 +3702,6 @@
       "required": [
         "paths"
       ],
-      "title": "FlowPathsResponse",
       "type": "object"
     }
   },
@@ -3726,7 +3730,6 @@
       "required": [
         "from_node_id"
       ],
-      "title": "FlowReachableParams",
       "type": "object"
     },
     "outputSchema": {
@@ -3742,7 +3745,6 @@
       "required": [
         "nodes"
       ],
-      "title": "FlowReachableResponse",
       "type": "object"
     }
   },
@@ -3765,7 +3767,6 @@
           ]
         }
       },
-      "title": "FlowUnreachableParams",
       "type": "object"
     },
     "outputSchema": {
@@ -3781,7 +3782,6 @@
       "required": [
         "nodes"
       ],
-      "title": "FlowUnreachableResponse",
       "type": "object"
     }
   },
@@ -3795,6 +3795,7 @@
     "outputSchema": {
       "$defs": {
         "ReadContext": {
+          "description": "Optional co-presence fields attached to many read responses (TUI/MCP shared state).",
           "properties": {
             "follow_ai": {
               "type": [
@@ -3853,7 +3854,6 @@
         "enabled",
         "context"
       ],
-      "title": "FollowAiReadResponse",
       "type": "object"
     }
   },
@@ -3870,7 +3870,6 @@
       "required": [
         "enabled"
       ],
-      "title": "FollowAiSetParams",
       "type": "object"
     },
     "outputSchema": {
@@ -3883,7 +3882,6 @@
       "required": [
         "enabled"
       ],
-      "title": "FollowAiSetResponse",
       "type": "object"
     }
   },
@@ -3909,12 +3907,12 @@
           ]
         }
       },
-      "title": "ObjectGetParams",
       "type": "object"
     },
     "outputSchema": {
       "$defs": {
         "McpClassRelationKind": {
+          "description": "UML-ish class relation kind on the wire.",
           "enum": [
             "inheritance",
             "composition",
@@ -3927,6 +3925,7 @@
           "type": "string"
         },
         "McpErCardinality": {
+          "description": "ER endpoint cardinality on the wire.",
           "enum": [
             "exactly_one",
             "zero_or_one",
@@ -3936,6 +3935,7 @@
           "type": "string"
         },
         "McpErStroke": {
+          "description": "Identifying vs non-identifying ER relationship stroke.",
           "enum": [
             "identifying",
             "non_identifying"
@@ -3943,6 +3943,7 @@
           "type": "string"
         },
         "McpGanttTaskStart": {
+          "description": "Gantt task start: absolute date, after another task, or unspecified.",
           "oneOf": [
             {
               "properties": {
@@ -3991,6 +3992,7 @@
           ]
         },
         "McpObject": {
+          "description": "Kind-tagged object body for `object_read` (mirrors domain categories).",
           "oneOf": [
             {
               "properties": {
@@ -4442,6 +4444,7 @@
           ]
         },
         "McpSeqBlockKind": {
+          "description": "Sequence fragment block kind.",
           "enum": [
             "alt",
             "opt",
@@ -4451,6 +4454,7 @@
           "type": "string"
         },
         "McpSeqSectionKind": {
+          "description": "Section role within a sequence block.",
           "enum": [
             "main",
             "else",
@@ -4459,6 +4463,7 @@
           "type": "string"
         },
         "McpSymbolAnchor": {
+          "description": "Frigg symbol anchor on sequence participants / flow nodes.",
           "properties": {
             "repository_id": {
               "type": [
@@ -4476,6 +4481,7 @@
           "type": "object"
         },
         "MessageKind": {
+          "description": "Sequence message arrow kind (sync/async/return).",
           "enum": [
             "sync",
             "async",
@@ -4484,6 +4490,7 @@
           "type": "string"
         },
         "ObjectGetItem": {
+          "description": "One resolved object for `object_read`.",
           "properties": {
             "object": {
               "$ref": "#/$defs/McpObject"
@@ -4499,6 +4506,7 @@
           "type": "object"
         },
         "ReadContext": {
+          "description": "Optional co-presence fields attached to many read responses (TUI/MCP shared state).",
           "properties": {
             "follow_ai": {
               "type": [
@@ -4560,7 +4568,6 @@
         "objects",
         "context"
       ],
-      "title": "ObjectGetResponse",
       "type": "object"
     }
   },
@@ -4603,7 +4610,6 @@
         "from_ref",
         "to_ref"
       ],
-      "title": "RouteFindParams",
       "type": "object"
     },
     "outputSchema": {
@@ -4622,7 +4628,6 @@
       "required": [
         "routes"
       ],
-      "title": "RouteFindResponse",
       "type": "object"
     }
   },
@@ -4636,6 +4641,7 @@
     "outputSchema": {
       "$defs": {
         "ReadContext": {
+          "description": "Optional co-presence fields attached to many read responses (TUI/MCP shared state).",
           "properties": {
             "follow_ai": {
               "type": [
@@ -4697,7 +4703,6 @@
         "object_refs",
         "context"
       ],
-      "title": "SelectionGetResponse",
       "type": "object"
     }
   },
@@ -4707,6 +4712,7 @@
     "inputSchema": {
       "$defs": {
         "UpdateMode": {
+          "description": "How `selection_update` merges `object_refs` into the multi-select set.",
           "enum": [
             "replace",
             "add",
@@ -4731,7 +4737,6 @@
       "required": [
         "object_refs"
       ],
-      "title": "SelectionUpdateParams",
       "type": "object"
     },
     "outputSchema": {
@@ -4754,7 +4759,6 @@
         "applied",
         "ignored"
       ],
-      "title": "SelectionUpdateResponse",
       "type": "object"
     }
   },
@@ -4783,7 +4787,6 @@
           ]
         }
       },
-      "title": "SeqMessagesParams",
       "type": "object"
     },
     "outputSchema": {
@@ -4799,7 +4802,6 @@
       "required": [
         "messages"
       ],
-      "title": "SeqMessagesResponse",
       "type": "object"
     }
   },
@@ -4834,7 +4836,6 @@
       "required": [
         "needle"
       ],
-      "title": "SeqSearchParams",
       "type": "object"
     },
     "outputSchema": {
@@ -4850,7 +4851,6 @@
       "required": [
         "messages"
       ],
-      "title": "SeqSearchResponse",
       "type": "object"
     }
   },
@@ -4887,7 +4887,6 @@
           ]
         }
       },
-      "title": "SeqTraceParams",
       "type": "object"
     },
     "outputSchema": {
@@ -4903,7 +4902,6 @@
       "required": [
         "messages"
       ],
-      "title": "SeqTraceResponse",
       "type": "object"
     }
   },
@@ -4917,6 +4915,7 @@
     "outputSchema": {
       "$defs": {
         "ReadContext": {
+          "description": "Optional co-presence fields attached to many read responses (TUI/MCP shared state).",
           "properties": {
             "follow_ai": {
               "type": [
@@ -4962,6 +4961,7 @@
           "type": "object"
         },
         "ViewScroll": {
+          "description": "Diagram canvas scroll offsets for `view_get_state`.",
           "properties": {
             "x": {
               "format": "double",
@@ -5005,7 +5005,6 @@
         "panes",
         "context"
       ],
-      "title": "ViewGetStateResponse",
       "type": "object"
     }
   },
@@ -5015,6 +5014,7 @@
     "inputSchema": {
       "$defs": {
         "McpWalkthroughOp": {
+          "description": "Tagged walkthrough mutation for `walkthrough_apply_ops` (nodes/edges/title).",
           "oneOf": [
             {
               "properties": {
@@ -5259,12 +5259,12 @@
         "base_rev",
         "ops"
       ],
-      "title": "WalkthroughApplyOpsParams",
       "type": "object"
     },
     "outputSchema": {
       "$defs": {
         "DeltaSummary": {
+          "description": "Compact added/removed/updated object refs after apply.",
           "properties": {
             "added": {
               "items": {
@@ -5314,7 +5314,6 @@
         "applied",
         "delta"
       ],
-      "title": "ApplyOpsResponse",
       "type": "object"
     }
   },
@@ -5328,6 +5327,7 @@
     "outputSchema": {
       "$defs": {
         "ReadContext": {
+          "description": "Optional co-presence fields attached to many read responses (TUI/MCP shared state).",
           "properties": {
             "follow_ai": {
               "type": [
@@ -5388,7 +5388,6 @@
       "required": [
         "context"
       ],
-      "title": "WalkthroughCurrentResponse",
       "type": "object"
     }
   },
@@ -5411,12 +5410,12 @@
         "walkthrough_id",
         "since_rev"
       ],
-      "title": "WalkthroughGetDeltaParams",
       "type": "object"
     },
     "outputSchema": {
       "$defs": {
         "DeltaChange": {
+          "description": "One grouped change of object refs between revs.",
           "properties": {
             "kind": {
               "$ref": "#/$defs/DeltaChangeKind"
@@ -5435,6 +5434,7 @@
           "type": "object"
         },
         "DeltaChangeKind": {
+          "description": "Kind of object-ref change inside a diagram delta.",
           "enum": [
             "added",
             "removed",
@@ -5467,7 +5467,6 @@
         "to_rev",
         "changes"
       ],
-      "title": "WalkthroughDeltaResponse",
       "type": "object"
     }
   },
@@ -5488,12 +5487,12 @@
         "walkthrough_id",
         "node_id"
       ],
-      "title": "WalkthroughGetNodeParams",
       "type": "object"
     },
     "outputSchema": {
       "$defs": {
         "McpWalkthroughNode": {
+          "description": "Wire form of a walkthrough node (body, object refs, tags, status).",
           "properties": {
             "body_md": {
               "type": [
@@ -5535,6 +5534,7 @@
           "type": "object"
         },
         "ReadContext": {
+          "description": "Optional co-presence fields attached to many read responses (TUI/MCP shared state).",
           "properties": {
             "follow_ai": {
               "type": [
@@ -5593,7 +5593,6 @@
         "node",
         "context"
       ],
-      "title": "WalkthroughGetNodeResponse",
       "type": "object"
     }
   },
@@ -5607,6 +5606,7 @@
     "outputSchema": {
       "$defs": {
         "ReadContext": {
+          "description": "Optional co-presence fields attached to many read responses (TUI/MCP shared state).",
           "properties": {
             "follow_ai": {
               "type": [
@@ -5652,6 +5652,7 @@
           "type": "object"
         },
         "WalkthroughSummary": {
+          "description": "Lightweight walkthrough row for list responses.",
           "properties": {
             "edges": {
               "format": "uint64",
@@ -5701,7 +5702,6 @@
         "walkthroughs",
         "context"
       ],
-      "title": "ListWalkthroughsResponse",
       "type": "object"
     }
   },
@@ -5718,7 +5718,6 @@
       "required": [
         "walkthrough_id"
       ],
-      "title": "WalkthroughOpenParams",
       "type": "object"
     },
     "outputSchema": {
@@ -5731,7 +5730,6 @@
       "required": [
         "active_walkthrough_id"
       ],
-      "title": "WalkthroughOpenResponse",
       "type": "object"
     }
   },
@@ -5748,12 +5746,12 @@
       "required": [
         "walkthrough_id"
       ],
-      "title": "WalkthroughGetParams",
       "type": "object"
     },
     "outputSchema": {
       "$defs": {
         "McpWalkthrough": {
+          "description": "Full walkthrough payload for get/apply responses.",
           "properties": {
             "edges": {
               "items": {
@@ -5789,6 +5787,7 @@
           "type": "object"
         },
         "McpWalkthroughEdge": {
+          "description": "Wire form of a directed walkthrough edge.",
           "properties": {
             "from_node_id": {
               "type": "string"
@@ -5814,6 +5813,7 @@
           "type": "object"
         },
         "McpWalkthroughNode": {
+          "description": "Wire form of a walkthrough node (body, object refs, tags, status).",
           "properties": {
             "body_md": {
               "type": [
@@ -5855,6 +5855,7 @@
           "type": "object"
         },
         "ReadContext": {
+          "description": "Optional co-presence fields attached to many read responses (TUI/MCP shared state).",
           "properties": {
             "follow_ai": {
               "type": [
@@ -5913,7 +5914,6 @@
         "walkthrough",
         "context"
       ],
-      "title": "WalkthroughGetResponse",
       "type": "object"
     }
   },
@@ -5930,12 +5930,12 @@
       "required": [
         "walkthrough_id"
       ],
-      "title": "WalkthroughGetParams",
       "type": "object"
     },
     "outputSchema": {
       "$defs": {
         "ReadContext": {
+          "description": "Optional co-presence fields attached to many read responses (TUI/MCP shared state).",
           "properties": {
             "follow_ai": {
               "type": [
@@ -5994,7 +5994,6 @@
         "text",
         "context"
       ],
-      "title": "WalkthroughRenderTextResponse",
       "type": "object"
     }
   },
@@ -6011,12 +6010,12 @@
       "required": [
         "walkthrough_id"
       ],
-      "title": "WalkthroughGetParams",
       "type": "object"
     },
     "outputSchema": {
       "$defs": {
         "ReadContext": {
+          "description": "Optional co-presence fields attached to many read responses (TUI/MCP shared state).",
           "properties": {
             "follow_ai": {
               "type": [
@@ -6062,6 +6061,7 @@
           "type": "object"
         },
         "WalkthroughDigest": {
+          "description": "Cheap walkthrough fingerprint (rev + counts) without full body.",
           "properties": {
             "counts": {
               "$ref": "#/$defs/WalkthroughDigestCounts"
@@ -6079,6 +6079,7 @@
           "type": "object"
         },
         "WalkthroughDigestCounts": {
+          "description": "Node/edge counts inside a walkthrough digest.",
           "properties": {
             "edges": {
               "format": "uint64",
@@ -6111,7 +6112,6 @@
         "digest",
         "context"
       ],
-      "title": "WalkthroughGetDigestResponse",
       "type": "object"
     }
   },
@@ -6146,7 +6146,6 @@
         "to",
         "kind"
       ],
-      "title": "XRefAddParams",
       "type": "object"
     },
     "outputSchema": {
@@ -6163,7 +6162,6 @@
         "xref_id",
         "status"
       ],
-      "title": "XRefAddResponse",
       "type": "object"
     }
   },
@@ -6224,12 +6222,12 @@
           ]
         }
       },
-      "title": "XRefListParams",
       "type": "object"
     },
     "outputSchema": {
       "$defs": {
         "XRefSummary": {
+          "description": "One cross-reference row for list tools.",
           "properties": {
             "from": {
               "type": "string"
@@ -6275,7 +6273,6 @@
       "required": [
         "xrefs"
       ],
-      "title": "XRefListResponse",
       "type": "object"
     }
   },
@@ -6298,7 +6295,6 @@
       "required": [
         "object_ref"
       ],
-      "title": "XRefNeighborsParams",
       "type": "object"
     },
     "outputSchema": {
@@ -6314,7 +6310,6 @@
       "required": [
         "neighbors"
       ],
-      "title": "XRefNeighborsResponse",
       "type": "object"
     }
   },
@@ -6331,7 +6326,6 @@
       "required": [
         "xref_id"
       ],
-      "title": "XRefRemoveParams",
       "type": "object"
     },
     "outputSchema": {
@@ -6344,7 +6338,6 @@
       "required": [
         "removed"
       ],
-      "title": "XRefRemoveResponse",
       "type": "object"
     }
   }

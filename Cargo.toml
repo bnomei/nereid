@@ -22,7 +22,7 @@ schemars = "1.2.1"
 fs2 = "0.4"
 ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
 crossterm = "0.29"
-rmcp = { version = "1.8", features = ["transport-streamable-http-server"] }
+rmcp = { version = "2.1.0", default-features = false, features = ["macros", "server", "transport-io", "transport-streamable-http-server"] }
 tokio = { version = "1.52.3", features = ["io-std", "macros", "rt", "sync", "time"] }
 regex = "1.13.0"
 axum = "0.8.9"
