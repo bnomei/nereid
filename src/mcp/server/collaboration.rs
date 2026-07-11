@@ -160,20 +160,12 @@ impl NereidMcp {
     ) -> Result<Json<SelectionUpdateResponse>, ErrorData> {
         let SelectionUpdateParams { object_refs, mode } = params.0;
 
-        let mut state = self.lock_state_synced().await?;
-        let mut applied_refs = BTreeSet::new();
-        let mut ignored_refs = BTreeSet::new();
-
+        let mut requested_refs = Vec::with_capacity(object_refs.len());
         for object_ref in object_refs {
-            let parsed = parse_object_ref(&object_ref)?;
-            if object_ref_is_missing(&state.session, &parsed) {
-                ignored_refs.insert(parsed.to_string());
-            } else {
-                applied_refs.insert(parsed);
-            }
+            requested_refs.push(parse_object_ref(&object_ref)?);
         }
 
-        let applied = applied_refs.iter().map(ToString::to_string).collect::<Vec<_>>();
+        let mut state = self.lock_state_synced().await?;
 
         fn apply_mode(session: &mut Session, mode: UpdateMode, object_refs: &BTreeSet<ObjectRef>) {
             match mode {
@@ -194,26 +186,59 @@ impl NereidMcp {
             }
         }
 
-        if let Some(session_folder) = &self.session_folder {
-            let mut candidate = state.session.clone();
-            let meta = session_folder.load_meta().map_err(|err| {
-                ErrorData::internal_error(format!("failed to load session meta: {err}"), None)
-            })?;
-            candidate.set_selected_object_refs(meta.selected_object_refs.into_iter().collect());
-            retain_existing_selected_object_refs(&mut candidate);
-            apply_mode(&mut candidate, mode, &applied_refs);
-            session_folder.save_selected_object_refs(&candidate).map_err(|err| {
-                ErrorData::internal_error(
-                    format!("failed to persist selected object refs: {err}"),
-                    Some(serde_json::json!({
-                        "selected_count": candidate.selected_object_refs().len() as u64,
-                    })),
-                )
-            })?;
+        let (applied, ignored_refs) = if let Some(session_folder) = &self.session_folder {
+            let mut applied_refs = BTreeSet::new();
+            let mut ignored_refs = BTreeSet::new();
+
+            let candidate = {
+                let mut update = session_folder.begin_session_update().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to reload session before save: {err}"),
+                        None,
+                    )
+                })?;
+                let candidate = update.session_mut();
+
+                for parsed in &requested_refs {
+                    if object_ref_is_missing(candidate, parsed) {
+                        ignored_refs.insert(parsed.to_string());
+                    } else {
+                        applied_refs.insert(parsed.clone());
+                    }
+                }
+
+                // Disk session already carries the latest selection under the write lock.
+                retain_existing_selected_object_refs(candidate);
+                apply_mode(candidate, mode, &applied_refs);
+
+                let selected_count = candidate.selected_object_refs().len() as u64;
+                update.commit().map_err(|err| {
+                    ErrorData::internal_error(
+                        format!("failed to persist selected object refs: {err}"),
+                        Some(serde_json::json!({ "selected_count": selected_count })),
+                    )
+                })?
+            };
+
+            let applied = applied_refs.iter().map(ToString::to_string).collect::<Vec<_>>();
             replace_committed_session(&mut state, candidate);
+            (applied, ignored_refs)
         } else {
+            let mut applied_refs = BTreeSet::new();
+            let mut ignored_refs = BTreeSet::new();
+
+            for parsed in &requested_refs {
+                if object_ref_is_missing(&state.session, parsed) {
+                    ignored_refs.insert(parsed.to_string());
+                } else {
+                    applied_refs.insert(parsed.clone());
+                }
+            }
+
             apply_mode(&mut state.session, mode, &applied_refs);
-        }
+            let applied = applied_refs.iter().map(ToString::to_string).collect::<Vec<_>>();
+            (applied, ignored_refs)
+        };
 
         let response =
             Json(SelectionUpdateResponse { applied, ignored: ignored_refs.into_iter().collect() });

@@ -5217,6 +5217,62 @@ async fn selection_update_add_uses_latest_meta_selection_in_persistent_mode() {
 }
 
 #[tokio::test]
+async fn selection_update_revalidates_against_disk_session_under_write_lock() {
+    let dir = temp_session_dir("mcp-selection-update-revalidate-disk");
+    let dir_str = dir.to_string_lossy().to_string();
+    let folder = SessionFolder::new(dir_str.clone());
+
+    let session = demo_session();
+    folder.save_session(&session).expect("save initial session");
+
+    // MCP process starts with a session that still contains d-flow.
+    let server = NereidMcp::new_persistent(session, folder);
+
+    // Concurrent peer removes d-flow from disk before selection_update acquires the write lock.
+    let mut external =
+        SessionFolder::new(dir_str.clone()).load_session().expect("reload session externally");
+    let flow_id = DiagramId::new("d-flow").expect("diagram id");
+    external.diagrams_mut().remove(&flow_id);
+    external.set_selected_object_refs(
+        [ObjectRef::from_str("d:d-seq/seq/participant/p:a").expect("object ref")]
+            .into_iter()
+            .collect(),
+    );
+    SessionFolder::new(dir_str.clone())
+        .save_session(&external)
+        .expect("persist concurrent diagram removal + selection");
+
+    let Json(result) = server
+        .selection_update(Parameters(SelectionUpdateParams {
+            object_refs: vec![
+                "d:d-flow/flow/node/n:a".to_owned(),
+                "d:d-seq/seq/participant/p:b".to_owned(),
+            ],
+            mode: UpdateMode::Add,
+        }))
+        .await
+        .expect("selection_update under concurrent diagram removal");
+
+    assert_eq!(result.applied, vec!["d:d-seq/seq/participant/p:b".to_owned()]);
+    assert_eq!(result.ignored, vec!["d:d-flow/flow/node/n:a".to_owned()]);
+
+    let loaded = SessionFolder::new(dir_str).load_session().expect("load merged selection");
+    let selected =
+        loaded.selected_object_refs().iter().map(ToString::to_string).collect::<Vec<_>>();
+    assert_eq!(
+        selected,
+        vec![
+            "d:d-seq/seq/participant/p:a".to_owned(),
+            "d:d-seq/seq/participant/p:b".to_owned(),
+        ]
+    );
+    assert!(
+        !loaded.diagrams().contains_key(&flow_id),
+        "selection_update must not clobber concurrent diagram removal"
+    );
+}
+
+#[tokio::test]
 async fn xref_add_persists_to_session_folder() {
     let dir = temp_session_dir("mcp-persist-xref-add");
     let dir_str = dir.to_string_lossy().to_string();
