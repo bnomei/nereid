@@ -6,8 +6,23 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-// Included by `ops/mod.rs`: sequence/flow op application, structure validation helpers, and
-// delta recording. Not a standalone module.
+// Included by `ops/mod.rs` (not a standalone module).
+//
+// What lives here:
+// - `apply_seq_op` / `apply_flow_op`: mutate a cloned AST for one op, recording `ObjectRef`
+//   events into `DeltaBuilder`.
+// - Sequence block/section membership attach/detach, nest-depth checks, Mermaid name/id
+//   uniqueness, and message-text validation.
+// - Structure prune: removing participants/messages strips membership; empty non-main
+//   sections and empty blocks collapse. `record_structure_prune_delta` diffs block/section
+//   id sets before vs after so the batch delta reflects synthetic Main materialization and
+//   pruned containers.
+// - End-of-batch sequence validity is enforced in `mod.rs` via Mermaid export (export-valid
+//   contiguous membership + ancestor containment).
+//
+// Contracts: ids are stable `ObjectId`s chosen by the caller; ops never invent diagram-level
+// revision (caller bumps after success). Cascades always emit removed refs for deleted edges/
+// messages so MCP `diagram_diff` stays complete.
 
 fn apply_seq_op(
     diagram_id: &DiagramId,
@@ -653,6 +668,7 @@ fn structure_snapshot(ast: &SequenceAst) -> StructureSnapshot {
     }
 }
 
+// Diff block/section id sets after prune so delta includes removed containers and synthetic adds.
 fn record_structure_prune_delta(
     diagram_id: &DiagramId,
     before: &StructureSnapshot,

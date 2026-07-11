@@ -7,6 +7,8 @@
 // Unauthorized copying, modification, or distribution is prohibited.
 
 //! Deterministic diagram AST fixtures for tests and benchmarks.
+//!
+//! Fixed stable ids (no RNG) so layout/render benches and regression tests stay reproducible.
 
 use super::flow_ast::{FlowEdge, FlowNode, FlowchartAst};
 use super::ids::ObjectId;

@@ -9,7 +9,9 @@
 //! Deterministic diagram layout and edge routing.
 //!
 //! Places sequence participants/message rows and flowchart layers on integer grids used by
-//! Unicode renderers. Layout is pure: no I/O; failures are unrouteable or incomplete graphs.
+//! Unicode renderers. Layout is pure (no I/O): given an AST, returns coordinates and routes
+//! or a typed error for cycles / missing endpoints. Graph/track scene entry points bridge
+//! through domain ASTs until a neutral scene module exists.
 
 pub mod flowchart;
 pub mod graph;

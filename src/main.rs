@@ -6,11 +6,19 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! CLI entrypoint: TUI + HTTP MCP, or stdio MCP.
+//! CLI entrypoint: TUI + HTTP MCP co-host, or stdio MCP.
 //!
-//! Default: load/init a session folder (or demo), start the TUI, and serve MCP on
-//! `http://127.0.0.1:<port>/mcp`. `--mcp` runs stdio-only for agent hosts. Also supports
-//! `--dump-mcp-tool-schema` for schema snapshot regeneration.
+//! # Modes
+//! - **Default (TUI + HTTP MCP):** load/init a session folder (cwd if omitted) or `--demo`,
+//!   share session folder + agent highlight + UiState between TUI and MCP, serve streamable
+//!   HTTP at `http://127.0.0.1:<port>/mcp` (default port 27435; `0` = ephemeral).
+//! - **`--mcp`:** stdio-only MCP (no TUI); persistent session folder unless `--demo`.
+//! - **`--dump-mcp-tool-schema`:** print tool schema snapshot and exit.
+//!
+//! # Co-host contracts
+//! TUI and MCP share the same session folder, agent highlight set, and UiState so attention,
+//! selection, follow-AI, and session reloads stay consistent. Mutations go through the folder;
+//! TUI reloads when `ui_session_rev` bumps. `--durable-writes` opts into fsync-backed saves.
 
 use std::collections::BTreeSet;
 use std::error::Error;
@@ -39,6 +47,7 @@ fn version() -> String {
     format!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
 }
 
+/// Parsed CLI verb: run session, print help, or print version.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum CliCommand {
     Run(CliOptions),
@@ -46,6 +55,7 @@ enum CliCommand {
     Version,
 }
 
+/// Runtime flags for TUI+HTTP MCP, stdio MCP, demo, and schema dump.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 struct CliOptions {
     mcp: bool,

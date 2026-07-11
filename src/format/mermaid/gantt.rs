@@ -7,6 +7,10 @@
 // Unauthorized copying, modification, or distribution is prohibited.
 
 //! Limited `gantt` parse/export for Nereid's gantt AST.
+//!
+//! Supports `title`, `dateFormat`, `section`, and task lines with date/`after`/duration.
+//! Task ids are positional `t:NNNN`; section ids `sec:NNNN`. Mermaid tags are unique and used
+//! only for `after` resolution.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -14,13 +18,20 @@ use std::fmt;
 use crate::model::ids::ObjectId;
 use crate::model::{GanttAst, GanttSection, GanttTask, GanttTaskStart};
 
+/// Failure parsing a limited `gantt` subset.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MermaidGanttParseError {
+    /// First non-empty line was not `gantt`.
     MissingHeader,
+    /// No non-empty, non-comment lines.
     EmptyInput,
+    /// Line outside the supported subset.
     UnsupportedLine { line_no: usize, line: String },
+    /// Task meta after `:` could not be interpreted.
     InvalidTask { line_no: usize, line: String },
+    /// `after` tag did not match a known Mermaid task tag.
     UnknownAfterTag { line_no: usize, tag: String },
+    /// Same Mermaid task tag declared twice.
     DuplicateMermaidTag { line_no: usize, tag: String },
 }
 
@@ -47,34 +58,27 @@ impl fmt::Display for MermaidGanttParseError {
 
 impl std::error::Error for MermaidGanttParseError {}
 
+/// Failure exporting a [`GanttAst`] to Mermaid (membership / tag / dependency integrity).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MermaidGanttExportError {
-    EmptyTaskName {
-        task_id: ObjectId,
-    },
-    MissingSectionTask {
-        section_id: ObjectId,
-        task_id: ObjectId,
-    },
+    /// Task has an empty display name.
+    EmptyTaskName { task_id: ObjectId },
+    /// Section lists a task id absent from the task map.
+    MissingSectionTask { section_id: ObjectId, task_id: ObjectId },
+    /// Task appears in more than one section.
     DuplicateTaskMembership {
         task_id: ObjectId,
         first_section_id: ObjectId,
         second_section_id: ObjectId,
     },
-    UnsectionedTask {
-        task_id: ObjectId,
-    },
-    TaskIdMismatch {
-        map_id: ObjectId,
-        task_id: ObjectId,
-    },
-    MissingDependency {
-        task_id: ObjectId,
-        dependency_id: ObjectId,
-    },
-    DuplicateMermaidTag {
-        tag: String,
-    },
+    /// Task is not listed in any section.
+    UnsectionedTask { task_id: ObjectId },
+    /// Map key does not match the id embedded on the task.
+    TaskIdMismatch { map_id: ObjectId, task_id: ObjectId },
+    /// `After` dependency id is not present in the task map.
+    MissingDependency { task_id: ObjectId, dependency_id: ObjectId },
+    /// Two tasks would export the same Mermaid tag.
+    DuplicateMermaidTag { tag: String },
 }
 
 impl fmt::Display for MermaidGanttExportError {
@@ -134,7 +138,9 @@ fn looks_like_date(s: &str) -> bool {
         && d.chars().all(|c| c.is_ascii_digit())
 }
 
-/// Parse limited gantt subset (title, dateFormat, section, tasks with date/after/duration).
+/// Parse limited gantt subset into a [`GanttAst`].
+///
+/// Accepts title, dateFormat, section headers, and tasks with date/`after`/duration meta.
 pub fn parse_gantt_diagram(input: &str) -> Result<GanttAst, MermaidGanttParseError> {
     let mut lines = input.lines().enumerate().filter(|(_, l)| {
         let t = l.trim();
@@ -287,7 +293,7 @@ pub fn parse_gantt_diagram(input: &str) -> Result<GanttAst, MermaidGanttParseErr
     Ok(ast)
 }
 
-/// Export gantt diagram to Mermaid.
+/// Export gantt diagram to canonical Mermaid `.mmd` (validates section membership and tags).
 pub fn export_gantt_diagram(ast: &GanttAst) -> Result<String, MermaidGanttExportError> {
     let mut membership = BTreeMap::<ObjectId, ObjectId>::new();
     for section in ast.sections() {
@@ -492,15 +498,9 @@ T3 :after a, 1d
         let err = parse_gantt_diagram(input).expect_err("duplicate tags must fail parse");
         assert_eq!(
             err,
-            MermaidGanttParseError::DuplicateMermaidTag {
-                line_no: 5,
-                tag: "a".to_owned(),
-            }
+            MermaidGanttParseError::DuplicateMermaidTag { line_no: 5, tag: "a".to_owned() }
         );
-        assert_eq!(
-            err.to_string(),
-            "gantt Mermaid task tag is not unique: a (line 5)"
-        );
+        assert_eq!(err.to_string(), "gantt Mermaid task tag is not unique: a (line 5)");
     }
 
     #[test]
@@ -524,20 +524,12 @@ T3 :after a, 1d
         );
         ast.tasks_mut().insert(
             second_id.clone(),
-            GanttTask::new(
-                second_id,
-                "T2",
-                GanttTaskStart::Date("2026-01-02".to_owned()),
-                1,
-                "1d",
-            )
-            .with_mermaid_tag(Some("a")),
+            GanttTask::new(second_id, "T2", GanttTaskStart::Date("2026-01-02".to_owned()), 1, "1d")
+                .with_mermaid_tag(Some("a")),
         );
         assert_eq!(
             export_gantt_diagram(&ast),
-            Err(MermaidGanttExportError::DuplicateMermaidTag {
-                tag: "a".to_owned()
-            })
+            Err(MermaidGanttExportError::DuplicateMermaidTag { tag: "a".to_owned() })
         );
     }
 }

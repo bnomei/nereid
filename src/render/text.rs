@@ -6,7 +6,10 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Text measurement and canvas trimming helpers for Unicode render output.
+//! Char-count measurement, ellipsis truncation, and trailing-space trim for paint.
+//!
+//! All renderers measure labels with these helpers so Unicode width and canvas string
+//! export stay consistent across graph, track, and walkthrough paint.
 
 use super::Canvas;
 

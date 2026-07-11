@@ -6,8 +6,23 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-// Session-folder helpers (include!'d into parent): meta/walkthrough JSON codecs,
-// atomic writes, path safety, and durability-aware filesystem commits.
+// Included by `session_folder.rs` (not a standalone module).
+//
+// What lives here:
+// - Mermaid export helpers and diagram/walkthrough/session meta JSON codecs (serde DTOs ↔ model).
+// - Atomic write path: temp file + rename under `WriteDurability`, with path safety checks.
+// - Sidecar assembly from ASTs (stable id maps, message/edge/block fingerprints, notes/symbols).
+//
+// Critical contracts:
+// - Path safety: every write stays under the session root; relative paths reject `..` and
+//   absolute components; symlinks are refused (`SymlinkRefused`).
+// - TOCTOU revalidation: after `create_dir_all_safe`, re-check parents + leaf immediately
+//   before open and again before rename so a concurrent swap of a parent to a symlink cannot
+//   redirect writes outside the session.
+// - Durability: `BestEffort` skips fsync; `Durable` syncs the temp file and (on Unix) the
+//   parent directory after rename.
+// - Callers hold the session write lock for multi-file commits; helpers themselves are
+//   single-path atomic only.
 
 fn export_diagram_mmd(
     folder: &SessionFolder,

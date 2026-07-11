@@ -27,45 +27,54 @@ pub struct SequenceAst {
 }
 
 impl SequenceAst {
+    /// Lifelines keyed by stable participant ids.
     pub fn participants(&self) -> &BTreeMap<ObjectId, SequenceParticipant> {
         &self.participants
     }
 
+    /// Mutable participant map.
     pub fn participants_mut(&mut self) -> &mut BTreeMap<ObjectId, SequenceParticipant> {
         &mut self.participants
     }
 
+    /// Messages in storage order (not necessarily `order_key` order).
     pub fn messages(&self) -> &[SequenceMessage] {
         &self.messages
     }
 
+    /// Mutable message list.
     pub fn messages_mut(&mut self) -> &mut Vec<SequenceMessage> {
         &mut self.messages
     }
 
-    /// Returns message references in deterministic `(order_key, message_id)` order.
+    /// Message references in deterministic `(order_key, message_id)` order (export / render).
     pub fn messages_in_order(&self) -> Vec<&SequenceMessage> {
         let mut messages = self.messages.iter().collect::<Vec<_>>();
         messages.sort_by(|a, b| SequenceMessage::cmp_in_order(a, b));
         messages
     }
 
+    /// Top-level notes (sidecar / UI; not Mermaid export).
     pub fn notes(&self) -> &[SequenceNote] {
         &self.notes
     }
 
+    /// Mutable note list.
     pub fn notes_mut(&mut self) -> &mut Vec<SequenceNote> {
         &mut self.notes
     }
 
+    /// Root alt/opt/loop/par blocks (nested children hang off each block).
     pub fn blocks(&self) -> &[SequenceBlock] {
         &self.blocks
     }
 
+    /// Mutable root block list.
     pub fn blocks_mut(&mut self) -> &mut Vec<SequenceBlock> {
         &mut self.blocks
     }
 
+    /// Depth-first lookup of a block by id (including nested).
     pub fn find_block(&self, block_id: &ObjectId) -> Option<&SequenceBlock> {
         fn find<'a>(blocks: &'a [SequenceBlock], block_id: &ObjectId) -> Option<&'a SequenceBlock> {
             for block in blocks {
@@ -82,6 +91,7 @@ impl SequenceAst {
         find(&self.blocks, block_id)
     }
 
+    /// Mutable depth-first block lookup.
     pub fn find_block_mut(&mut self, block_id: &ObjectId) -> Option<&mut SequenceBlock> {
         fn find<'a>(
             blocks: &'a mut [SequenceBlock],
@@ -101,6 +111,7 @@ impl SequenceAst {
         find(&mut self.blocks, block_id)
     }
 
+    /// Depth-first section lookup across the block tree.
     pub fn find_section(&self, section_id: &ObjectId) -> Option<&SequenceSection> {
         fn find<'a>(
             blocks: &'a [SequenceBlock],
@@ -122,6 +133,7 @@ impl SequenceAst {
         find(&self.blocks, section_id)
     }
 
+    /// Mutable depth-first section lookup.
     pub fn find_section_mut(&mut self, section_id: &ObjectId) -> Option<&mut SequenceSection> {
         fn find<'a>(
             blocks: &'a mut [SequenceBlock],
@@ -163,6 +175,7 @@ impl SequenceAst {
         find(&self.blocks, section_id)
     }
 
+    /// Mutable owner block for `section_id`.
     pub fn find_block_for_section_mut(
         &mut self,
         section_id: &ObjectId,
@@ -367,7 +380,7 @@ impl SequenceAst {
     }
 }
 
-/// Sequence lifeline with Mermaid name, optional role alias, and note text.
+/// Sequence lifeline with Mermaid name, optional role alias, note, and symbol anchor.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SequenceParticipant {
     mermaid_name: String,
@@ -377,43 +390,53 @@ pub struct SequenceParticipant {
 }
 
 impl SequenceParticipant {
+    /// Lifeline with Mermaid participant name only.
     pub fn new(mermaid_name: impl Into<String>) -> Self {
         Self { mermaid_name: mermaid_name.into(), role: None, note: None, symbol: None }
     }
 
+    /// Set the Mermaid-facing participant name (export identity).
     pub fn set_mermaid_name(&mut self, mermaid_name: impl Into<String>) {
         self.mermaid_name = mermaid_name.into();
     }
 
+    /// Set optional role keyword used in export (`actor Alice`, …).
     pub fn set_role<T: Into<String>>(&mut self, role: Option<T>) {
         self.role = role.map(Into::into);
     }
 
+    /// Sidecar/UI note; not part of Mermaid export.
     pub fn set_note<T: Into<String>>(&mut self, note: Option<T>) {
         self.note = note.map(Into::into);
     }
 
+    /// Attach or clear a Frigg symbol anchor (sidecar).
     pub fn set_symbol(&mut self, symbol: Option<SymbolAnchor>) {
         self.symbol = symbol;
     }
 
+    /// Mermaid participant name.
     pub fn mermaid_name(&self) -> &str {
         &self.mermaid_name
     }
 
+    /// Optional role keyword for export.
     pub fn role(&self) -> Option<&str> {
         self.role.as_deref()
     }
 
+    /// Sidecar/UI note text.
     pub fn note(&self) -> Option<&str> {
         self.note.as_deref()
     }
 
+    /// Optional Frigg symbol anchor.
     pub fn symbol(&self) -> Option<&SymbolAnchor> {
         self.symbol.as_ref()
     }
 }
 
+/// Mermaid fragment kind for alt / opt / loop / par blocks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SequenceBlockKind {
     Alt,
@@ -422,6 +445,7 @@ pub enum SequenceBlockKind {
     Par,
 }
 
+/// Nested control-flow region: sections (main/else/and) plus child blocks.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SequenceBlock {
     block_id: ObjectId,
@@ -432,10 +456,12 @@ pub struct SequenceBlock {
 }
 
 impl SequenceBlock {
+    /// Deterministic parse-time id: `b:NNNN`.
     pub fn make_block_id(block_index: usize) -> ObjectId {
         ObjectId::new(format!("b:{block_index:04}")).expect("valid block id")
     }
 
+    /// Assemble a block with its sections and nested children.
     pub fn new(
         block_id: ObjectId,
         kind: SequenceBlockKind,
@@ -446,39 +472,48 @@ impl SequenceBlock {
         Self { block_id, kind, header, sections, blocks }
     }
 
+    /// Stable block id (`seq/block` category).
     pub fn block_id(&self) -> &ObjectId {
         &self.block_id
     }
 
+    /// Alt / opt / loop / par discriminant.
     pub fn kind(&self) -> SequenceBlockKind {
         self.kind
     }
 
+    /// Optional header text on the opening keyword line.
     pub fn header(&self) -> Option<&str> {
         self.header.as_deref()
     }
 
+    /// Set or clear the opening header.
     pub fn set_header<T: Into<String>>(&mut self, header: Option<T>) {
         self.header = header.map(Into::into);
     }
 
+    /// Main / else / and sections for this block.
     pub fn sections(&self) -> &[SequenceSection] {
         &self.sections
     }
 
+    /// Mutable sections list.
     pub fn sections_mut(&mut self) -> &mut Vec<SequenceSection> {
         &mut self.sections
     }
 
+    /// Nested child blocks.
     pub fn blocks(&self) -> &[SequenceBlock] {
         &self.blocks
     }
 
+    /// Mutable nested blocks.
     pub fn blocks_mut(&mut self) -> &mut Vec<SequenceBlock> {
         &mut self.blocks
     }
 }
 
+/// Section role inside a [`SequenceBlock`] (main branch, `else`, or `and`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SequenceSectionKind {
     Main,
@@ -486,6 +521,9 @@ pub enum SequenceSectionKind {
     And,
 }
 
+/// One branch of a sequence block, listing member message ids.
+///
+/// Nested export validity requires a message appear on every ancestor section as well as the leaf.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SequenceSection {
     section_id: ObjectId,
@@ -495,10 +533,12 @@ pub struct SequenceSection {
 }
 
 impl SequenceSection {
+    /// Deterministic parse-time id: `sec:BBBB:SS`.
     pub fn make_section_id(block_index: usize, section_index: usize) -> ObjectId {
         ObjectId::new(format!("sec:{block_index:04}:{section_index:02}")).expect("valid section id")
     }
 
+    /// Assemble a section with optional header and message membership.
     pub fn new(
         section_id: ObjectId,
         kind: SequenceSectionKind,
@@ -508,31 +548,38 @@ impl SequenceSection {
         Self { section_id, kind, header, message_ids }
     }
 
+    /// Stable section id (`seq/section` category).
     pub fn section_id(&self) -> &ObjectId {
         &self.section_id
     }
 
+    /// Main / else / and discriminant.
     pub fn kind(&self) -> SequenceSectionKind {
         self.kind
     }
 
+    /// Optional branch header (`else miss`, …).
     pub fn header(&self) -> Option<&str> {
         self.header.as_deref()
     }
 
+    /// Set or clear the branch header.
     pub fn set_header<T: Into<String>>(&mut self, header: Option<T>) {
         self.header = header.map(Into::into);
     }
 
+    /// Message ids claimed by this section (must stay contiguous in `order_key` for export).
     pub fn message_ids(&self) -> &[ObjectId] {
         &self.message_ids
     }
 
+    /// Mutable membership list.
     pub fn message_ids_mut(&mut self) -> &mut Vec<ObjectId> {
         &mut self.message_ids
     }
 }
 
+/// Semantic message arrow class after Mermaid arrow normalization.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SequenceMessageKind {
     Sync,
@@ -540,6 +587,7 @@ pub enum SequenceMessageKind {
     Return,
 }
 
+/// Directed message between participants with stable id and ordering key.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SequenceMessage {
     message_id: ObjectId,
@@ -552,6 +600,7 @@ pub struct SequenceMessage {
 }
 
 impl SequenceMessage {
+    /// Create without a raw Mermaid arrow (export falls back to kind defaults).
     pub fn new(
         message_id: ObjectId,
         from_participant_id: ObjectId,
@@ -571,43 +620,53 @@ impl SequenceMessage {
         }
     }
 
+    /// Preserve the original Mermaid arrow token for lossless export.
     pub fn set_raw_arrow<T: Into<String>>(&mut self, raw_arrow: Option<T>) {
         self.raw_arrow = raw_arrow.map(Into::into);
     }
 
+    /// Stable message id (`seq/message` category).
     pub fn message_id(&self) -> &ObjectId {
         &self.message_id
     }
 
+    /// Source participant id.
     pub fn from_participant_id(&self) -> &ObjectId {
         &self.from_participant_id
     }
 
+    /// Target participant id.
     pub fn to_participant_id(&self) -> &ObjectId {
         &self.to_participant_id
     }
 
+    /// Sync / async / return classification.
     pub fn kind(&self) -> SequenceMessageKind {
         self.kind
     }
 
+    /// Original Mermaid arrow when known.
     pub fn raw_arrow(&self) -> Option<&str> {
         self.raw_arrow.as_deref()
     }
 
+    /// Message label text.
     pub fn text(&self) -> &str {
         &self.text
     }
 
+    /// Sort key for vertical order; ties break on `message_id`.
     pub fn order_key(&self) -> i64 {
         self.order_key
     }
 
+    /// Total order used by export and render: `(order_key, message_id)`.
     pub fn cmp_in_order(a: &Self, b: &Self) -> Ordering {
         a.order_key.cmp(&b.order_key).then_with(|| a.message_id.cmp(&b.message_id))
     }
 }
 
+/// Free-floating note attached to the diagram (sidecar / UI; not Mermaid `Note over`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SequenceNote {
     note_id: ObjectId,
@@ -615,14 +674,17 @@ pub struct SequenceNote {
 }
 
 impl SequenceNote {
+    /// Note with stable id and body text.
     pub fn new(note_id: ObjectId, text: impl Into<String>) -> Self {
         Self { note_id, text: text.into() }
     }
 
+    /// Stable note id.
     pub fn note_id(&self) -> &ObjectId {
         &self.note_id
     }
 
+    /// Note body.
     pub fn text(&self) -> &str {
         &self.text
     }

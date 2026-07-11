@@ -6,7 +6,10 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-// include!: TUI chrome layout, titles, footers, focus cycling, and styles.
+// include!: TUI chrome layout helpers (not a standalone module).
+//
+// Role: pane stacking thresholds, focus cycle, titles, footer/hint styles, and
+// responsive chrome for diagram + sidebar layout. Owned by `tui/mod.rs` via `include!`.
 
 fn stack_main_panes_vertically(area: Rect, sidebar_panel_count: usize) -> bool {
     if sidebar_panel_count >= 3 {

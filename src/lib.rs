@@ -8,10 +8,11 @@
 
 //! Nereid — live diagram session workspace for terminals and agents.
 //!
-//! Layers a typed session model (sequence/flowchart diagrams, walkthroughs, cross-references,
-//! and Frigg symbol anchors) over Mermaid-ish import/export, layout/render, and folder
-//! persistence. Humans use the ratatui TUI; agents use the MCP tool surface. Both share the same
-//! revision-gated mutations, selection set, and attention state when co-hosted.
+//! Layers a typed session model (sequence/flowchart/class/ER/gantt diagrams, walkthroughs,
+//! cross-references, and Frigg symbol anchors) over Mermaid-ish import/export, layout/render, and
+//! session folder persistence. Humans use the ratatui TUI; agents use the MCP tool surface. When
+//! co-hosted they share revision-gated mutations (`base_rev`), selection, attention, and
+//! follow-AI via [`ui::UiState`].
 
 pub mod format;
 pub mod layout;

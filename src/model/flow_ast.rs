@@ -26,52 +26,63 @@ pub struct FlowchartAst {
 }
 
 impl FlowchartAst {
+    /// Nodes keyed by stable object ids (`flow/node`).
     pub fn nodes(&self) -> &BTreeMap<ObjectId, FlowNode> {
         &self.nodes
     }
 
+    /// Mutable node map.
     pub fn nodes_mut(&mut self) -> &mut BTreeMap<ObjectId, FlowNode> {
         &mut self.nodes
     }
 
+    /// Edges keyed by stable object ids (`flow/edge`).
     pub fn edges(&self) -> &BTreeMap<ObjectId, FlowEdge> {
         &self.edges
     }
 
+    /// Mutable edge map.
     pub fn edges_mut(&mut self) -> &mut BTreeMap<ObjectId, FlowEdge> {
         &mut self.edges
     }
 
+    /// Default `linkStyle default` payload when present.
     pub fn default_edge_style(&self) -> Option<&str> {
         self.default_edge_style.as_deref()
     }
 
+    /// Set or clear the default edge style string.
     pub fn set_default_edge_style<T: Into<String>>(&mut self, style: Option<T>) {
         self.default_edge_style = style.map(Into::into);
     }
 
+    /// Subgraph groups (future export; parse currently ignores Mermaid subgraphs).
     pub fn groups(&self) -> &BTreeMap<ObjectId, FlowGroup> {
         &self.groups
     }
 
+    /// Mutable group map.
     pub fn groups_mut(&mut self) -> &mut BTreeMap<ObjectId, FlowGroup> {
         &mut self.groups
     }
 
+    /// Node id → group id membership map.
     pub fn node_groups(&self) -> &BTreeMap<ObjectId, ObjectId> {
         &self.node_groups
     }
 
+    /// Mutable node→group membership.
     pub fn node_groups_mut(&mut self) -> &mut BTreeMap<ObjectId, ObjectId> {
         &mut self.node_groups
     }
 
+    /// Group containing `node_id`, if any.
     pub fn node_group(&self, node_id: &ObjectId) -> Option<&ObjectId> {
         self.node_groups.get(node_id)
     }
 }
 
-/// Flowchart node with optional Mermaid id, display label, shape, and note.
+/// Flowchart node with optional Mermaid id, display label, shape, note, and symbol.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowNode {
     mermaid_id: Option<String>,
@@ -82,6 +93,7 @@ pub struct FlowNode {
 }
 
 impl FlowNode {
+    /// Rect-shaped node with label only.
     pub fn new(label: impl Into<String>) -> Self {
         Self {
             mermaid_id: None,
@@ -92,6 +104,7 @@ impl FlowNode {
         }
     }
 
+    /// Explicit shape and optional Mermaid source id (used for sidecar reconciliation).
     pub fn new_with(
         label: impl Into<String>,
         shape: impl Into<String>,
@@ -100,42 +113,52 @@ impl FlowNode {
         Self { mermaid_id, label: label.into(), shape: shape.into(), note: None, symbol: None }
     }
 
+    /// Set Mermaid node id for export/parse round-trips.
     pub fn set_mermaid_id<T: Into<String>>(&mut self, mermaid_id: Option<T>) {
         self.mermaid_id = mermaid_id.map(Into::into);
     }
 
+    /// Replace display label.
     pub fn set_label(&mut self, label: impl Into<String>) {
         self.label = label.into();
     }
 
+    /// Replace shape token (`rect`, `circle`, `diamond`, …).
     pub fn set_shape(&mut self, shape: impl Into<String>) {
         self.shape = shape.into();
     }
 
+    /// Sidecar/UI note; not part of Mermaid export.
     pub fn set_note<T: Into<String>>(&mut self, note: Option<T>) {
         self.note = note.map(Into::into);
     }
 
+    /// Attach or clear a Frigg symbol anchor (sidecar).
     pub fn set_symbol(&mut self, symbol: Option<SymbolAnchor>) {
         self.symbol = symbol;
     }
 
+    /// Mermaid source id when known.
     pub fn mermaid_id(&self) -> Option<&str> {
         self.mermaid_id.as_deref()
     }
 
+    /// Display label.
     pub fn label(&self) -> &str {
         &self.label
     }
 
+    /// Shape token used by layout/render/export.
     pub fn shape(&self) -> &str {
         &self.shape
     }
 
+    /// Sidecar/UI note text.
     pub fn note(&self) -> Option<&str> {
         self.note.as_deref()
     }
 
+    /// Optional Frigg symbol anchor.
     pub fn symbol(&self) -> Option<&SymbolAnchor> {
         self.symbol.as_ref()
     }
@@ -159,36 +182,44 @@ pub struct FlowGroup {
 }
 
 impl FlowGroup {
+    /// Group with display label only.
     pub fn new(label: impl Into<String>) -> Self {
         Self { mermaid_id: None, label: label.into() }
     }
 
+    /// Group with optional Mermaid subgraph id.
     pub fn new_with(label: impl Into<String>, mermaid_id: Option<String>) -> Self {
         Self { mermaid_id, label: label.into() }
     }
 
+    /// Set Mermaid subgraph id.
     pub fn set_mermaid_id<T: Into<String>>(&mut self, mermaid_id: Option<T>) {
         self.mermaid_id = mermaid_id.map(Into::into);
     }
 
+    /// Replace group label.
     pub fn set_label(&mut self, label: impl Into<String>) {
         self.label = label.into();
     }
 
+    /// Mermaid subgraph id when known.
     pub fn mermaid_id(&self) -> Option<&str> {
         self.mermaid_id.as_deref()
     }
 
+    /// Display label.
     pub fn label(&self) -> &str {
         &self.label
     }
 }
 
 impl FlowEdge {
+    /// Unlabeled edge with default connector/style.
     pub fn new(from_node_id: ObjectId, to_node_id: ObjectId) -> Self {
         Self { from_node_id, to_node_id, label: None, connector: None, style: None }
     }
 
+    /// Edge with optional label and style (connector left unset).
     pub fn new_with(
         from_node_id: ObjectId,
         to_node_id: ObjectId,
@@ -198,34 +229,42 @@ impl FlowEdge {
         Self { from_node_id, to_node_id, label, connector: None, style }
     }
 
+    /// Set or clear edge label text.
     pub fn set_label<T: Into<String>>(&mut self, label: Option<T>) {
         self.label = label.map(Into::into);
     }
 
+    /// Set Mermaid connector token (`-->`, `-.->`, …) for export.
     pub fn set_connector<T: Into<String>>(&mut self, connector: Option<T>) {
         self.connector = connector.map(Into::into);
     }
 
+    /// Set per-edge style (from `linkStyle` or tools).
     pub fn set_style<T: Into<String>>(&mut self, style: Option<T>) {
         self.style = style.map(Into::into);
     }
 
+    /// Source node id.
     pub fn from_node_id(&self) -> &ObjectId {
         &self.from_node_id
     }
 
+    /// Target node id.
     pub fn to_node_id(&self) -> &ObjectId {
         &self.to_node_id
     }
 
+    /// Optional edge label.
     pub fn label(&self) -> Option<&str> {
         self.label.as_deref()
     }
 
+    /// Optional Mermaid connector token.
     pub fn connector(&self) -> Option<&str> {
         self.connector.as_deref()
     }
 
+    /// Optional edge style payload.
     pub fn style(&self) -> Option<&str> {
         self.style.as_deref()
     }

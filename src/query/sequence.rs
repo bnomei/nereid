@@ -6,7 +6,10 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Sequence-diagram message search by substring or regex.
+//! Sequence-diagram message search, participant filters, and ordered traces.
+//!
+//! Queries walk messages in `order_key`/`message_id` order (`messages_in_order`), independent
+//! of insertion order in the AST vec.
 
 use crate::model::ids::ObjectId;
 use crate::model::seq_ast::{SequenceAst, SequenceMessage};
@@ -19,6 +22,9 @@ pub enum MessageSearchMode {
     Regex,
 }
 
+/// Messages whose text matches `needle` under `mode`, in diagram order.
+///
+/// Regex mode returns `regex::Error` on invalid patterns; substring mode always succeeds.
 pub fn message_search<'a>(
     ast: &'a SequenceAst,
     needle: &str,
@@ -53,6 +59,7 @@ pub fn message_search<'a>(
     }
 }
 
+/// Messages with exact `from`/`to` participant endpoints, in diagram order.
 pub fn messages_between<'a>(
     ast: &'a SequenceAst,
     from_participant_id: &ObjectId,
@@ -67,6 +74,7 @@ pub fn messages_between<'a>(
         .collect()
 }
 
+/// Up to `limit` messages immediately before `message_id` in order; `None` if id missing.
 pub fn trace_before<'a>(
     ast: &'a SequenceAst,
     message_id: &ObjectId,
@@ -78,6 +86,7 @@ pub fn trace_before<'a>(
     Some(messages[start_index..target_index].to_vec())
 }
 
+/// Up to `limit` messages immediately after `message_id` in order; `None` if id missing.
 pub fn trace_after<'a>(
     ast: &'a SequenceAst,
     message_id: &ObjectId,

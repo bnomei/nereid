@@ -17,7 +17,7 @@ use crate::render::scene::TrackModel;
 
 use super::sequence::{layout_sequence, SequenceLayout, SequenceLayoutError};
 
-/// Place a track-family scene.
+/// Place a track-family scene via the temporary sequence-AST bridge.
 pub fn layout_track(model: &TrackModel) -> Result<SequenceLayout, SequenceLayoutError> {
     layout_sequence(model.as_sequence_ast())
 }

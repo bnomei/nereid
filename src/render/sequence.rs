@@ -60,6 +60,7 @@ struct ParticipantRender<'a> {
     lifeline_x: usize,
 }
 
+/// Sequence paint failure: missing AST membership or canvas write error.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SequenceRenderError {
     Canvas(CanvasError),
@@ -112,6 +113,7 @@ pub fn render_sequence_unicode(
     render_sequence_unicode_with_options(ast, layout, RenderOptions::default())
 }
 
+/// Like [`render_sequence_unicode`] with notes and object-label toggles.
 pub fn render_sequence_unicode_with_options(
     ast: &SequenceAst,
     layout: &SequenceLayout,
@@ -207,6 +209,7 @@ pub fn render_sequence_unicode_with_options(
     Ok(canvas_to_string_trimmed_with_overlays(&composited, &overlays))
 }
 
+/// Sequence Unicode plus participant/message/block highlight spans for TUI selection.
 pub fn render_sequence_unicode_annotated(
     diagram_id: &DiagramId,
     ast: &SequenceAst,
@@ -220,6 +223,7 @@ pub fn render_sequence_unicode_annotated(
     )
 }
 
+/// Annotated sequence render with explicit [`RenderOptions`].
 pub fn render_sequence_unicode_annotated_with_options(
     diagram_id: &DiagramId,
     ast: &SequenceAst,

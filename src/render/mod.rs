@@ -8,8 +8,10 @@
 
 //! Unicode/ASCII projection of layout results for TUI and MCP text views.
 //!
-//! Each renderer returns a string grid plus a highlight index mapping cells to `ObjectRef`s so
-//! the TUI can focus objects and MCP can render selection without re-parsing geometry.
+//! Pipeline: domain AST → lower ([`scene`]) → family layout → paint → string grid.
+//! Annotated renders also build a [`HighlightIndex`] mapping cells to `ObjectRef`s so the TUI
+//! can focus objects and MCP agent highlight / selection can paint without re-parsing geometry.
+//! Public entry: [`render_diagram_unicode`] (and annotated variants).
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -120,16 +122,27 @@ pub(crate) fn clamp_highlight_index_to_text(highlight_index: &mut HighlightIndex
     });
 }
 
+/// Unicode box-drawing glyphs used when merging node borders and corridor edges on the canvas.
 pub const UNICODE_BOX_HORIZONTAL: char = '─';
+/// See [`UNICODE_BOX_HORIZONTAL`].
 pub const UNICODE_BOX_VERTICAL: char = '│';
+/// See [`UNICODE_BOX_HORIZONTAL`].
 pub const UNICODE_BOX_TOP_LEFT: char = '┌';
+/// See [`UNICODE_BOX_HORIZONTAL`].
 pub const UNICODE_BOX_TOP_RIGHT: char = '┐';
+/// See [`UNICODE_BOX_HORIZONTAL`].
 pub const UNICODE_BOX_BOTTOM_LEFT: char = '└';
+/// See [`UNICODE_BOX_HORIZONTAL`].
 pub const UNICODE_BOX_BOTTOM_RIGHT: char = '┘';
+/// See [`UNICODE_BOX_HORIZONTAL`].
 pub const UNICODE_BOX_TEE_RIGHT: char = '├';
+/// See [`UNICODE_BOX_HORIZONTAL`].
 pub const UNICODE_BOX_TEE_LEFT: char = '┤';
+/// See [`UNICODE_BOX_HORIZONTAL`].
 pub const UNICODE_BOX_TEE_DOWN: char = '┬';
+/// See [`UNICODE_BOX_HORIZONTAL`].
 pub const UNICODE_BOX_TEE_UP: char = '┴';
+/// See [`UNICODE_BOX_HORIZONTAL`].
 pub const UNICODE_BOX_CROSS: char = '┼';
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -219,14 +232,17 @@ impl Canvas {
         Ok(Self { width, height, cells: vec![fill; len], box_edges: vec![BoxEdges::NONE; len] })
     }
 
+    /// Canvas width in character cells.
     pub fn width(&self) -> usize {
         self.width
     }
 
+    /// Canvas height in character cells.
     pub fn height(&self) -> usize {
         self.height
     }
 
+    /// Whether `(x, y)` lies inside the canvas.
     pub fn in_bounds(&self, x: usize, y: usize) -> bool {
         x < self.width && y < self.height
     }
@@ -480,6 +496,7 @@ impl fmt::Display for Canvas {
     }
 }
 
+/// Canvas construction or write failure (area overflow or out-of-bounds cell).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CanvasError {
     AreaOverflow { width: usize, height: usize },

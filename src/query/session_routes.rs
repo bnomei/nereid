@@ -7,6 +7,10 @@
 // Unauthorized copying, modification, or distribution is prohibited.
 
 //! Session-wide route finding over diagram structure and cross-diagram xrefs.
+//!
+//! Builds an undirected multigraph of `ObjectRef` nodes (flow/seq/class/er/gantt structure
+//! plus session xrefs) for BFS shortest path and bounded multi-route search. Prefer
+//! [`SessionRouteAdjacency::derive`] once when answering many queries against the same session.
 
 use std::cmp::{Ordering, Reverse};
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque};
@@ -20,6 +24,7 @@ pub struct SessionRouteAdjacency {
 }
 
 impl SessionRouteAdjacency {
+    /// Snapshot structural + xref neighbors from the current in-memory session.
     pub fn derive(session: &Session) -> Self {
         Self { adjacency: derive_adjacency(session) }
     }
@@ -349,10 +354,12 @@ fn reconstruct_path(
     reversed
 }
 
-/// Tie-breaking strategy when multiple routes share the same hop count.
+/// Ordering for multi-route results after exploration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RoutesOrdering {
+    /// Keep discovery order (heap expands fewest-hops first).
     FewestHops,
+    /// Sort full paths lexicographically after collection.
     Lexicographic,
 }
 
@@ -374,6 +381,10 @@ impl PartialOrd for CandidateRoute {
     }
 }
 
+/// Up to `limit` simple paths from `from` to `to` over a precomputed adjacency.
+///
+/// `max_hops` caps path length (edge hops); `None` means unbounded. Empty when either ref is
+/// absent from the graph (except the zero-hop self route when `from == to` and present).
 pub fn find_routes_with_adjacency(
     adjacency: &SessionRouteAdjacency,
     from: &ObjectRef,
@@ -437,6 +448,7 @@ pub fn find_routes_with_adjacency(
     }
 }
 
+/// [`find_routes_with_adjacency`] after deriving adjacency from `session` (one-shot).
 pub fn find_routes(
     session: &Session,
     from: &ObjectRef,
@@ -449,6 +461,7 @@ pub fn find_routes(
     find_routes_with_adjacency(&adjacency, from, to, limit, max_hops, ordering)
 }
 
+/// Shortest path (fewest hops) from `from` to `to`, or `None` if unreachable.
 pub fn find_route_with_adjacency(
     adjacency: &SessionRouteAdjacency,
     from: &ObjectRef,
@@ -488,6 +501,7 @@ pub fn find_route_with_adjacency(
     None
 }
 
+/// [`find_route_with_adjacency`] after deriving adjacency from `session` (one-shot).
 pub fn find_route(session: &Session, from: &ObjectRef, to: &ObjectRef) -> Option<Vec<ObjectRef>> {
     let adjacency = SessionRouteAdjacency::derive(session);
     find_route_with_adjacency(&adjacency, from, to)

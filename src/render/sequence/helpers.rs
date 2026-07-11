@@ -6,10 +6,11 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-// include!: sequence lifeline boxes, message arrows, and block framing.
-
-/// Sequence rendering internals:
-/// row/column placement, block decoration, overlays, and text composition.
+// include!: sequence paint internals (not a standalone module).
+//
+// Role: participant boxes, lifelines, message arrows, block/section frames, and
+// highlight span bookkeeping for the sequence Unicode renderer.
+// Owned by `sequence.rs` via `include!` so private helpers share its scope.
 fn seq_box_height(options: RenderOptions) -> usize {
     if options.show_notes {
         BOX_HEIGHT_WITH_NOTES

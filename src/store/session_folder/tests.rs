@@ -2389,8 +2389,11 @@ fn replace_flowchart_mermaid_preserves_parallel_edge_ids_differing_only_by_conne
     dotted.set_style(Some("dotted-style"));
     ast.edges_mut().insert(dotted_id.clone(), dotted);
 
-    let mut diagram =
-        Diagram::new(DiagramId::new("d-flow-parallel").unwrap(), "Flow", DiagramAst::Flowchart(ast));
+    let mut diagram = Diagram::new(
+        DiagramId::new("d-flow-parallel").unwrap(),
+        "Flow",
+        DiagramAst::Flowchart(ast),
+    );
 
     // Reorder edges and keep both connectors so fingerprint must include connector.
     replace_diagram_from_mermaid(&mut diagram, "flowchart\nB\nA -.-> B\nA --> B\n").unwrap();

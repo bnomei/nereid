@@ -8,9 +8,10 @@
 
 //! Session domain model and diagram ASTs.
 //!
-//! Owns the in-memory truth for diagrams, walkthrough narratives, and cross-diagram `ObjectRef`
-//! links. Mermaid text and Unicode renders are projections; stable ids live here and in store
-//! sidecars, not solely in positional Mermaid parse order.
+//! Owns the in-memory truth for **sessions**: typed diagram ASTs, walkthrough narratives, xrefs,
+//! and multi-object selection. Stable ids (`ObjectId`, `ObjectRef`) and revision (`base_rev`/OCC)
+//! live here and in store sidecars; Mermaid text and Unicode renders are projections, not sources
+//! of identity.
 
 pub mod class_ast;
 pub mod diagram;

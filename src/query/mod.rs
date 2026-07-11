@@ -8,8 +8,9 @@
 
 //! Read-only derived views over diagrams and session xrefs.
 //!
-//! Flow reachability, sequence search, and multi-diagram route finding for MCP query tools and
-//! TUI navigation. Never mutates session content.
+//! Flow reachability/paths/cycles, sequence message search and traces, and session-wide
+//! `ObjectRef` routes (structure edges plus cross-diagram xrefs) for MCP query tools and TUI
+//! navigation. Pure: never mutates session content or revisions.
 
 pub mod flow;
 pub mod sequence;

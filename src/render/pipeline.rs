@@ -31,6 +31,7 @@ use super::sequence::{
 };
 use super::{AnnotatedRender, CanvasError, RenderOptions};
 
+/// Layout or paint failure while rendering a lowered graph/track scene.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PipelineRenderError {
     SequenceLayout(SequenceLayoutError),

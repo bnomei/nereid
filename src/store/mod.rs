@@ -9,9 +9,11 @@
 //! Session-folder persistence and identity reconciliation.
 //!
 //! On-disk format: `nereid-session.meta.json`, `diagrams/*.mmd` + `*.meta.json` sidecars
-//! (stable ids, notes, symbols, sequence_blocks), walkthrough JSON, best-effort text exports,
-//! and a write lock for TUI/MCP cohabitation. Load re-parses Mermaid then reconciles ids from
-//! sidecars so xrefs survive rewrites.
+//! (stable ids, fingerprints, notes, symbols, sequence_blocks), walkthrough JSON, async text
+//! exports, and a cross-process write lock for TUI/MCP cohabitation. Load re-parses Mermaid
+//! then reconciles stable ids from sidecars so xrefs and notes survive rewrites. Prefer
+//! [`SessionFolder::begin_session_update`] / commit for concurrent writers; diagram OCC
+//! (`base_rev`) lives in `ops`, not here.
 
 pub mod session_folder;
 

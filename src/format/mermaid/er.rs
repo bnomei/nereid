@@ -7,17 +7,25 @@
 // Unauthorized copying, modification, or distribution is prohibited.
 
 //! Limited `erDiagram` parse/export for Nereid's ER AST.
+//!
+//! Bare entity names and `A ||--o{ B : label` style relationships. Entity ids are
+//! `e:<sanitized_name>`; relationship ids are positional `r:NNNN`. Attribute blocks are rejected.
 
 use std::fmt;
 
 use crate::model::ids::ObjectId;
 use crate::model::{ErAst, ErCardinality, ErEntity, ErRelationship, ErStroke};
 
+/// Failure parsing a limited `erDiagram` subset.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MermaidErParseError {
+    /// First non-empty line was not `erDiagram`.
     MissingHeader,
+    /// No non-empty, non-comment lines.
     EmptyInput,
+    /// Line outside the supported subset.
     UnsupportedLine { line_no: usize, line: String },
+    /// Relationship line failed name/cardinality split.
     InvalidRelationship { line_no: usize, line: String },
 }
 
@@ -38,11 +46,12 @@ impl fmt::Display for MermaidErParseError {
 
 impl std::error::Error for MermaidErParseError {}
 
+/// Failure exporting an [`ErAst`] to Mermaid.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MermaidErExportError {
-    EmptyEntityName {
-        entity_id: ObjectId,
-    },
+    /// Entity has an empty display name.
+    EmptyEntityName { entity_id: ObjectId },
+    /// Relationship points at a missing entity id.
     MissingRelationshipEndpoint {
         relationship_id: ObjectId,
         endpoint: &'static str,
@@ -116,7 +125,7 @@ fn card_export(card: ErCardinality, left: bool) -> &'static str {
     }
 }
 
-/// Parse limited `erDiagram` subset.
+/// Parse limited `erDiagram` subset into an [`ErAst`].
 pub fn parse_er_diagram(input: &str) -> Result<ErAst, MermaidErParseError> {
     let mut lines = input.lines().enumerate().filter(|(_, l)| {
         let t = l.trim();
@@ -233,7 +242,7 @@ fn split_name_card(part: &str, name_first: bool) -> Option<(&str, &str)> {
     None
 }
 
-/// Export ER diagram to Mermaid.
+/// Export ER diagram to canonical Mermaid `.mmd` (bare entities, then relationships).
 pub fn export_er_diagram(ast: &ErAst) -> Result<String, MermaidErExportError> {
     let mut out = String::from("erDiagram\n");
     for (entity_id, entity) in ast.entities() {

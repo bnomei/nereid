@@ -14,9 +14,9 @@ use rmcp::handler::server::wrapper::{Json, Parameters};
 use crate::model::{
     seq_ast::{SequenceBlock, SequenceBlockKind, SequenceSection, SequenceSectionKind},
     ClassAst, ClassNode, ClassRelation, ClassRelationKind, Diagram, DiagramAst, FlowEdge, FlowNode,
-    FlowchartAst, ObjectRef, SequenceAst, SequenceMessage, SequenceMessageKind, SequenceParticipant,
-    SessionId, Walkthrough, WalkthroughEdge, WalkthroughId, WalkthroughNode, WalkthroughNodeId,
-    XRef, XRefId, XRefStatus,
+    FlowchartAst, ObjectRef, SequenceAst, SequenceMessage, SequenceMessageKind,
+    SequenceParticipant, SessionId, Walkthrough, WalkthroughEdge, WalkthroughId, WalkthroughNode,
+    WalkthroughNodeId, XRef, XRefId, XRefStatus,
 };
 use crate::render::render_diagram_unicode;
 use std::str::FromStr;
@@ -3133,9 +3133,7 @@ async fn diagram_read_fails_closed_when_class_export_rejects_ast() {
     session.set_active_diagram_id(Some(diagram_id));
 
     let server = NereidMcp::new(session);
-    let err = match server
-        .diagram_read(Parameters(DiagramTargetParams { diagram_id: None }))
-        .await
+    let err = match server.diagram_read(Parameters(DiagramTargetParams { diagram_id: None })).await
     {
         Ok(_) => panic!("export failure must fail closed"),
         Err(err) => err,
@@ -3180,9 +3178,7 @@ async fn diagram_read_fails_closed_when_sequence_export_rejects_ast() {
     session.set_active_diagram_id(Some(diagram_id));
 
     let server = NereidMcp::new(session);
-    let err = match server
-        .diagram_read(Parameters(DiagramTargetParams { diagram_id: None }))
-        .await
+    let err = match server.diagram_read(Parameters(DiagramTargetParams { diagram_id: None })).await
     {
         Ok(_) => panic!("sequence export failure must fail closed (no messages-only rebuild)"),
         Err(err) => err,
@@ -5261,10 +5257,7 @@ async fn selection_update_revalidates_against_disk_session_under_write_lock() {
         loaded.selected_object_refs().iter().map(ToString::to_string).collect::<Vec<_>>();
     assert_eq!(
         selected,
-        vec![
-            "d:d-seq/seq/participant/p:a".to_owned(),
-            "d:d-seq/seq/participant/p:b".to_owned(),
-        ]
+        vec!["d:d-seq/seq/participant/p:a".to_owned(), "d:d-seq/seq/participant/p:b".to_owned(),]
     );
     assert!(
         !loaded.diagrams().contains_key(&flow_id),

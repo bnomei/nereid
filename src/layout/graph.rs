@@ -23,7 +23,7 @@ use crate::render::scene::GraphModel;
 
 use super::flowchart::{layout_flowchart, FlowEdgeEndpoint, FlowchartLayout, FlowchartLayoutError};
 
-/// Place a graph-family scene.
+/// Place a graph-family scene via the temporary flowchart-AST bridge (cycles rejected).
 pub fn layout_graph(model: &GraphModel) -> Result<FlowchartLayout, FlowchartLayoutError> {
     layout_flowchart(&model.to_flowchart_ast())
 }

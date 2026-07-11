@@ -24,20 +24,34 @@ use crate::model::seq_ast::{
     SequenceParticipant, SequenceSection, SequenceSectionKind,
 };
 
+/// Failure parsing a limited `sequenceDiagram` subset.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MermaidSequenceParseError {
+    /// First non-empty line was not `sequenceDiagram`.
     MissingHeader,
+    /// Line outside the supported subset.
     UnsupportedSyntax { line_no: usize, line: String },
+    /// Participant declaration did not match expected forms.
     InvalidParticipantDecl { line_no: usize, line: String },
+    /// Participant name failed identifier validation.
     InvalidParticipantName { line_no: usize, name: String, reason: MermaidIdentError },
+    /// Message line could not be split into from/arrow/to/text.
     InvalidMessageLine { line_no: usize, line: String },
+    /// Message endpoint name failed identifier validation.
     InvalidMessageParticipant { line_no: usize, name: String, reason: MermaidIdentError },
+    /// Message missing `: text` payload.
     MissingMessageText { line_no: usize, line: String },
+    /// `end` with no open block on the stack.
     UnmatchedEnd { line_no: usize },
+    /// `else` not under an open `alt`.
     ElseOutsideAlt { line_no: usize, line: String },
+    /// `and` not under an open `par`.
     AndOutsidePar { line_no: usize, line: String },
+    /// Nested alt/opt/loop/par exceeded the supported depth.
     BlockNestingTooDeep { line_no: usize, max_depth: usize },
+    /// Closed section contained no messages.
     EmptyBlockSection { line_no: usize, section_id: ObjectId },
+    /// EOF with a still-open block.
     UnclosedBlock { opened_on_line_no: usize, block_id: ObjectId, kind: SequenceBlockKind },
 }
 
@@ -119,11 +133,16 @@ impl fmt::Display for MermaidSequenceParseError {
 
 impl std::error::Error for MermaidSequenceParseError {}
 
+/// Failure exporting a [`SequenceAst`] to Mermaid (participants, text, block membership).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MermaidSequenceExportError {
+    /// Message endpoint not present in the participant map.
     MissingParticipant { participant_id: ObjectId },
+    /// Participant role keyword is not export-safe.
     InvalidParticipantRole { participant_id: ObjectId, role: String },
+    /// Message text contains characters this subset cannot express.
     InvalidMessageText { message_id: ObjectId, text: String },
+    /// Section/block membership is not contiguous or nest-valid for export.
     InvalidBlockMembership { block_id: ObjectId, reason: String },
 }
 

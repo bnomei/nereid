@@ -6,12 +6,16 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Flowchart graph queries: node degrees and directed reachability.
+//! Flowchart graph queries: degrees, reachability, bounded paths, SCCs, and dead ends.
+//!
+//! Results use stable id ordering where collections are sorted. Missing start/end nodes yield
+//! empty results rather than errors.
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use crate::model::{FlowchartAst, ObjectId};
 
+/// Edge walk direction for reachability queries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ReachDirection {
     Out,
@@ -26,6 +30,7 @@ pub struct FlowNodeDegree {
     pub out_degree: u64,
 }
 
+/// Per-node in/out degree over all edges (isolated nodes appear with zeros).
 pub fn degrees(ast: &FlowchartAst) -> BTreeMap<ObjectId, FlowNodeDegree> {
     let mut degrees: BTreeMap<ObjectId, FlowNodeDegree> = BTreeMap::new();
     for node_id in ast.nodes().keys() {
@@ -168,10 +173,15 @@ pub(crate) fn reachable_with_direction(
     }
 }
 
+/// Nodes reachable by following outgoing edges from `from_node_id` (includes start when present).
 pub fn reachable(ast: &FlowchartAst, from_node_id: &ObjectId) -> Vec<ObjectId> {
     reachable_with_direction(ast, from_node_id, ReachDirection::Out)
 }
 
+/// Simple paths from `from_node_id` to `to_node_id`, shortest first, capped by `limit`.
+///
+/// `max_extra_hops` allows paths longer than the BFS shortest length; uses bidirectional
+/// distance pruning. Returns empty when either endpoint is missing or unreachable.
 pub fn paths(
     ast: &FlowchartAst,
     from_node_id: &ObjectId,
@@ -243,6 +253,7 @@ pub fn paths(
     results
 }
 
+/// Strongly connected components that form cycles (multi-node SCCs, or self-loop singles).
 pub fn cycles(ast: &FlowchartAst) -> Vec<Vec<ObjectId>> {
     let outgoing = outgoing_adjacency(ast);
 
@@ -336,6 +347,7 @@ pub fn cycles(ast: &FlowchartAst) -> Vec<Vec<ObjectId>> {
     cycles
 }
 
+/// Nodes with no outgoing edges (terminals), including isolates.
 pub fn dead_ends(ast: &FlowchartAst) -> Vec<ObjectId> {
     let outgoing = outgoing_adjacency(ast);
     outgoing

@@ -8,8 +8,8 @@
 
 //! In-memory session aggregate shared by TUI and MCP.
 //!
-//! Holds diagrams, walkthroughs, xrefs, active targets, and the multi-object selection set.
-//! Disk durability is the store layer's job; this type is the live working set.
+//! Live working set: diagrams (with OCC rev), walkthroughs, xrefs, active targets, and multi-object
+//! selection. Disk durability is the store layer; this type never reads or writes paths itself.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -45,35 +45,46 @@ impl Session {
         }
     }
 
+    /// Stable session container id (folder / MCP scope).
     pub fn session_id(&self) -> &SessionId {
         &self.session_id
     }
 
+    /// All diagrams keyed by stable id.
     pub fn diagrams(&self) -> &BTreeMap<DiagramId, Diagram> {
         &self.diagrams
     }
 
+    /// Mutable diagram map for insert/remove/replace by tools and store load.
     pub fn diagrams_mut(&mut self) -> &mut BTreeMap<DiagramId, Diagram> {
         &mut self.diagrams
     }
 
+    /// Walkthrough graphs in this session.
     pub fn walkthroughs(&self) -> &BTreeMap<WalkthroughId, Walkthrough> {
         &self.walkthroughs
     }
 
+    /// Mutable walkthrough map.
     pub fn walkthroughs_mut(&mut self) -> &mut BTreeMap<WalkthroughId, Walkthrough> {
         &mut self.walkthroughs
     }
 
+    /// Cross-diagram xrefs keyed by stable id.
     pub fn xrefs(&self) -> &BTreeMap<XRefId, XRef> {
         &self.xrefs
     }
 
+    /// Mutable xref map.
     pub fn xrefs_mut(&mut self) -> &mut BTreeMap<XRefId, XRef> {
         &mut self.xrefs
     }
 
     /// Whether `object_ref` resolves to a live object in its diagram-specific category.
+    ///
+    /// Category segments must match known kind paths (`seq/message`, `flow/node`, `gantt/lane`, …).
+    /// Sidecar-only notes on classes/entities/participants are not separate categories; sequence
+    /// `SequenceNote`s are also not checked here (no `seq/note` path).
     pub fn object_ref_exists(&self, object_ref: &ObjectRef) -> bool {
         let Some(diagram) = self.diagrams.get(object_ref.diagram_id()) else {
             return false;
@@ -133,19 +144,22 @@ impl Session {
         !self.object_ref_exists(object_ref)
     }
 
+    /// Session-default diagram for tools/UI that omit `diagram_id`.
     pub fn active_diagram_id(&self) -> Option<&DiagramId> {
         self.active_diagram_id.as_ref()
     }
 
-    /// Set the session-default diagram for tools that omit `diagram_id`.
+    /// Set or clear the session-default diagram (not validated against `diagrams`).
     pub fn set_active_diagram_id(&mut self, diagram_id: Option<DiagramId>) {
         self.active_diagram_id = diagram_id;
     }
 
+    /// Session-default walkthrough for narrative tools.
     pub fn active_walkthrough_id(&self) -> Option<&WalkthroughId> {
         self.active_walkthrough_id.as_ref()
     }
 
+    /// Set or clear the active walkthrough id.
     pub fn set_active_walkthrough_id(&mut self, walkthrough_id: Option<WalkthroughId>) {
         self.active_walkthrough_id = walkthrough_id;
     }
@@ -155,10 +169,12 @@ impl Session {
         &self.selected_object_refs
     }
 
+    /// Mutable selection set for incremental add/remove.
     pub fn selected_object_refs_mut(&mut self) -> &mut BTreeSet<ObjectRef> {
         &mut self.selected_object_refs
     }
 
+    /// Replace the entire selection set atomically.
     pub fn set_selected_object_refs(&mut self, selected_object_refs: BTreeSet<ObjectRef>) {
         self.selected_object_refs = selected_object_refs;
     }

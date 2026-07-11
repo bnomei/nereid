@@ -525,9 +525,7 @@ fn apply_seq_add_message_rejects_empty_text() {
         .unwrap_err();
         assert_eq!(
             err,
-            super::ApplyError::InvalidSeqMessageText {
-                text: text.to_owned(),
-            },
+            super::ApplyError::InvalidSeqMessageText { text: text.to_owned() },
             "expected rejection for {text:?}"
         );
         assert_eq!(diagram.rev(), 0, "failed apply must not bump rev");
@@ -576,18 +574,13 @@ fn apply_seq_update_message_rejects_empty_text() {
             rev,
             &[Op::Seq(SeqOp::UpdateMessage {
                 message_id: message_id.clone(),
-                patch: SeqMessagePatch {
-                    text: Some(text.to_owned()),
-                    ..Default::default()
-                },
+                patch: SeqMessagePatch { text: Some(text.to_owned()), ..Default::default() },
             })],
         )
         .unwrap_err();
         assert_eq!(
             err,
-            super::ApplyError::InvalidSeqMessageText {
-                text: text.to_owned(),
-            },
+            super::ApplyError::InvalidSeqMessageText { text: text.to_owned() },
             "expected rejection for {text:?}"
         );
         assert_eq!(diagram.rev(), rev, "failed apply must not bump rev");
@@ -597,11 +590,7 @@ fn apply_seq_update_message_rejects_empty_text() {
         panic!("expected sequence ast");
     };
     assert_eq!(
-        ast.messages()
-            .iter()
-            .find(|m| m.message_id() == &message_id)
-            .expect("message")
-            .text(),
+        ast.messages().iter().find(|m| m.message_id() == &message_id).expect("message").text(),
         "hi"
     );
 }
@@ -1611,11 +1600,8 @@ fn remove_message_keeps_single_main_when_nested_and_main_remain() {
 
     let DiagramAst::Sequence(ast) = diagram.ast() else { panic!("sequence") };
     let parent = &ast.blocks()[0];
-    let main_count = parent
-        .sections()
-        .iter()
-        .filter(|s| s.kind() == SequenceSectionKind::Main)
-        .count();
+    let main_count =
+        parent.sections().iter().filter(|s| s.kind() == SequenceSectionKind::Main).count();
     assert_eq!(main_count, 1, "must not synthesize a second Main when Main still has messages");
     assert_eq!(parent.sections().len(), 1);
     assert_eq!(parent.sections()[0].section_id(), &alt_main);

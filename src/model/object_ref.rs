@@ -8,28 +8,26 @@
 
 //! Canonical `ObjectRef` paths for stable UI, MCP, and xref addressing.
 //!
-//! Form: `d:<diagram_id>/<category...>/<object_id>` (e.g. `d:flow/flow/node/n:a`).
+//! Wire form: `d:<diagram_id>/<category...>/<object_id>` (e.g. `d:flow/flow/node/n:a`).
+//! Category segments are free-form so unknown kinds remain parseable; existence is checked later
+//! by [`Session::object_ref_exists`](crate::model::Session::object_ref_exists).
 
 use std::fmt;
 use std::str::FromStr;
 
 use super::ids::{DiagramId, IdError, ObjectId};
 
-/// One-or-more path segments describing the object category within a diagram.
+/// Category path segments under a diagram (`seq/message`, `flow/node`, …).
 ///
-/// Examples (from `docs/protocol-01.md`):
-/// - `seq/participant`
-/// - `seq/message`
-/// - `flow/node`
-/// - `flow/edge`
-///
-/// Unknown categories are intentionally representable.
+/// At least one non-empty segment is required. Unknown categories are intentionally representable
+/// so protocol clients can pass forward-compatible refs.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct CategoryPath {
     segments: Vec<String>,
 }
 
 impl CategoryPath {
+    /// Build from ordered segments; rejects empty path or empty segment strings.
     pub fn new(segments: Vec<String>) -> Result<Self, CategoryPathError> {
         if segments.is_empty() {
             return Err(CategoryPathError::Empty);
@@ -40,14 +38,18 @@ impl CategoryPath {
         Ok(Self { segments })
     }
 
+    /// Ordered category segments as stored (not joined).
     pub fn segments(&self) -> &[String] {
         &self.segments
     }
 }
 
+/// Invalid [`CategoryPath`] construction (empty path or empty segment).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CategoryPathError {
+    /// No segments provided.
     Empty,
+    /// At least one segment was the empty string.
     EmptySegment,
 }
 
@@ -62,10 +64,10 @@ impl fmt::Display for CategoryPathError {
 
 impl std::error::Error for CategoryPathError {}
 
-/// Canonical stable object reference used by UI and MCP tools.
+/// Stable cross-layer object address: diagram + category path + object id.
 ///
-/// Canonical format (see `docs/protocol-01.md`):
-/// `d:<diagram_id>/<category...>/<object_id>`
+/// Canonical wire form: `d:<diagram_id>/<category...>/<object_id>`. Used by TUI selection, MCP
+/// tools, walkthrough evidence, and xrefs. Does not itself prove the object still exists.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ObjectRef {
     diagram_id: DiagramId,
@@ -74,22 +76,29 @@ pub struct ObjectRef {
 }
 
 impl ObjectRef {
+    /// Assemble a ref from already-validated id pieces (no existence check).
     pub fn new(diagram_id: DiagramId, category: CategoryPath, object_id: ObjectId) -> Self {
         Self { diagram_id, category, object_id }
     }
 
+    /// Diagram that owns the referenced object.
     pub fn diagram_id(&self) -> &DiagramId {
         &self.diagram_id
     }
 
+    /// Category path within the diagram (`seq/message`, `gantt/lane`, …).
     pub fn category(&self) -> &CategoryPath {
         &self.category
     }
 
+    /// Stable object id (node, edge, message, …).
     pub fn object_id(&self) -> &ObjectId {
         &self.object_id
     }
 
+    /// Parse the canonical `d:…/…/…` wire form.
+    ///
+    /// Category is everything between the diagram id and the final segment (object id).
     pub fn parse(input: &str) -> Result<Self, ParseObjectRefError> {
         const PREFIX: &str = "d:";
         let rest = input.strip_prefix(PREFIX).ok_or(ParseObjectRefError::MissingPrefix)?;
@@ -147,14 +156,22 @@ impl FromStr for ObjectRef {
     }
 }
 
+/// Failure parsing an [`ObjectRef`] wire string.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseObjectRefError {
+    /// Input did not start with `d:`.
     MissingPrefix,
+    /// Empty diagram id after the prefix.
     MissingDiagramId,
+    /// Missing or empty category path between diagram and object id.
     MissingCategory,
+    /// Missing final object-id segment.
     MissingObjectId,
+    /// Diagram id failed segment validation.
     InvalidDiagramId(IdError),
+    /// Category path failed validation.
     InvalidCategory(CategoryPathError),
+    /// Object id failed segment validation.
     InvalidObjectId(IdError),
 }
 

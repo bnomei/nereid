@@ -8,7 +8,8 @@
 
 //! Sequence layout: participant columns and per-message row spacing budgets.
 //!
-//! Spacing grows with label pressure so renderers can draw block frames without clipping headers.
+//! Columns are assigned by participant id order; rows follow message `(order_key, message_id)`.
+//! Spacing budgets grow with label pressure so renderers can draw block frames without clipping.
 
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -47,6 +48,7 @@ impl SequenceLayout {
     }
 }
 
+/// Placed message: endpoints, column span, and row index in layout order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SequenceMessageLayout {
     message_id: ObjectId,
@@ -83,6 +85,9 @@ impl SequenceMessageLayout {
     }
 }
 
+/// Extra row/column spacing derived from label width pressure (headers, spans, self-loops).
+///
+/// Pressure is width beyond a base capacity; renderers expand gutters from these budgets.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SequenceSpacingBudget {
     participant_label_pressure_by_id: BTreeMap<ObjectId, usize>,
@@ -134,6 +139,7 @@ struct SequenceSpacingMeasurement {
     self_loop_stub_len_by_message_id: BTreeMap<ObjectId, usize>,
 }
 
+/// Layout failure when a message references a participant missing from the AST.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SequenceLayoutError {
     UnknownParticipant { message_id: ObjectId, participant_id: ObjectId },

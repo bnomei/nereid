@@ -8,8 +8,9 @@
 
 //! Limited flowchart/`graph` parse/export for Nereid's flowchart AST.
 //!
-//! Nodes (rect/round/diamond), edges, chains, and ignored `linkStyle`/`subgraph` lines. Node
-//! stable ids reconcile via mermaid id maps in diagram sidecars.
+//! Nodes (rect/round/diamond), edges, chains, and `linkStyle` (stored, not rendered). Subgraph
+//! lines are ignored on parse. Node stable ids are `n:<mermaid_id>`; long-term identity
+//! reconciles via mermaid id maps in diagram sidecars.
 
 use std::fmt;
 
@@ -19,45 +20,33 @@ pub use super::ident::MermaidIdentError;
 use crate::model::flow_ast::{FlowEdge, FlowNode, FlowchartAst};
 use crate::model::ids::ObjectId;
 
+/// Failure parsing a limited flowchart/`graph` subset.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MermaidFlowchartParseError {
+    /// First non-empty line was not a flowchart header.
     MissingHeader,
-    InvalidDirection {
-        line_no: usize,
-        direction: String,
-    },
-    InvalidLinkStyleIndex {
-        line_no: usize,
-        index: usize,
-        max_index: usize,
-    },
-    UnsupportedSyntax {
-        line_no: usize,
-        line: String,
-    },
-    InvalidNodeId {
-        line_no: usize,
-        name: String,
-        reason: MermaidIdentError,
-    },
-    InvalidNodeLabelSyntax {
-        line_no: usize,
-        token: String,
-    },
-    EmptyNodeLabel {
-        line_no: usize,
-        token: String,
-    },
-    EmptyEdgeLabel {
-        line_no: usize,
-        line: String,
-    },
+    /// Direction token was not TD/TB/LR/RL/BT.
+    InvalidDirection { line_no: usize, direction: String },
+    /// `linkStyle` index out of range for edges seen so far.
+    InvalidLinkStyleIndex { line_no: usize, index: usize, max_index: usize },
+    /// Line outside the supported subset.
+    UnsupportedSyntax { line_no: usize, line: String },
+    /// Node id failed Mermaid identifier validation.
+    InvalidNodeId { line_no: usize, name: String, reason: MermaidIdentError },
+    /// Node shape/label token could not be parsed.
+    InvalidNodeLabelSyntax { line_no: usize, token: String },
+    /// Parsed node label was empty.
+    EmptyNodeLabel { line_no: usize, token: String },
+    /// Edge label segment was empty.
+    EmptyEdgeLabel { line_no: usize, line: String },
+    /// Same Mermaid node id declared with different labels.
     ConflictingNodeLabel {
         line_no: usize,
         mermaid_id: String,
         existing_label: String,
         new_label: String,
     },
+    /// Same Mermaid node id declared with different shapes.
     ConflictingNodeShape {
         line_no: usize,
         mermaid_id: String,
@@ -124,12 +113,18 @@ impl fmt::Display for MermaidFlowchartParseError {
 
 impl std::error::Error for MermaidFlowchartParseError {}
 
+/// Failure exporting a [`FlowchartAst`] to Mermaid.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MermaidFlowchartExportError {
+    /// Edge endpoint not present in the node map.
     MissingNode { node_id: ObjectId },
+    /// Stable node id is not exportable as `n:<ident>`.
     InvalidNodeId { node_id: ObjectId },
+    /// Node label contains characters Mermaid cannot express in this subset.
     InvalidNodeLabel { node_id: ObjectId, label: String },
+    /// Shape token is not one of the export-supported shapes.
     InvalidNodeShape { node_id: ObjectId, shape: String },
+    /// Edge label contains unsupported characters.
     InvalidEdgeLabel { edge_id: ObjectId, label: String },
 }
 

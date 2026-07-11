@@ -8,7 +8,8 @@
 
 //! Mermaid-ish parse and export for supported diagram kinds.
 //!
-//! Bridge between session-folder `.mmd` files and internal sequence/flowchart ASTs. Unsupported
-//! Mermaid is rejected with line-oriented errors; export is deterministic for stable diffs.
+//! Bridge between session-folder `.mmd` files and internal diagram ASTs (sequence, flowchart,
+//! class, ER, gantt). Unsupported Mermaid is rejected with line-oriented errors; export is
+//! deterministic for stable diffs. Long-term object identity lives in store sidecars, not parse order.
 
 pub mod mermaid;

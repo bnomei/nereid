@@ -7,6 +7,10 @@
 // Unauthorized copying, modification, or distribution is prohibited.
 
 //! Mermaid-ish parsing and exporting for supported diagram kinds.
+//!
+//! Each submodule owns one diagram kind's limited subset: `parse_*` builds a model AST with
+//! positional stable ids; `export_*` emits canonical `.mmd`. Shared identifier rules live in
+//! `ident` (not re-exported beyond error types used by public parsers).
 
 pub mod class;
 pub mod er;

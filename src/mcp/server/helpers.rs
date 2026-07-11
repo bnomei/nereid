@@ -6,7 +6,12 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-// include!: MCP tool helpers (id parse, Mermaid projection, deltas, error mapping).
+// include!: MCP server private helpers (not a standalone module).
+//
+// Role: id/ref parsing, digest builders, delta history, apply/error mapping, and
+// Mermaid projection for `diagram_read` / snapshots. Mermaid export is fail-closed:
+// export errors become MCP errors rather than skeleton or wrong-identity text.
+// Owned by `server.rs` via `include!` so helpers share NereidMcp/tool scope.
 
 fn diagram_kind_label(kind: DiagramKind) -> &'static str {
     match kind {

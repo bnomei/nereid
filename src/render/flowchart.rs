@@ -742,6 +742,7 @@ impl FlowchartRenderPlan {
     }
 }
 
+/// Flowchart paint failure: missing placement/AST node or canvas write error.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlowchartRenderError {
     Canvas(CanvasError),
@@ -786,6 +787,7 @@ pub fn render_flowchart_unicode(
     render_flowchart_unicode_with_options(ast, layout, RenderOptions::default())
 }
 
+/// Like [`render_flowchart_unicode`] with notes, labels, and column-gap options.
 pub fn render_flowchart_unicode_with_options(
     ast: &FlowchartAst,
     layout: &FlowchartLayout,
@@ -795,6 +797,7 @@ pub fn render_flowchart_unicode_with_options(
     plan.render_text(ast)
 }
 
+/// Flowchart Unicode plus node/edge highlight spans for TUI selection.
 pub fn render_flowchart_unicode_annotated(
     diagram_id: &DiagramId,
     ast: &FlowchartAst,
@@ -808,6 +811,7 @@ pub fn render_flowchart_unicode_annotated(
     )
 }
 
+/// Annotated flowchart render with explicit [`RenderOptions`].
 pub fn render_flowchart_unicode_annotated_with_options(
     diagram_id: &DiagramId,
     ast: &FlowchartAst,

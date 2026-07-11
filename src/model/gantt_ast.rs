@@ -7,6 +7,9 @@
 // Unauthorized copying, modification, or distribution is prohibited.
 
 //! Gantt chart AST: sections, tasks, dates/durations, and after-dependencies.
+//!
+//! Derived **lanes** (`gantt/lane`) are calendar-stable ids used by xrefs, selection, and notes.
+//! Task/section membership is explicit; layout windows are resolved from starts + durations.
 
 use std::collections::BTreeMap;
 
@@ -21,7 +24,7 @@ pub(crate) struct GanttTaskWindow {
     pub(crate) end: u32,
 }
 
-/// Gantt diagram content.
+/// Gantt diagram content: sections, tasks, and derived time-lane metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct GanttAst {
     title: Option<String>,
@@ -36,50 +39,62 @@ pub struct GanttAst {
 }
 
 impl GanttAst {
+    /// Optional chart title (`title …` in Mermaid).
     pub fn title(&self) -> Option<&str> {
         self.title.as_deref()
     }
 
+    /// Set or clear the chart title.
     pub fn set_title(&mut self, title: Option<impl Into<String>>) {
         self.title = title.map(Into::into);
     }
 
+    /// Optional Mermaid `dateFormat` token (informational; parse accepts YYYY-MM-DD starts).
     pub fn date_format(&self) -> Option<&str> {
         self.date_format.as_deref()
     }
 
+    /// Set or clear the dateFormat string.
     pub fn set_date_format(&mut self, date_format: Option<impl Into<String>>) {
         self.date_format = date_format.map(Into::into);
     }
 
+    /// Named sections in document order.
     pub fn sections(&self) -> &[GanttSection] {
         &self.sections
     }
 
+    /// Mutable section list.
     pub fn sections_mut(&mut self) -> &mut Vec<GanttSection> {
         &mut self.sections
     }
 
+    /// Tasks keyed by stable id (`gantt/task`).
     pub fn tasks(&self) -> &BTreeMap<ObjectId, GanttTask> {
         &self.tasks
     }
 
+    /// Mutable task map.
     pub fn tasks_mut(&mut self) -> &mut BTreeMap<ObjectId, GanttTask> {
         &mut self.tasks
     }
 
+    /// Sidecar notes keyed by derived lane id.
     pub fn lane_notes(&self) -> &BTreeMap<ObjectId, String> {
         &self.lane_notes
     }
 
+    /// Mutable lane-note map.
     pub fn lane_notes_mut(&mut self) -> &mut BTreeMap<ObjectId, String> {
         &mut self.lane_notes
     }
 
+    /// Note text for a single lane id, if any.
     pub fn lane_note(&self, lane_id: &ObjectId) -> Option<&str> {
         self.lane_notes.get(lane_id).map(String::as_str)
     }
 
+    /// Set or clear a lane note (sidecar-only).
     pub fn set_lane_note(&mut self, lane_id: ObjectId, note: Option<impl Into<String>>) {
         match note {
             Some(n) => {
@@ -334,26 +349,32 @@ pub struct GanttSection {
 }
 
 impl GanttSection {
+    /// Empty section (no tasks yet).
     pub fn new(section_id: ObjectId, name: impl Into<String>) -> Self {
         Self { section_id, name: name.into(), task_ids: Vec::new() }
     }
 
+    /// Stable section id (`gantt/section`).
     pub fn section_id(&self) -> &ObjectId {
         &self.section_id
     }
 
+    /// Section display name.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Rename the section.
     pub fn set_name(&mut self, name: impl Into<String>) {
         self.name = name.into();
     }
 
+    /// Task membership in document order (export requires unique membership).
     pub fn task_ids(&self) -> &[ObjectId] {
         &self.task_ids
     }
 
+    /// Mutable task membership.
     pub fn task_ids_mut(&mut self) -> &mut Vec<ObjectId> {
         &mut self.task_ids
     }
@@ -387,6 +408,7 @@ pub struct GanttTask {
 }
 
 impl GanttTask {
+    /// Task without mermaid tag or note; `duration_days` drives layout, `raw_duration` export.
     pub fn new(
         task_id: ObjectId,
         name: impl Into<String>,
@@ -405,43 +427,53 @@ impl GanttTask {
         }
     }
 
+    /// Builder: Mermaid task tag used by `after` dependencies.
     pub fn with_mermaid_tag(mut self, tag: Option<impl Into<String>>) -> Self {
         self.mermaid_tag = tag.map(Into::into);
         self
     }
 
+    /// Sidecar/UI note; not part of Mermaid export.
     pub fn set_note<T: Into<String>>(&mut self, note: Option<T>) {
         self.note = note.map(Into::into);
     }
 
+    /// Stable task id (`gantt/task`).
     pub fn task_id(&self) -> &ObjectId {
         &self.task_id
     }
 
+    /// Optional Mermaid tag for `after` references.
     pub fn mermaid_tag(&self) -> Option<&str> {
         self.mermaid_tag.as_deref()
     }
 
+    /// Task display name.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Rename the task.
     pub fn set_name(&mut self, name: impl Into<String>) {
         self.name = name.into();
     }
 
+    /// Start specification (date / after / unspecified).
     pub fn start(&self) -> &GanttTaskStart {
         &self.start
     }
 
+    /// Duration in days for layout (minimum 1 applied by resolvers).
     pub fn duration_days(&self) -> u32 {
         self.duration_days
     }
 
+    /// Raw duration token preserved for Mermaid export.
     pub fn raw_duration(&self) -> &str {
         &self.raw_duration
     }
 
+    /// Sidecar/UI note text.
     pub fn note(&self) -> Option<&str> {
         self.note.as_deref()
     }

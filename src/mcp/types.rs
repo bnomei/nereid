@@ -8,7 +8,8 @@
 
 //! MCP tool JSON types and schemars schemas.
 //!
-//! These shapes are the agent-facing contract (underscore tool names, snake_case op tags).
+//! Agent-facing contract (underscore tool names, snake_case op tags). Lifecycle groups:
+//! diagram tools, walkthrough, collab (attention/selection/follow-AI), and queries.
 //! Keep in sync with `tool_schema.snapshot.json` after field changes.
 
 use std::collections::BTreeMap;
@@ -25,12 +26,14 @@ pub struct DiagramSummary {
     pub rev: u64,
 }
 
+/// `diagram_list` payload with co-presence context.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ListDiagramsResponse {
     pub diagrams: Vec<DiagramSummary>,
     pub context: ReadContext,
 }
 
+/// Lightweight walkthrough row for list responses.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WalkthroughSummary {
     pub walkthrough_id: String,
@@ -40,23 +43,27 @@ pub struct WalkthroughSummary {
     pub edges: u64,
 }
 
+/// `walkthrough_list` payload with co-presence context.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ListWalkthroughsResponse {
     pub walkthroughs: Vec<WalkthroughSummary>,
     pub context: ReadContext,
 }
 
+/// Params for `walkthrough_get`.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct WalkthroughGetParams {
     pub walkthrough_id: String,
 }
 
+/// Params for `walkthrough_get_node`.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct WalkthroughGetNodeParams {
     pub walkthrough_id: String,
     pub node_id: String,
 }
 
+/// Wire form of a walkthrough node (body, object refs, tags, status).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct McpWalkthroughNode {
     pub node_id: String,
@@ -67,12 +74,14 @@ pub struct McpWalkthroughNode {
     pub status: Option<String>,
 }
 
+/// Single-node walkthrough read response.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WalkthroughGetNodeResponse {
     pub node: McpWalkthroughNode,
     pub context: ReadContext,
 }
 
+/// Wire form of a directed walkthrough edge.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct McpWalkthroughEdge {
     pub from_node_id: String,
@@ -81,6 +90,7 @@ pub struct McpWalkthroughEdge {
     pub label: Option<String>,
 }
 
+/// Full walkthrough payload for get/apply responses.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct McpWalkthrough {
     pub walkthrough_id: String,
@@ -90,42 +100,49 @@ pub struct McpWalkthrough {
     pub edges: Vec<McpWalkthroughEdge>,
 }
 
+/// `walkthrough_get` payload with co-presence context.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WalkthroughGetResponse {
     pub walkthrough: McpWalkthrough,
     pub context: ReadContext,
 }
 
+/// Node/edge counts inside a walkthrough digest.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WalkthroughDigestCounts {
     pub nodes: u64,
     pub edges: u64,
 }
 
+/// Cheap walkthrough fingerprint (rev + counts) without full body.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WalkthroughDigest {
     pub rev: u64,
     pub counts: WalkthroughDigestCounts,
 }
 
+/// `walkthrough_get_digest` response.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WalkthroughGetDigestResponse {
     pub digest: WalkthroughDigest,
     pub context: ReadContext,
 }
 
+/// Unicode walkthrough preview from `walkthrough_render_text`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WalkthroughRenderTextResponse {
     pub text: String,
     pub context: ReadContext,
 }
 
+/// Unicode diagram preview from `diagram_render_text`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DiagramRenderTextResponse {
     pub text: String,
     pub context: ReadContext,
 }
 
+/// Params for cross-diagram `route_find`.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct RouteFindParams {
     pub from_ref: String,
@@ -135,54 +152,64 @@ pub struct RouteFindParams {
     pub ordering: Option<String>,
 }
 
+/// Ordered paths of object refs between two endpoints.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct RouteFindResponse {
     pub routes: Vec<Vec<String>>,
 }
 
+/// Params for `diagram_open` (set session active diagram).
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct DiagramOpenParams {
     pub diagram_id: String,
 }
 
+/// Confirms the new session-active diagram id.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DiagramOpenResponse {
     pub active_diagram_id: String,
 }
 
+/// Params for `diagram_delete`.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct DiagramDeleteParams {
     pub diagram_id: String,
 }
 
+/// Delete result including any new active diagram after removal.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DiagramDeleteResponse {
     pub deleted_diagram_id: String,
     pub active_diagram_id: Option<String>,
 }
 
+/// Session-active diagram id plus co-presence context.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DiagramCurrentResponse {
     pub active_diagram_id: Option<String>,
     pub context: ReadContext,
 }
 
+/// Params for `walkthrough_open`.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct WalkthroughOpenParams {
     pub walkthrough_id: String,
 }
 
+/// Confirms the new session-active walkthrough id.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WalkthroughOpenResponse {
     pub active_walkthrough_id: String,
 }
 
+/// Session-active walkthrough id plus co-presence context.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WalkthroughCurrentResponse {
     pub active_walkthrough_id: Option<String>,
     pub context: ReadContext,
 }
 
+/// Human or agent attention spotlight (object + diagram) for collab tools.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct AttentionReadResponse {
     pub object_ref: Option<String>,
@@ -190,38 +217,45 @@ pub struct AttentionReadResponse {
     pub context: ReadContext,
 }
 
+/// Params for `attention_agent_set` (agent highlight spotlight).
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct AttentionAgentSetParams {
     pub object_ref: String,
 }
 
+/// Confirms agent attention after set.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct AttentionSetResponse {
     pub object_ref: String,
     pub diagram_id: String,
 }
 
+/// Count of cleared agent attention entries.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct AttentionClearResponse {
     pub cleared: u64,
 }
 
+/// Whether TUI follow-AI camera is enabled.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct FollowAiReadResponse {
     pub enabled: bool,
     pub context: ReadContext,
 }
 
+/// Params for `follow_ai_set`.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct FollowAiSetParams {
     pub enabled: bool,
 }
 
+/// Confirms follow-AI after set.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct FollowAiSetResponse {
     pub enabled: bool,
 }
 
+/// How `selection_update` merges `object_refs` into the multi-select set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum UpdateMode {
@@ -231,12 +265,14 @@ pub enum UpdateMode {
     Remove,
 }
 
+/// Current multi-select object refs.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SelectionGetResponse {
     pub object_refs: Vec<String>,
     pub context: ReadContext,
 }
 
+/// Params for `selection_update` (replace/add/remove modes).
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct SelectionUpdateParams {
     pub object_refs: Vec<String>,
@@ -244,18 +280,21 @@ pub struct SelectionUpdateParams {
     pub mode: UpdateMode,
 }
 
+/// Applied vs ignored refs from a selection update.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SelectionUpdateResponse {
     pub applied: Vec<String>,
     pub ignored: Vec<String>,
 }
 
+/// Diagram canvas scroll offsets for `view_get_state`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ViewScroll {
     pub x: f64,
     pub y: f64,
 }
 
+/// Coarse TUI view snapshot (active diagram, scroll, pane visibility).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ViewGetStateResponse {
     pub active_diagram_id: Option<String>,
@@ -264,6 +303,7 @@ pub struct ViewGetStateResponse {
     pub context: ReadContext,
 }
 
+/// Per-kind object counts for digests (unused kinds stay 0).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DiagramCounts {
     pub participants: u64,
@@ -280,6 +320,7 @@ pub struct DiagramCounts {
     pub lanes: u64,
 }
 
+/// Cheap diagram fingerprint (`diagram_get_digest`) before full AST/Mermaid reads.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DiagramDigest {
     pub rev: u64,
@@ -288,6 +329,7 @@ pub struct DiagramDigest {
     pub context: ReadContext,
 }
 
+/// Full Mermaid projection + rev for `diagram_read` (fail-closed export).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DiagramSnapshot {
     pub rev: u64,
@@ -296,6 +338,7 @@ pub struct DiagramSnapshot {
     pub context: ReadContext,
 }
 
+/// Optional co-presence fields attached to many read responses (TUI/MCP shared state).
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 pub struct ReadContext {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -312,6 +355,7 @@ pub struct ReadContext {
     pub ui_session_rev: Option<u64>,
 }
 
+/// Create a diagram from raw Mermaid; optional id/name and whether it becomes session-active.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct DiagramCreateFromMermaidParams {
     /// Raw Mermaid diagram source (`flowchart`/`graph` or `sequenceDiagram`).
@@ -324,12 +368,14 @@ pub struct DiagramCreateFromMermaidParams {
     pub make_active: Option<bool>,
 }
 
+/// Create-from-Mermaid result with optional new session-active diagram.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DiagramCreateFromMermaidResponse {
     pub diagram: DiagramSummary,
     pub active_diagram_id: Option<String>,
 }
 
+/// Revision-gated Mermaid whole-diagram replace (`base_rev` must match).
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct DiagramReplaceFromMermaidParams {
     pub diagram_id: Option<String>,
@@ -338,6 +384,7 @@ pub struct DiagramReplaceFromMermaidParams {
     pub mermaid: String,
 }
 
+/// Stable-id reconciliation report after Mermaid replace.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DiagramIdentityReport {
     /// Object ids present after replace but not before (new allocations).
@@ -348,6 +395,7 @@ pub struct DiagramIdentityReport {
     pub preserved: Vec<String>,
 }
 
+/// Replace result: new rev, identity report, and dangling xrefs.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DiagramReplaceFromMermaidResponse {
     pub new_rev: u64,
@@ -358,6 +406,7 @@ pub struct DiagramReplaceFromMermaidResponse {
     pub dangling_xref_ids: Vec<String>,
 }
 
+/// Typed AST snapshot from `diagram_get_ast`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DiagramGetAstResponse {
     pub diagram_id: String,
@@ -368,6 +417,7 @@ pub struct DiagramGetAstResponse {
     pub ast: McpDiagramAst,
 }
 
+/// Frigg symbol anchor on sequence participants / flow nodes.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct McpSymbolAnchor {
     pub stable_symbol_id: String,
@@ -375,6 +425,7 @@ pub struct McpSymbolAnchor {
     pub repository_id: Option<String>,
 }
 
+/// Kind-tagged diagram AST for MCP (structure ops and get_ast).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum McpDiagramAst {
@@ -404,6 +455,7 @@ pub enum McpDiagramAst {
     },
 }
 
+/// Class node in MCP AST / object reads.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct McpClassNodeAst {
     pub class_id: String,
@@ -413,6 +465,7 @@ pub struct McpClassNodeAst {
     pub note: Option<String>,
 }
 
+/// UML-ish class relation kind on the wire.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum McpClassRelationKind {
@@ -425,6 +478,7 @@ pub enum McpClassRelationKind {
     Link,
 }
 
+/// Class relation edge in MCP AST.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct McpClassRelationAst {
     pub relation_id: String,
@@ -435,6 +489,7 @@ pub struct McpClassRelationAst {
     pub raw_connector: Option<String>,
 }
 
+/// ER entity node in MCP AST.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct McpErEntityAst {
     pub entity_id: String,
@@ -442,6 +497,7 @@ pub struct McpErEntityAst {
     pub note: Option<String>,
 }
 
+/// ER endpoint cardinality on the wire.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum McpErCardinality {
@@ -451,6 +507,7 @@ pub enum McpErCardinality {
     ZeroOrMore,
 }
 
+/// Identifying vs non-identifying ER relationship stroke.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum McpErStroke {
@@ -458,6 +515,7 @@ pub enum McpErStroke {
     NonIdentifying,
 }
 
+/// ER relationship edge in MCP AST.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct McpErRelationshipAst {
     pub relationship_id: String,
@@ -470,6 +528,7 @@ pub struct McpErRelationshipAst {
     pub raw_connector: Option<String>,
 }
 
+/// Gantt section grouping task ids.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct McpGanttSectionAst {
     pub section_id: String,
@@ -477,6 +536,7 @@ pub struct McpGanttSectionAst {
     pub task_ids: Vec<String>,
 }
 
+/// Gantt task start: absolute date, after another task, or unspecified.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum McpGanttTaskStart {
@@ -485,6 +545,7 @@ pub enum McpGanttTaskStart {
     Unspecified,
 }
 
+/// Gantt task row in MCP AST.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct McpGanttTaskAst {
     pub task_id: String,
@@ -496,6 +557,7 @@ pub struct McpGanttTaskAst {
     pub note: Option<String>,
 }
 
+/// Gantt time-lane header in MCP AST.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct McpGanttLaneAst {
     pub lane_id: String,
@@ -503,6 +565,7 @@ pub struct McpGanttLaneAst {
     pub note: Option<String>,
 }
 
+/// Sequence participant in MCP AST.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct McpSeqParticipantAst {
     pub participant_id: String,
@@ -513,6 +576,7 @@ pub struct McpSeqParticipantAst {
     pub symbol: Option<McpSymbolAnchor>,
 }
 
+/// Sequence message in MCP AST.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct McpSeqMessageAst {
     pub message_id: String,
@@ -524,6 +588,7 @@ pub struct McpSeqMessageAst {
     pub order_key: i64,
 }
 
+/// Nested alt/opt/loop/par block with sections and child blocks.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct McpSeqBlockAst {
     pub block_id: String,
@@ -533,6 +598,7 @@ pub struct McpSeqBlockAst {
     pub blocks: Vec<McpSeqBlockAst>,
 }
 
+/// Sequence fragment block kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum McpSeqBlockKind {
@@ -542,6 +608,7 @@ pub enum McpSeqBlockKind {
     Par,
 }
 
+/// One section inside a sequence block (main/else/and) owning message ids.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct McpSeqSectionAst {
     pub section_id: String,
@@ -550,6 +617,7 @@ pub struct McpSeqSectionAst {
     pub message_ids: Vec<String>,
 }
 
+/// Section role within a sequence block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum McpSeqSectionKind {
@@ -566,6 +634,7 @@ pub enum McpSeqSectionAddKind {
     And,
 }
 
+/// Flowchart node in MCP AST.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct McpFlowNodeAst {
     pub node_id: String,
@@ -577,6 +646,7 @@ pub struct McpFlowNodeAst {
     pub symbol: Option<McpSymbolAnchor>,
 }
 
+/// Flowchart edge in MCP AST.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct McpFlowEdgeAst {
     pub edge_id: String,
@@ -587,6 +657,7 @@ pub struct McpFlowEdgeAst {
     pub style: Option<String>,
 }
 
+/// Kind of object-ref change inside a diagram delta.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DeltaChangeKind {
@@ -595,12 +666,14 @@ pub enum DeltaChangeKind {
     Updated,
 }
 
+/// One grouped change of object refs between revs.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DeltaChange {
     pub kind: DeltaChangeKind,
     pub refs: Vec<String>,
 }
 
+/// `diagram_get_delta` response spanning `from_rev`→`to_rev`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DiagramDeltaResponse {
     pub from_rev: u64,
@@ -608,6 +681,7 @@ pub struct DiagramDeltaResponse {
     pub changes: Vec<DeltaChange>,
 }
 
+/// Compact added/removed/updated object refs after apply.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DeltaSummary {
     pub added: Vec<String>,
@@ -615,6 +689,7 @@ pub struct DeltaSummary {
     pub updated: Vec<String>,
 }
 
+/// Result of `diagram_apply_ops` / walkthrough apply (new rev + delta).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ApplyOpsResponse {
     pub new_rev: u64,
@@ -622,11 +697,13 @@ pub struct ApplyOpsResponse {
     pub delta: DeltaSummary,
 }
 
+/// Optional diagram id for tools defaulting to session-active diagram.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct DiagramTargetParams {
     pub diagram_id: Option<String>,
 }
 
+/// Neighborhood slice around a center object ref.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct DiagramGetSliceParams {
     pub diagram_id: Option<String>,
@@ -636,30 +713,35 @@ pub struct DiagramGetSliceParams {
     pub filters: Option<DiagramSliceFilters>,
 }
 
+/// Category include/exclude filters for diagram slices.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DiagramSliceFilters {
     pub include_categories: Option<Vec<String>>,
     pub exclude_categories: Option<Vec<String>>,
 }
 
+/// Object and edge refs in a `diagram_get_slice` neighborhood.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DiagramGetSliceResponse {
     pub objects: Vec<String>,
     pub edges: Vec<String>,
 }
 
+/// Params for `diagram_get_delta` since a known rev.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct GetDeltaParams {
     pub diagram_id: Option<String>,
     pub since_rev: u64,
 }
 
+/// Params for `walkthrough_get_delta`.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct WalkthroughGetDeltaParams {
     pub walkthrough_id: String,
     pub since_rev: u64,
 }
 
+/// Revision-gated diagram structure ops (`base_rev` OCC).
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct ApplyOpsParams {
     pub diagram_id: Option<String>,
@@ -667,6 +749,7 @@ pub struct ApplyOpsParams {
     pub ops: Vec<McpOp>,
 }
 
+/// Revision-gated walkthrough structure ops.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct WalkthroughApplyOpsParams {
     pub walkthrough_id: String,
@@ -674,6 +757,7 @@ pub struct WalkthroughApplyOpsParams {
     pub ops: Vec<McpWalkthroughOp>,
 }
 
+/// Dry-run apply params for `diagram_propose_ops` (same shape as apply).
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct DiagramProposeOpsParams {
     pub diagram_id: Option<String>,
@@ -681,6 +765,7 @@ pub struct DiagramProposeOpsParams {
     pub ops: Vec<McpOp>,
 }
 
+/// Proposed-apply preview without persisting (same fields as apply response).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DiagramProposeOpsResponse {
     pub new_rev: u64,
@@ -688,6 +773,7 @@ pub struct DiagramProposeOpsResponse {
     pub delta: DeltaSummary,
 }
 
+/// Walkthrough delta since a known rev.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WalkthroughDeltaResponse {
     pub from_rev: u64,
@@ -695,6 +781,7 @@ pub struct WalkthroughDeltaResponse {
     pub changes: Vec<DeltaChange>,
 }
 
+/// Filters for `xref_list` (status, endpoints, dangling).
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct XRefListParams {
     pub dangling_only: Option<bool>,
@@ -707,6 +794,7 @@ pub struct XRefListParams {
     pub limit: Option<u64>,
 }
 
+/// One cross-reference row for list tools.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct XRefSummary {
     pub xref_id: String,
@@ -717,22 +805,26 @@ pub struct XRefSummary {
     pub status: String,
 }
 
+/// `xref_list` payload.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct XRefListResponse {
     pub xrefs: Vec<XRefSummary>,
 }
 
+/// Params for one-hop xref neighborhood traversal.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct XRefNeighborsParams {
     pub object_ref: String,
     pub direction: Option<String>,
 }
 
+/// Neighbor object refs via xrefs.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct XRefNeighborsResponse {
     pub neighbors: Vec<String>,
 }
 
+/// Params for `xref_add`.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct XRefAddParams {
     pub xref_id: String,
@@ -742,22 +834,26 @@ pub struct XRefAddParams {
     pub label: Option<String>,
 }
 
+/// Created xref id and resolved status.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct XRefAddResponse {
     pub xref_id: String,
     pub status: String,
 }
 
+/// Params for `xref_remove`.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct XRefRemoveParams {
     pub xref_id: String,
 }
 
+/// Whether the xref existed and was removed.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct XRefRemoveResponse {
     pub removed: bool,
 }
 
+/// Params for sequence message trace (forward/back along order).
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct SeqTraceParams {
     pub diagram_id: Option<String>,
@@ -766,11 +862,13 @@ pub struct SeqTraceParams {
     pub limit: Option<u64>,
 }
 
+/// Ordered message ids from a sequence trace.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SeqTraceResponse {
     pub messages: Vec<String>,
 }
 
+/// Params for sequence message text search.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct SeqSearchParams {
     pub diagram_id: Option<String>,
@@ -779,11 +877,13 @@ pub struct SeqSearchParams {
     pub case_insensitive: Option<bool>,
 }
 
+/// Message ids matching a sequence search.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SeqSearchResponse {
     pub messages: Vec<String>,
 }
 
+/// Filter messages by from/to participant.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct SeqMessagesParams {
     pub diagram_id: Option<String>,
@@ -791,11 +891,13 @@ pub struct SeqMessagesParams {
     pub to_participant_id: Option<String>,
 }
 
+/// Message ids between optional participant endpoints.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SeqMessagesResponse {
     pub messages: Vec<String>,
 }
 
+/// Params for flowchart reachability from a start node.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct FlowReachableParams {
     pub diagram_id: Option<String>,
@@ -803,22 +905,26 @@ pub struct FlowReachableParams {
     pub direction: Option<String>,
 }
 
+/// Reachable flow node ids.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct FlowReachableResponse {
     pub nodes: Vec<String>,
 }
 
+/// Params for nodes not reachable from a start (or graph roots).
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct FlowUnreachableParams {
     pub diagram_id: Option<String>,
     pub start_node_id: Option<String>,
 }
 
+/// Unreachable flow node ids.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct FlowUnreachableResponse {
     pub nodes: Vec<String>,
 }
 
+/// Params for simple paths between two flow nodes.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct FlowPathsParams {
     pub diagram_id: Option<String>,
@@ -828,21 +934,25 @@ pub struct FlowPathsParams {
     pub max_extra_hops: Option<u64>,
 }
 
+/// Node-id paths between flow endpoints.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct FlowPathsResponse {
     pub paths: Vec<Vec<String>>,
 }
 
+/// Detected directed cycles as node-id rings.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct FlowCyclesResponse {
     pub cycles: Vec<Vec<String>>,
 }
 
+/// Flow nodes with no outgoing edges.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct FlowDeadEndsResponse {
     pub nodes: Vec<String>,
 }
 
+/// Params for flow degree ranking.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct FlowDegreesParams {
     pub diagram_id: Option<String>,
@@ -850,6 +960,7 @@ pub struct FlowDegreesParams {
     pub sort_by: Option<String>,
 }
 
+/// One flow node's in/out degree ranking row.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct FlowDegreeNode {
     pub node_ref: String,
@@ -858,11 +969,13 @@ pub struct FlowDegreeNode {
     pub out_degree: u64,
 }
 
+/// Ranked flow nodes by degree.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct FlowDegreesResponse {
     pub nodes: Vec<FlowDegreeNode>,
 }
 
+/// Sequence message arrow kind (sync/async/return).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum MessageKind {
@@ -871,24 +984,28 @@ pub enum MessageKind {
     Return,
 }
 
+/// Params for `object_read` (single ref and/or batch).
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct ObjectGetParams {
     pub object_ref: Option<String>,
     pub object_refs: Option<Vec<String>>,
 }
 
+/// One resolved object for `object_read`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ObjectGetItem {
     pub object_ref: String,
     pub object: McpObject,
 }
 
+/// Batch object payload with co-presence context.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ObjectGetResponse {
     pub objects: Vec<ObjectGetItem>,
     pub context: ReadContext,
 }
 
+/// Kind-tagged object body for `object_read` (mirrors domain categories).
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum McpObject {
@@ -978,6 +1095,7 @@ pub enum McpObject {
 }
 
 /// Tagged diagram mutation op for `diagram_apply_ops` / `diagram_propose_ops`.
+/// Covers sequence (participants/messages/blocks) and flowchart (nodes/edges) structure.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum McpOp {
@@ -1110,6 +1228,7 @@ pub enum McpOp {
     },
 }
 
+/// Tagged walkthrough mutation for `walkthrough_apply_ops` (nodes/edges/title).
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum McpWalkthroughOp {

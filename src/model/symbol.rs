@@ -8,10 +8,12 @@
 
 //! Frigg `stable_symbol_id` anchors on participants and flow nodes.
 //!
-//! Sidecar-persisted metadata (not Mermaid source) linking diagrams to code symbols.
+//! Sidecar-persisted metadata (not Mermaid source) linking diagram objects to code symbols.
+//! Format: `sym-` + non-empty lowercase hex. Optional `repository_id` scopes multi-repo sessions.
 
 use std::fmt;
 
+/// Code-symbol link attached to a participant or flow node (sidecar / UI only).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SymbolAnchor {
     stable_symbol_id: String,
@@ -19,6 +21,7 @@ pub struct SymbolAnchor {
 }
 
 impl SymbolAnchor {
+    /// Validate `stable_symbol_id` (`sym-` + lowercase hex) and retain optional repository scope.
     pub fn new(
         stable_symbol_id: impl Into<String>,
         repository_id: Option<String>,
@@ -28,17 +31,21 @@ impl SymbolAnchor {
         Ok(Self { stable_symbol_id, repository_id })
     }
 
+    /// Frigg stable symbol id (`sym-<hex>`).
     pub fn stable_symbol_id(&self) -> &str {
         &self.stable_symbol_id
     }
 
+    /// Optional repository scope when the session spans multiple Frigg repos.
     pub fn repository_id(&self) -> Option<&str> {
         self.repository_id.as_deref()
     }
 }
 
+/// Invalid [`SymbolAnchor`] construction.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SymbolAnchorError {
+    /// Id was empty, missing `sym-`, or used non-lowercase-hex digits.
     InvalidStableSymbolId { stable_symbol_id: String },
 }
 

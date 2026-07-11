@@ -8,7 +8,9 @@
 
 //! Diagram envelope: kind, revision, default symbol repository, and typed AST.
 //!
-//! `rev` is the optimistic-concurrency token for MCP/TUI mutations.
+//! [`Diagram::rev`] is the optimistic-concurrency (OCC) token: MCP/TUI mutations supply
+//! `base_rev` and callers bump on successful write. Kind is fixed at construction; AST replace
+//! rejects cross-kind swaps.
 
 use super::class_ast::ClassAst;
 use super::er_ast::ErAst;
@@ -28,7 +30,7 @@ pub enum DiagramKind {
     Gantt,
 }
 
-/// Kind-tagged diagram AST wrapper used by [`Diagram`].
+/// Kind-tagged diagram AST payload held by [`Diagram`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DiagramAst {
     Sequence(SequenceAst),
@@ -39,6 +41,7 @@ pub enum DiagramAst {
 }
 
 impl DiagramAst {
+    /// Discriminant matching the enclosed AST variant.
     pub fn kind(&self) -> DiagramKind {
         match self {
             Self::Sequence(_) => DiagramKind::Sequence,
@@ -50,6 +53,7 @@ impl DiagramAst {
     }
 }
 
+/// AST replace attempted with a different [`DiagramKind`] than the diagram was created with.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DiagramAstKindMismatch {
     expected: DiagramKind,
@@ -57,10 +61,12 @@ pub struct DiagramAstKindMismatch {
 }
 
 impl DiagramAstKindMismatch {
+    /// Kind fixed on the diagram envelope.
     pub fn expected(&self) -> DiagramKind {
         self.expected
     }
 
+    /// Kind of the AST that was rejected.
     pub fn found(&self) -> DiagramKind {
         self.found
     }
@@ -78,7 +84,7 @@ impl fmt::Display for DiagramAstKindMismatch {
 
 impl std::error::Error for DiagramAstKindMismatch {}
 
-/// A single, typed diagram artifact.
+/// Session-owned diagram artifact: identity, display name, kind-locked AST, and OCC rev.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagram {
     diagram_id: DiagramId,
@@ -90,6 +96,7 @@ pub struct Diagram {
 }
 
 impl Diagram {
+    /// Create with `rev = 0`; kind is taken from `ast` and never changes afterward.
     pub fn new(diagram_id: DiagramId, name: impl Into<String>, ast: DiagramAst) -> Self {
         let kind = ast.kind();
         Self {
@@ -102,22 +109,27 @@ impl Diagram {
         }
     }
 
+    /// Stable diagram id within the session.
     pub fn diagram_id(&self) -> &DiagramId {
         &self.diagram_id
     }
 
+    /// Human-facing diagram title (not necessarily equal to id).
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Kind fixed at construction; drives AST replace checks and tool dispatch.
     pub fn kind(&self) -> DiagramKind {
         self.kind
     }
 
+    /// Borrow the typed AST payload.
     pub fn ast(&self) -> &DiagramAst {
         &self.ast
     }
 
+    /// Swap AST when kinds match; returns the previous AST. Does not bump `rev`.
     pub fn replace_ast(&mut self, ast: DiagramAst) -> Result<DiagramAst, DiagramAstKindMismatch> {
         let found = ast.kind();
         if found != self.kind {
@@ -127,27 +139,34 @@ impl Diagram {
         Ok(std::mem::replace(&mut self.ast, ast))
     }
 
+    /// Like [`Self::replace_ast`] but discards the previous payload.
     pub fn set_ast(&mut self, ast: DiagramAst) -> Result<(), DiagramAstKindMismatch> {
         self.replace_ast(ast).map(|_| ())
     }
 
+    /// Current optimistic-concurrency revision (MCP `base_rev` token).
     pub fn rev(&self) -> u64 {
         self.rev
     }
 
+    /// Load or force a revision (e.g. after store restore); prefer [`Self::bump_rev`] for writes.
     pub fn set_rev(&mut self, rev: u64) {
         self.rev = rev;
     }
 
+    /// Default Frigg repository id for unresolved symbol anchors on this diagram.
     pub fn default_symbol_repository_id(&self) -> Option<&str> {
         self.default_symbol_repository_id.as_deref()
     }
 
+    /// Set or clear the diagram-default symbol repository.
     pub fn set_default_symbol_repository_id<T: Into<String>>(&mut self, repository_id: Option<T>) {
         self.default_symbol_repository_id = repository_id.map(Into::into);
     }
 
+    /// Advance OCC rev after a successful mutation; saturates at `u64::MAX`.
     pub fn bump_rev(&mut self) {
+        // Saturating: never wrap (would look like a successful older base_rev under OCC).
         self.rev = self.rev.saturating_add(1);
     }
 }

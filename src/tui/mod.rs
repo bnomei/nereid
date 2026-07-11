@@ -9,7 +9,8 @@
 //! Interactive ratatui session shell over a live diagram session.
 //!
 //! Handles focus panes, search, hint jumps, external Mermaid edit, follow-AI camera, and MCP
-//! HTTP co-hosting. Reloads the session folder when MCP mutates disk-backed state.
+//! HTTP co-hosting. Shares [`crate::ui::UiState`] and agent highlight with the MCP server when
+//! co-hosted; reloads the session folder when MCP mutates disk-backed state (`ui_session_rev`).
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -60,13 +61,12 @@ const NODE_HINT_CHARS: &str = "ASDFJKLEWCMPGH";
 const CENTER_BORDER_PADDING: i32 = 1;
 const TUI_FLOWCHART_EXTRA_COL_GAP: usize = 2;
 
-/// Runs the interactive terminal UI.
-///
-/// This is an app shell for T001; it renders a static diagram buffer and supports basic scrolling.
+/// Runs the TUI with a built-in demo session (no MCP co-host).
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     run_with_session(demo_session())
 }
 
+/// Runs the TUI on an in-memory session without shared agent highlight or folder reload.
 pub fn run_with_session(session: crate::model::Session) -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = TerminalSession::new()?;
     let mut app = App::new(session);
@@ -95,6 +95,7 @@ pub fn run_with_session(session: crate::model::Session) -> Result<(), Box<dyn st
     Ok(())
 }
 
+/// TUI with shared agent highlight set (MCP spotlight) but no live UiState or folder.
 pub fn run_with_session_with_ui(
     session: crate::model::Session,
     agent_highlights: Arc<Mutex<BTreeSet<ObjectRef>>>,
@@ -102,6 +103,7 @@ pub fn run_with_session_with_ui(
     run_with_session_with_ui_state(session, agent_highlights, None, None)
 }
 
+/// Full co-host entry: agent highlight, optional shared UiState, optional session folder reload.
 pub fn run_with_session_with_ui_state(
     session: crate::model::Session,
     agent_highlights: Arc<Mutex<BTreeSet<ObjectRef>>>,
@@ -4541,6 +4543,7 @@ fn xref_direction_prefix_for_flags(has_outgoing: bool, has_incoming: bool) -> &'
     }
 }
 
+/// Load the packaged `data/demo-session` fixture (used by `--demo` and demo-oriented tests).
 pub fn demo_session() -> Session {
     let root =
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data").join("demo-session");

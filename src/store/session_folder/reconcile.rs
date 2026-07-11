@@ -8,9 +8,11 @@
 
 //! Reconcile parsed Mermaid ASTs against sidecar stable-id fingerprints.
 //!
-//! Participants map by name, flow nodes by mermaid id, messages/edges by content fingerprint,
-//! and sequence blocks by kind/header/section membership plus parent id. Used on load and by
-//! `replace_diagram_from_mermaid`.
+//! Restores stable `ObjectId`s after re-parse so xrefs, notes, and symbols survive Mermaid
+//! rewrites. Match priority: explicit mermaid id / name maps first, then content fingerprints
+//! (messages: endpoints+kind+text; edges: endpoints+label+normalized connector; sequence
+//! blocks: kind/header/sections/parent; gantt tasks: strong section-qualified fingerprints
+//! before weaker bare ones). Used on `SessionFolder` load and by `replace_diagram_from_mermaid`.
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 

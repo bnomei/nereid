@@ -6,7 +6,10 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Walkthrough graph renderer as a left-to-right Unicode node flow.
+//! Walkthrough graph as a left-to-right Unicode node flow (MCP/TUI text preview).
+//!
+//! Baseline only: nodes in declaration order; edges only between adjacent nodes in that order.
+//! Not the full walkthrough graph layout—sufficient for digest-style previews.
 
 use std::fmt;
 
@@ -29,6 +32,7 @@ struct NodeRender<'a> {
     box_inner_width: usize,
 }
 
+/// Canvas bounds failure or edge endpoint missing from the walkthrough node list.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WalkthroughRenderError {
     Canvas(CanvasError),

@@ -6,11 +6,12 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Filesystem adapter for a single session directory.
+//! Filesystem adapter for a single session directory (`SessionFolder`).
 //!
-//! Coordinates meta commit, per-diagram Mermaid/sidecar writes, walkthrough files, async text
-//! exports, and cross-process locking. Prefer begin_session_update/commit for concurrent MCP
-//! and TUI writers.
+//! Coordinates meta commit, per-diagram Mermaid + sidecar writes, walkthrough files, async
+//! text exports, and cross-process write locking. Prefer `begin_session_update` / `commit`
+//! when MCP and TUI cohabit. Atomic writes revalidate paths against symlink TOCTOU; GC cancels
+//! pending ascii exports by both `*.wt.json` and `*.ascii.txt` keys.
 
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
@@ -398,24 +399,30 @@ pub enum StoreError {
         value: String,
         source: Box<SymbolAnchorError>,
     },
+    /// Relative path escapes the session root or contains disallowed components (`..`, absolute).
     InvalidRelativePath {
         field: &'static str,
         value: PathBuf,
     },
+    /// Resolved path is not under the session directory (after canonicalize).
     PathOutsideSession {
         session_dir: PathBuf,
         path: PathBuf,
     },
+    /// Refusing to follow or write through a symlink inside the session tree.
     SymlinkRefused {
         path: PathBuf,
     },
+    /// Timed out acquiring `.nereid-session.write.lock` (cross-process exclusive).
     SessionWriteLockTimeout {
         path: PathBuf,
     },
+    /// Meta missing but `diagrams/` has content — refuse to seed and orphan existing files.
     MetaMissingWithExistingDiagrams {
         meta_path: PathBuf,
         diagrams_dir: PathBuf,
     },
+    /// Meta missing but `walkthroughs/` has content — refuse to seed and orphan existing files.
     MetaMissingWithExistingWalkthroughs {
         meta_path: PathBuf,
         walkthroughs_dir: PathBuf,
@@ -695,7 +702,11 @@ pub struct DiagramMeta {
     pub sequence_participant_symbols: BTreeMap<ObjectId, SymbolAnchor>,
 }
 
-/// Name/mermaid-id → stable object id maps for participants and flow nodes.
+/// Maps Mermaid surface keys → stable `ObjectId` strings for reconcile on load/replace.
+///
+/// `by_mermaid_id` (flow nodes / gantt tags), `by_name` (participants, classes, entities),
+/// and `by_fingerprint` (messages, edges, relations, untagged gantt tasks) cover identity
+/// when the textual Mermaid is rewritten.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DiagramStableIdMap {
     pub by_mermaid_id: BTreeMap<String, String>,
@@ -716,6 +727,8 @@ pub struct DiagramXRef {
 }
 
 /// Flow edge fingerprint for load-time id reconciliation.
+///
+/// Match key: `(from, to, label, normalized connector)`; `style` restores with the matched id.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiagramFlowEdgeMeta {
     pub edge_id: ObjectId,
@@ -759,6 +772,8 @@ pub struct DiagramGanttSectionMeta {
 }
 
 /// Sequence message fingerprint for load-time id reconciliation.
+///
+/// Match key: `(from, to, kind, text)` — order_key is not part of the fingerprint.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiagramSequenceMessageMeta {
     pub message_id: ObjectId,
@@ -769,6 +784,8 @@ pub struct DiagramSequenceMessageMeta {
 }
 
 /// Sequence block tree fingerprint (parent + sections + membership).
+///
+/// Match key: kind, header, parent stable id, and per-section kind/header/message membership.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiagramSequenceBlockMeta {
     pub block_id: ObjectId,
@@ -871,8 +888,9 @@ pub enum XRefStatus {
 
 /// Filesystem adapter for the session folder format under a single root directory.
 ///
-/// Coordinates meta JSON, per-diagram Mermaid sidecars, walkthrough JSON, ASCII exports,
-/// and cross-process write locking.
+/// Coordinates meta JSON, per-diagram Mermaid + sidecars, walkthrough JSON, ASCII exports,
+/// and cross-process write locking. In-process writers also take `meta_lock` before the
+/// file lock so process-local critical sections nest in a fixed order.
 #[derive(Debug, Clone)]
 pub struct SessionFolder {
     root: PathBuf,
@@ -897,6 +915,10 @@ struct WalkthroughArtifactsSnapshot {
 }
 
 /// Scoped session mutation guarded by the folder write lock; commit persists atomically.
+///
+/// Created by [`SessionFolder::begin_session_update`] (lock + reload). Drop without commit
+/// discards in-memory edits and releases the write lock. Diagram-level OCC still uses
+/// `base_rev` via `ops::apply_ops` inside the update body.
 #[derive(Debug)]
 pub struct SessionUpdate<'a> {
     folder: &'a SessionFolder,
@@ -923,6 +945,7 @@ impl<'a> SessionUpdate<'a> {
     }
 }
 
+/// Holds process-local `meta_lock` then exclusive `.nereid-session.write.lock` (order: mutex → file).
 #[derive(Debug)]
 struct SessionWriteGuard<'a> {
     _meta_guard: std::sync::MutexGuard<'a, ()>,
@@ -949,6 +972,7 @@ fn try_lock_session_file(file: &fs::File, path: &Path) -> Result<bool, StoreErro
     })
 }
 
+/// How aggressively atomic session writes fsync before/after rename.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum WriteDurability {
     /// Fast, best-effort persistence.
@@ -1055,6 +1079,7 @@ impl SessionFolder {
     }
 
     fn lock_session_write(&self) -> Result<SessionWriteGuard<'_>, StoreError> {
+        // Lock order: process-local meta_lock, then exclusive file lock (never reverse).
         let meta_guard = self.lock_meta();
         fs::create_dir_all(&self.root)
             .map_err(|source| StoreError::Io { path: self.root.clone(), source })?;
@@ -2262,7 +2287,7 @@ include!("session_folder/helpers.rs");
 #[cfg(test)]
 mod tests;
 
-/// Object-id sets before/after a Mermaid replace (for identity reporting).
+/// Object-id sets before/after a Mermaid replace (for identity / MCP reporting).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiagramMermaidReplaceResult {
     pub new_rev: u64,
@@ -2270,11 +2295,18 @@ pub struct DiagramMermaidReplaceResult {
     pub next_object_ids: BTreeSet<String>,
 }
 
-/// Failures from [`replace_diagram_from_mermaid`].
+/// Failures from [`replace_diagram_from_mermaid`] (kind, parse, or AST set mismatch).
 #[derive(Debug)]
 pub enum DiagramMermaidReplaceError {
-    KindMismatch { expected: DiagramKind, found: DiagramKind },
-    MissingOrUnknownKind { first_line: Option<String> },
+    /// Source Mermaid kind does not match the target diagram.
+    KindMismatch {
+        expected: DiagramKind,
+        found: DiagramKind,
+    },
+    /// First non-empty content line is not a recognized diagram header.
+    MissingOrUnknownKind {
+        first_line: Option<String>,
+    },
     ParseSequence(Box<MermaidSequenceParseError>),
     ParseFlowchart(Box<MermaidFlowchartParseError>),
     ParseClass(Box<MermaidClassParseError>),
@@ -2365,7 +2397,9 @@ fn collect_stable_object_ids(ast: &DiagramAst) -> BTreeSet<String> {
 
 /// Parse Mermaid into the same diagram kind, reconciling stable ids from the current AST.
 ///
-/// Kind must match; returns identity id sets for MCP reporting. Does not persist by itself.
+/// Builds an identity sidecar from the live diagram, parses source, runs reconcile (name /
+/// mermaid-id / fingerprint match), installs the AST, and bumps revision. Kind must match;
+/// does not touch disk — callers persist via `SessionFolder` / `SessionUpdate`.
 pub fn replace_diagram_from_mermaid(
     diagram: &mut Diagram,
     mermaid: &str,

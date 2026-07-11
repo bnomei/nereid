@@ -8,7 +8,8 @@
 
 //! Flowchart layering and orthogonal edge routing on a sparse integer grid.
 //!
-//! Deterministic barycenter ordering and bounded search windows for soft occupancy detours.
+//! DAG-first longest-path layers, deterministic barycenter ordering within layers, and
+//! bounded-search orthogonal routes that treat node cells as soft occupancy obstacles.
 
 use std::cmp::{Ordering, Reverse};
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
@@ -16,6 +17,7 @@ use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
 use crate::model::flow_ast::{FlowEdge, FlowchartAst};
 use crate::model::ids::ObjectId;
 
+/// Layered node placements for a flowchart (even grid anchors; odd cells free for routing).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowchartLayout {
     layers: Vec<Vec<ObjectId>>,
@@ -51,6 +53,7 @@ impl FlowchartLayout {
     }
 }
 
+/// Rank (layer) and order index of a node within that layer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowNodePlacement {
     layer: usize,
@@ -67,6 +70,7 @@ impl FlowNodePlacement {
     }
 }
 
+/// Integer routing-grid coordinate (node anchors on even x/y; edges prefer odd corridors).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct GridPoint {
     x: i32,
@@ -91,12 +95,21 @@ impl GridPoint {
     }
 }
 
+/// Layout failure: dangling edge endpoint or directed cycle in the flowchart.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlowchartLayoutError {
-    UnknownNode { edge_id: ObjectId, endpoint: FlowEdgeEndpoint, node_id: ObjectId },
-    CycleDetected { nodes: Vec<ObjectId> },
+    UnknownNode {
+        edge_id: ObjectId,
+        endpoint: FlowEdgeEndpoint,
+        node_id: ObjectId,
+    },
+    /// Nodes participating in a cycle (empty if only a generic cycle report is available).
+    CycleDetected {
+        nodes: Vec<ObjectId>,
+    },
 }
 
+/// Which endpoint of an edge referenced an unknown node id.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlowEdgeEndpoint {
     From,

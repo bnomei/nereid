@@ -6,12 +6,13 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-//! Revision-gated diagram mutations and change deltas.
+//! Revision-gated diagram mutations and change deltas (optimistic concurrency).
 //!
 //! Agents and the TUI edit through typed ops (`SeqOp`, `FlowOp`) applied with a `base_rev`
-//! check. Successful batches bump the diagram revision and return added/removed/updated
-//! `ObjectRef`s for UI refresh and MCP `diagram_diff`. Structure ops must leave sequence
-//! blocks export-valid (contiguous section membership; nested messages also on ancestors).
+//! OCC check against `diagram.rev()`. Successful batches bump the revision and return a
+//! coarse `Delta` of added/removed/updated `ObjectRef`s for UI refresh and MCP `diagram_diff`.
+//! Batches are all-or-nothing on a cloned AST; sequence structure must remain Mermaid-export
+//! valid (contiguous section membership; nested messages also on ancestor sections).
 
 use std::collections::HashSet;
 use std::fmt;
@@ -218,7 +219,10 @@ pub struct ApplyResult {
     pub delta: Delta,
 }
 
-/// Coarse object-level change set from an op batch (added / removed / updated refs).
+/// Coarse object-level change set from an op batch (added / removed / updated `ObjectRef`s).
+///
+/// Net effect after collapsing intermediate states within the same batch (e.g. add-then-remove
+/// cancels out; update of an already-added ref stays in `added` only).
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Delta {
     pub added: Vec<ObjectRef>,
@@ -226,6 +230,7 @@ pub struct Delta {
     pub updated: Vec<ObjectRef>,
 }
 
+/// Collapses per-op `ObjectRef` events into a net [`Delta`] for one batch.
 #[derive(Debug, Default)]
 struct DeltaBuilder {
     added: HashSet<ObjectRef>,
@@ -247,6 +252,7 @@ impl DeltaBuilder {
     }
 
     fn record_updated(&mut self, object_ref: ObjectRef) {
+        // Already added or removed in this batch: keep the stronger lifecycle event.
         if self.added.contains(&object_ref) || self.removed.contains(&object_ref) {
             return;
         }
@@ -275,12 +281,15 @@ fn sort_object_refs(refs: &mut [ObjectRef]) {
     });
 }
 
-/// Apply ops if `base_rev` matches `diagram.rev()`, then bump revision.
+/// Apply ops under OCC if `base_rev` matches `diagram.rev()`, then bump revision once.
+///
+/// Empty `ops` is a no-op that keeps the current revision. `Op::XRef` is rejected; session
+/// xrefs use dedicated MCP tools. Sequence batches re-validate block structure via export.
 ///
 /// # Errors
 ///
-/// Returns [`ApplyError::Conflict`] on stale `base_rev`, kind mismatches, missing ids, invalid
-/// Mermaid identifiers, or export-invalid sequence structure after the batch.
+/// [`ApplyError::Conflict`] on stale `base_rev`; also kind mismatches, missing/duplicate ids,
+/// invalid Mermaid identifiers/message text, or export-invalid sequence structure after the batch.
 pub fn apply_ops(
     diagram: &mut Diagram,
     base_rev: u64,
@@ -363,17 +372,20 @@ pub enum ObjectKind {
     FlowEdge,
 }
 
-/// Failures from [`apply_ops`]: conflicts, missing ids, structure, identifiers.
+/// Failures from [`apply_ops`]: OCC conflicts, missing ids, structure, identifiers.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ApplyError {
+    /// OCC rejection: caller's `base_rev` does not match `diagram.rev()`.
     Conflict {
         base_rev: u64,
         current_rev: u64,
     },
+    /// Op family does not match the diagram AST kind (e.g. `SeqOp` on flowchart).
     KindMismatch {
         diagram_kind: DiagramKind,
         op_kind: OpKind,
     },
+    /// Op family not applied through this path (currently `XRef`).
     UnsupportedOp {
         op_kind: OpKind,
     },
@@ -385,6 +397,7 @@ pub enum ApplyError {
         kind: ObjectKind,
         object_id: ObjectId,
     },
+    /// Edge endpoint references a node id absent from the flowchart AST.
     MissingFlowNode {
         node_id: ObjectId,
     },

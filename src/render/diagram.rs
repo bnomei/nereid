@@ -22,6 +22,7 @@ use super::pipeline::{
 use super::sequence::SequenceRenderError;
 use super::{AnnotatedRender, RenderOptions};
 
+/// Errors from layout or paint when rendering a full [`Diagram`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DiagramRenderError {
     SequenceLayout(SequenceLayoutError),
@@ -90,10 +91,12 @@ impl From<PipelineRenderError> for DiagramRenderError {
     }
 }
 
+/// Primary Unicode text view of a diagram (TUI canvas, MCP `diagram_render_text`).
 pub fn render_diagram_unicode(diagram: &Diagram) -> Result<String, DiagramRenderError> {
     render_diagram_unicode_with_options(diagram, RenderOptions::default())
 }
 
+/// Like [`render_diagram_unicode`] with notes / labels / flowchart gap toggles.
 pub fn render_diagram_unicode_with_options(
     diagram: &Diagram,
     options: RenderOptions,
@@ -101,12 +104,14 @@ pub fn render_diagram_unicode_with_options(
     Ok(render_ast_unicode_with_options(diagram.ast(), options)?)
 }
 
+/// Unicode render plus per-object cell spans for selection and agent highlight.
 pub fn render_diagram_unicode_annotated(
     diagram: &Diagram,
 ) -> Result<AnnotatedRender, DiagramRenderError> {
     render_diagram_unicode_annotated_with_options(diagram, RenderOptions::default())
 }
 
+/// Annotated diagram render with explicit [`RenderOptions`].
 pub fn render_diagram_unicode_annotated_with_options(
     diagram: &Diagram,
     options: RenderOptions,

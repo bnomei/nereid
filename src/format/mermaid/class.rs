@@ -7,6 +7,10 @@
 // Unauthorized copying, modification, or distribution is prohibited.
 
 //! Limited `classDiagram` parse/export for Nereid's class AST.
+//!
+//! Supports bare class names, `Class : member` lines (method heuristic: contains `(`), and a
+//! fixed relation-token set. Class ids are `c:<sanitized_name>`; relation ids are positional
+//! `r:NNNN` until sidecar reconciliation.
 
 use std::fmt;
 
@@ -28,12 +32,18 @@ fn sanitize_object_id_fragment(name: &str) -> String {
     out
 }
 
+/// Failure parsing a limited `classDiagram` subset.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MermaidClassParseError {
+    /// First non-empty line was not `classDiagram`.
     MissingHeader,
+    /// No non-empty, non-comment lines.
     EmptyInput,
+    /// Line outside the supported subset.
     UnsupportedLine { line_no: usize, line: String },
+    /// Relation line could not be split into endpoints + token.
     InvalidRelation { line_no: usize, line: String },
+    /// Member line with empty class name.
     EmptyClassName { line_no: usize },
 }
 
@@ -59,9 +69,12 @@ impl fmt::Display for MermaidClassParseError {
 
 impl std::error::Error for MermaidClassParseError {}
 
+/// Failure exporting a [`ClassAst`] to Mermaid.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MermaidClassExportError {
+    /// Class has an empty display name.
     EmptyClassName { class_id: ObjectId },
+    /// Relation points at a class id not present in the AST.
     MissingRelationEndpoint { relation_id: ObjectId, endpoint: &'static str, class_id: ObjectId },
 }
 
@@ -172,7 +185,7 @@ fn classify_member(member: &str) -> bool {
     member.contains('(')
 }
 
-/// Parse a limited `classDiagram` Mermaid subset.
+/// Parse a limited `classDiagram` Mermaid subset into a [`ClassAst`].
 pub fn parse_class_diagram(input: &str) -> Result<ClassAst, MermaidClassParseError> {
     let mut lines = input.lines().enumerate().filter(|(_, l)| {
         let t = l.trim();

@@ -6,10 +6,11 @@
 // This file is part of Nereid and is proprietary software.
 // Unauthorized copying, modification, or distribution is prohibited.
 
-// include!: flowchart labels, edge drawing, and highlight span bookkeeping.
-
-/// Flowchart rendering internals:
-/// routing spans, lane assignment, collision checks, and connector drawing passes.
+// include!: flowchart paint internals (not a standalone module).
+//
+// Role: orthogonal connector drawing, lane clearance, label placement, and
+// highlight span bookkeeping for the flowchart Unicode renderer.
+// Owned by `flowchart.rs` via `include!` so private helpers share its scope.
 #[cfg(test)]
 fn hline_span(y: usize, x0: usize, x1: usize) -> LineSpan {
     if x0 <= x1 {

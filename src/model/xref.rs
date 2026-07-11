@@ -8,14 +8,15 @@
 
 //! Cross-diagram links between `ObjectRef` endpoints.
 //!
-//! Status tracks dangling endpoints after deletes/replaces so agents can treat them as TODOs.
+//! An xref is a directed edge in session space (not inside a single diagram AST). Status tracks
+//! dangling endpoints after deletes/replaces so agents can treat broken links as TODOs.
 
 use std::fmt;
 use std::str::FromStr;
 
 use super::object_ref::ObjectRef;
 
-/// Cross-diagram link between two [`ObjectRef`]s (see `docs/protocol-01.md` §4).
+/// Directed link between two [`ObjectRef`] endpoints with free-form kind and optional label.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct XRef {
     from: ObjectRef,
@@ -26,6 +27,7 @@ pub struct XRef {
 }
 
 impl XRef {
+    /// Build with empty label; status is usually recomputed via [`XRefStatus::from_flags`].
     pub fn new(
         from: ObjectRef,
         to: ObjectRef,
@@ -35,45 +37,57 @@ impl XRef {
         Self { from, to, kind: kind.into(), label: None, status }
     }
 
+    /// Source endpoint.
     pub fn from(&self) -> &ObjectRef {
         &self.from
     }
 
+    /// Target endpoint.
     pub fn to(&self) -> &ObjectRef {
         &self.to
     }
 
+    /// Free-form relation kind (protocol does not enumerate values).
     pub fn kind(&self) -> &str {
         &self.kind
     }
 
+    /// Optional human-readable label.
     pub fn label(&self) -> Option<&str> {
         self.label.as_deref()
     }
 
+    /// Current endpoint liveness status.
     pub fn status(&self) -> XRefStatus {
         self.status
     }
 
+    /// Set or clear the display label.
     pub fn set_label(&mut self, label: Option<String>) {
         self.label = label;
     }
 
+    /// Update dangling status after session mutation or revalidation.
     pub fn set_status(&mut self, status: XRefStatus) {
         self.status = status;
     }
 }
 
-/// XRef endpoint resolution status (see `docs/protocol-01.md` §4.2).
+/// Endpoint resolution status for an [`XRef`] (`ok` / `dangling_*` wire strings).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum XRefStatus {
+    /// Both endpoints resolve via [`Session::object_ref_exists`](crate::model::Session::object_ref_exists).
     Ok,
+    /// Only the `from` endpoint is missing.
     DanglingFrom,
+    /// Only the `to` endpoint is missing.
     DanglingTo,
+    /// Both endpoints are missing.
     DanglingBoth,
 }
 
 impl XRefStatus {
+    /// Map independent endpoint-missing flags to a status variant.
     pub fn from_flags(from_dangling: bool, to_dangling: bool) -> Self {
         match (from_dangling, to_dangling) {
             (false, false) => Self::Ok,
@@ -83,10 +97,12 @@ impl XRefStatus {
         }
     }
 
+    /// True when either endpoint is missing.
     pub fn is_dangling(self) -> bool {
         self != Self::Ok
     }
 
+    /// Protocol wire string (`ok`, `dangling_from`, …).
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Ok => "ok",
@@ -103,6 +119,7 @@ impl fmt::Display for XRefStatus {
     }
 }
 
+/// Unknown [`XRefStatus`] wire token.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseXRefStatusError;
 

@@ -7,14 +7,22 @@
 // Unauthorized copying, modification, or distribution is prohibited.
 
 //! Validation rules for Mermaid node and participant identifiers.
+//!
+//! Allowed: non-empty ASCII alphanumeric + `_`, no whitespace or `/` (slash would break
+//! `ObjectRef` composition when ids are embedded in paths).
 
 use std::fmt;
 
+/// Why a Mermaid identifier was rejected during parse or export.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MermaidIdentError {
+    /// Empty token.
     Empty,
+    /// Contained whitespace.
     ContainsWhitespace,
+    /// Contained `/` (unsafe for path-like ids).
     ContainsSlash,
+    /// Character outside `[A-Za-z0-9_]`.
     InvalidChar { ch: char },
 }
 

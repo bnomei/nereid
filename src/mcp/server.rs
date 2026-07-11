@@ -41,6 +41,7 @@ mod xref;
 
 const DELTA_HISTORY_LIMIT: usize = 64;
 
+/// Ring-buffer entry for diagram apply deltas (`diagram_get_delta`).
 #[derive(Debug, Clone)]
 struct LastDelta {
     from_rev: u64,
@@ -49,6 +50,7 @@ struct LastDelta {
     diagram_metadata_updated: bool,
 }
 
+/// Compact walkthrough change sets for delta history.
 #[derive(Debug, Clone, Default)]
 struct WalkthroughDelta {
     added: BTreeSet<String>,
@@ -56,6 +58,7 @@ struct WalkthroughDelta {
     updated: BTreeSet<String>,
 }
 
+/// Ring-buffer entry for walkthrough apply deltas.
 #[derive(Debug, Clone)]
 struct WalkthroughLastDelta {
     from_rev: u64,
@@ -63,6 +66,7 @@ struct WalkthroughLastDelta {
     delta: WalkthroughDelta,
 }
 
+/// In-memory session plus bounded delta histories under the MCP mutex.
 #[derive(Debug)]
 struct McpState {
     session: Session,
@@ -96,6 +100,7 @@ impl NereidMcp {
         Self::new_with_agent_highlights(session, Arc::new(Mutex::new(BTreeSet::new())))
     }
 
+    /// In-memory MCP with a shared agent highlight set (TUI co-host without folder).
     pub fn new_with_agent_highlights(
         session: Session,
         agent_highlights: Arc<Mutex<BTreeSet<ObjectRef>>>,
@@ -103,6 +108,7 @@ impl NereidMcp {
         Self::new_with_agent_highlights_and_ui_state(session, agent_highlights, None)
     }
 
+    /// In-memory MCP with agent highlight and optional shared UiState.
     pub fn new_with_agent_highlights_and_ui_state(
         session: Session,
         agent_highlights: Arc<Mutex<BTreeSet<ObjectRef>>>,
@@ -121,7 +127,7 @@ impl NereidMcp {
         }
     }
 
-    /// MCP server that persists session mutations through a [`SessionFolder`].
+    /// MCP server that persists session mutations through a session folder.
     pub fn new_persistent(session: Session, session_folder: SessionFolder) -> Self {
         Self::new_persistent_with_agent_highlights(
             session,
@@ -130,6 +136,7 @@ impl NereidMcp {
         )
     }
 
+    /// Persistent MCP with shared agent highlight (stdio or HTTP without TUI UiState).
     pub fn new_persistent_with_agent_highlights(
         session: Session,
         session_folder: SessionFolder,
@@ -143,6 +150,7 @@ impl NereidMcp {
         )
     }
 
+    /// Full co-host: session folder, agent highlight, and live TUI UiState.
     pub fn new_persistent_with_agent_highlights_and_ui_state(
         session: Session,
         session_folder: SessionFolder,
