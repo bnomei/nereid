@@ -1522,7 +1522,7 @@ fn remove_message_records_synthetic_main_section_in_delta_added() {
     let DiagramAst::Sequence(ast) = diagram.ast() else { panic!("sequence") };
     assert_eq!(ast.blocks()[0].sections().len(), 1);
     assert_eq!(ast.blocks()[0].sections()[0].section_id(), &synthetic_main);
-    assert_eq!(ast.blocks()[0].sections()[0].message_ids(), &[m2.clone()]);
+    assert_eq!(ast.blocks()[0].sections()[0].message_ids(), std::slice::from_ref(&m2));
     export_sequence_diagram(ast).expect("export after synthetic Main recovery");
 }
 
@@ -1605,7 +1605,7 @@ fn remove_message_keeps_single_main_when_nested_and_main_remain() {
     assert_eq!(main_count, 1, "must not synthesize a second Main when Main still has messages");
     assert_eq!(parent.sections().len(), 1);
     assert_eq!(parent.sections()[0].section_id(), &alt_main);
-    assert_eq!(parent.sections()[0].message_ids(), &[m2.clone()]);
+    assert_eq!(parent.sections()[0].message_ids(), std::slice::from_ref(&m2));
     assert_eq!(parent.blocks().len(), 1, "nested block should be preserved");
     export_sequence_diagram(ast).expect("export after remove with nested + non-empty Main");
 }
