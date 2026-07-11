@@ -55,7 +55,7 @@ fn checksum_compute_only_save(session: &Session) -> u64 {
 // Benchmark identity (keep stable):
 // - Group name in this file: `store.save_session`
 // - Case IDs (the string after the `/`) must remain stable across refactors so
-//   results stay comparable over time (e.g. `compute_only_small`, `io_medium_dense`).
+//   results stay comparable over time (e.g. `compute_only_small`, `io_medium`, `io_large`).
 // - If implementations move/deduplicate, update the wiring but do not rename
 //   group or case IDs.
 fn benches_store(c: &mut Criterion) {
@@ -89,6 +89,23 @@ fn benches_store(c: &mut Criterion) {
             |tmp| {
                 let folder = SessionFolder::new(tmp.path());
                 folder.save_session(black_box(&session_medium)).expect("save_session");
+                black_box(std::fs::metadata(folder.meta_path()).expect("meta_path metadata").len())
+            },
+            BatchSize::SmallInput,
+        )
+    });
+
+    let session_large = fixtures::session::fixture(fixtures::session::Case::SessionLarge);
+    let session_large_compute = session_large.clone();
+    group.bench_function("compute_only_large", move |b| {
+        b.iter(|| black_box(checksum_compute_only_save(black_box(&session_large_compute))))
+    });
+    group.bench_function("io_large", move |b| {
+        b.iter_batched_ref(
+            || TempDir::new("store_save_session_io_large"),
+            |tmp| {
+                let folder = SessionFolder::new(tmp.path());
+                folder.save_session(black_box(&session_large)).expect("save_session");
                 black_box(std::fs::metadata(folder.meta_path()).expect("meta_path metadata").len())
             },
             BatchSize::SmallInput,

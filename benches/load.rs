@@ -31,7 +31,7 @@ fn seed_folder(prefix: &str, session: &Session) -> SeededFolder {
 // Benchmark identity (keep stable):
 // - Group name in this file: `store.load_session`
 // - Case IDs (the string after the `/`) must remain stable across refactors so
-//   results stay comparable over time (e.g. `small`, `medium`).
+//   results stay comparable over time (e.g. `small`, `medium`, `large`).
 // - If implementations move/deduplicate, update the wiring but do not rename
 //   group or case IDs.
 fn benches_load(c: &mut Criterion) {
@@ -55,6 +55,17 @@ fn benches_load(c: &mut Criterion) {
     group.bench_function("medium", move |b| {
         b.iter(|| {
             let loaded = seeded_medium.folder.load_session().expect("load_session");
+            black_box(fixtures::checksum_session(black_box(&loaded)))
+        })
+    });
+
+    let session_large = fixtures::session::fixture(fixtures::session::Case::SessionLarge);
+    let diagrams_large = session_large.diagrams().len() as u64;
+    let seeded_large = seed_folder("store_load_session_large", &session_large);
+    group.throughput(Throughput::Elements(diagrams_large));
+    group.bench_function("large", move |b| {
+        b.iter(|| {
+            let loaded = seeded_large.folder.load_session().expect("load_session");
             black_box(fixtures::checksum_session(black_box(&loaded)))
         })
     });

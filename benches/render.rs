@@ -8,13 +8,16 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use nereid::layout::{flowchart::layout_flowchart, sequence::layout_sequence};
+use nereid::model::{Diagram, DiagramAst, DiagramId};
+use nereid::render::render_diagram_unicode_annotated;
 use nereid::render::{flowchart::render_flowchart_unicode, sequence::render_sequence_unicode};
 
 mod fixtures;
 mod profiler;
 
 // Benchmark identity (keep stable):
-// - Group names in this file: `render.sequence`, `render.flow`
+// - Group names in this file: `render.sequence`, `render.flow`, `render.annotated`,
+//   `render.class_er`, `render.gantt`
 // - Case IDs (the string after the `/`) must remain stable across refactors so
 //   results stay comparable over time (e.g. `small`, `medium_dense`, `large_long_labels`).
 // - If implementations move/deduplicate, update the wiring but do not rename
@@ -80,6 +83,100 @@ fn benches_render(c: &mut Criterion) {
             })
         });
     }
+    group.finish();
+
+    let mut group = c.benchmark_group("render.annotated");
+    let annotated_flow = Diagram::new(
+        DiagramId::new("bench:render:annotated-flow").expect("diagram id"),
+        "Annotated Flow",
+        DiagramAst::Flowchart(fixtures::flow::fixture(fixtures::flow::Case::MediumDense)),
+    );
+    group.bench_function("flow_medium_dense", move |b| {
+        b.iter(|| {
+            let rendered = render_diagram_unicode_annotated(black_box(&annotated_flow))
+                .expect("render_diagram_unicode_annotated");
+            black_box(
+                rendered
+                    .text
+                    .len()
+                    .wrapping_add(rendered.highlight_index.values().map(Vec::len).sum::<usize>()),
+            )
+        })
+    });
+    let annotated_sequence = Diagram::new(
+        DiagramId::new("bench:render:annotated-sequence").expect("diagram id"),
+        "Annotated Sequence",
+        DiagramAst::Sequence(fixtures::seq::fixture(fixtures::seq::Case::SelfLoopDense)),
+    );
+    group.bench_function("sequence_self_loop_dense", move |b| {
+        b.iter(|| {
+            let rendered = render_diagram_unicode_annotated(black_box(&annotated_sequence))
+                .expect("render_diagram_unicode_annotated");
+            black_box(
+                rendered
+                    .text
+                    .len()
+                    .wrapping_add(rendered.highlight_index.values().map(Vec::len).sum::<usize>()),
+            )
+        })
+    });
+    group.finish();
+
+    let mut group = c.benchmark_group("render.class_er");
+    let class_diagram = Diagram::new(
+        DiagramId::new("bench:render:class").expect("diagram id"),
+        "Class Cyclic Compartments",
+        fixtures::graph_track::class_cyclic_compartments(),
+    );
+    group.bench_function("class_cyclic_compartments", move |b| {
+        b.iter(|| {
+            let rendered = render_diagram_unicode_annotated(black_box(&class_diagram))
+                .expect("render class diagram");
+            black_box(
+                rendered
+                    .text
+                    .len()
+                    .wrapping_add(rendered.highlight_index.values().map(Vec::len).sum::<usize>()),
+            )
+        })
+    });
+    let er_diagram = Diagram::new(
+        DiagramId::new("bench:render:er").expect("diagram id"),
+        "ER Cyclic Cardinality",
+        fixtures::graph_track::er_cyclic_cardinality(),
+    );
+    group.bench_function("er_cyclic_cardinality", move |b| {
+        b.iter(|| {
+            let rendered = render_diagram_unicode_annotated(black_box(&er_diagram))
+                .expect("render ER diagram");
+            black_box(
+                rendered
+                    .text
+                    .len()
+                    .wrapping_add(rendered.highlight_index.values().map(Vec::len).sum::<usize>()),
+            )
+        })
+    });
+    group.finish();
+
+    let mut group = c.benchmark_group("render.gantt");
+    let gantt_diagram = Diagram::new(
+        DiagramId::new("bench:render:gantt").expect("diagram id"),
+        "Gantt Dependency Dense",
+        fixtures::graph_track::gantt_dependency_dense(),
+    );
+    group.bench_function("dependency_dense", move |b| {
+        b.iter(|| {
+            let rendered = render_diagram_unicode_annotated(black_box(&gantt_diagram))
+                .expect("render gantt diagram");
+            black_box(
+                rendered
+                    .text
+                    .len()
+                    .wrapping_add(rendered.highlight_index.values().map(Vec::len).sum::<usize>()),
+            )
+        })
+    });
     group.finish();
 }
 

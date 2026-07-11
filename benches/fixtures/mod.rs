@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use nereid::format::mermaid::{parse_class_diagram, parse_er_diagram, parse_gantt_diagram};
 use nereid::model::seq_ast::{
     SequenceBlock, SequenceBlockKind, SequenceSection, SequenceSectionKind,
 };
@@ -548,6 +549,90 @@ pub mod seq {
             Case::NestedBlocks => diagram_nested_blocks(case.params()),
             _ => diagram(case.params()),
         }
+    }
+}
+
+/// Deterministic non-flow diagram fixtures for scene-native rendering benchmarks.
+///
+/// These are parsed once during benchmark setup. The measured render path therefore covers the
+/// public AST lowering/layout/paint dispatch without folding Mermaid parsing into its timing.
+pub mod graph_track {
+    use super::*;
+
+    const GRAPH_NODE_COUNT: usize = 64;
+    const GANTT_SECTION_COUNT: usize = 8;
+    const GANTT_TASKS_PER_SECTION: usize = 32;
+
+    fn class_source() -> String {
+        let mut source = String::from("classDiagram\n");
+        for idx in 0..GRAPH_NODE_COUNT {
+            source.push_str(&format!("    Class{idx:03} : field_{idx:03}\n"));
+            source.push_str(&format!("    Class{idx:03} : method_{idx:03}()\n"));
+        }
+        for idx in 0..GRAPH_NODE_COUNT {
+            let next = (idx + 1) % GRAPH_NODE_COUNT;
+            let chord = (idx + 9) % GRAPH_NODE_COUNT;
+            source.push_str(&format!("    Class{idx:03} --> Class{next:03} : ring\n"));
+            source.push_str(&format!("    Class{idx:03} ..> Class{chord:03} : chord\n"));
+        }
+        for idx in (0..GRAPH_NODE_COUNT).step_by(8) {
+            source.push_str(&format!("    Class{idx:03} -- Class{idx:03} : self\n"));
+        }
+        source
+    }
+
+    fn er_source() -> String {
+        let mut source = String::from("erDiagram\n");
+        let cardinalities = [("||", "o{"), ("|o", "|{"), ("}|", "o|"), ("}o", "||")];
+        for idx in 0..GRAPH_NODE_COUNT {
+            let next = (idx + 1) % GRAPH_NODE_COUNT;
+            let chord = (idx + 7) % GRAPH_NODE_COUNT;
+            let (from_card, to_card) = cardinalities[idx % cardinalities.len()];
+            source.push_str(&format!(
+                "    Entity{idx:03} {from_card}--{to_card} Entity{next:03} : ring\n"
+            ));
+            let (from_card, to_card) = cardinalities[(idx + 1) % cardinalities.len()];
+            source.push_str(&format!(
+                "    Entity{idx:03} {from_card}..{to_card} Entity{chord:03} : chord\n"
+            ));
+        }
+        source
+    }
+
+    fn gantt_source() -> String {
+        let mut source = String::from(
+            "gantt\n    title Dependency-dense render benchmark\n    dateFormat YYYY-MM-DD\n",
+        );
+        let mut previous_tag = None::<String>;
+        for section in 0..GANTT_SECTION_COUNT {
+            source.push_str(&format!("    section Section {section:02}\n"));
+            for task in 0..GANTT_TASKS_PER_SECTION {
+                let index = section * GANTT_TASKS_PER_SECTION + task;
+                let tag = format!("t{index:03}");
+                if let Some(previous_tag) = &previous_tag {
+                    source.push_str(&format!(
+                        "    Task {index:03} : {tag}, after {previous_tag}, {}d\n",
+                        (index % 5) + 1
+                    ));
+                } else {
+                    source.push_str(&format!("    Task {index:03} : {tag}, 2026-01-01, 1d\n"));
+                }
+                previous_tag = Some(tag);
+            }
+        }
+        source
+    }
+
+    pub fn class_cyclic_compartments() -> DiagramAst {
+        DiagramAst::Class(parse_class_diagram(&class_source()).expect("parse class fixture"))
+    }
+
+    pub fn er_cyclic_cardinality() -> DiagramAst {
+        DiagramAst::Er(parse_er_diagram(&er_source()).expect("parse ER fixture"))
+    }
+
+    pub fn gantt_dependency_dense() -> DiagramAst {
+        DiagramAst::Gantt(parse_gantt_diagram(&gantt_source()).expect("parse gantt fixture"))
     }
 }
 

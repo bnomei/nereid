@@ -129,6 +129,34 @@ fn benches_scenario(c: &mut Criterion) {
             BatchSize::LargeInput,
         )
     });
+
+    let session_large_existing = fixtures::session::fixture(fixtures::session::Case::SessionLarge);
+    let touch_large_a = touch_first_flow_node_spec(&session_large_existing, "TouchedA");
+    let touch_large_b = touch_first_flow_node_spec(&session_large_existing, "TouchedB");
+    group.bench_function("session_large_touch_1_existing_folder", move |b| {
+        b.iter_batched_ref(
+            || {
+                let input = PersistEditInput {
+                    session: session_large_existing.clone(),
+                    tmp: TempDir::new(
+                        "scenario_persist_edit_session_large_touch_1_existing_folder",
+                    ),
+                    flip: false,
+                };
+
+                let folder = SessionFolder::new(input.tmp.path());
+                folder.save_session(black_box(&input.session)).expect("save_session");
+
+                input
+            },
+            |input| {
+                let touch = if input.flip { &touch_large_a } else { &touch_large_b };
+                input.flip = !input.flip;
+                black_box(checksum_persist_edit(input, touch))
+            },
+            BatchSize::LargeInput,
+        )
+    });
     group.finish();
 }
 
